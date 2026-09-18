@@ -835,6 +835,13 @@ h3 {
   gap: 10px;
 }
 
+/* 教师端成绩视图：页头工具条（组织筛选 + 刷新） */
+.student-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .approval-actions {
   display: inline-flex;
   align-items: center;
