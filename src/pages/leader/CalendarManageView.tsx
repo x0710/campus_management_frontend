@@ -2,9 +2,9 @@
  * 领导端：校历管理（校历日历 + 事件增删改）。
  * 复用 useCalendarEvents + CalendarBoard，在其上叠加管理能力：
  * - 工具栏「新增事件」→ POST /api/calendars（权限 calendar.create）；
- * - 右侧卡片详情态「编辑」→ PATCH /api/calendars/{id}（权限 calendar.update）；
- * - 右侧卡片详情态「删除」→ DELETE /api/calendars/{id}（权限 calendar.delete，删除前二次确认）；
- * - 每次保存/删除后失效日历缓存并强制刷新看板与已打开详情（ai 要求 13）。
+ * - 右侧卡片中每个事件详情的「编辑」→ PATCH /api/calendars/{id}（权限 calendar.update）；
+ * - 右侧卡片中每个事件详情的「删除」→ DELETE /api/calendars/{id}（权限 calendar.delete，删除前二次确认）；
+ * - 每次保存/删除后失效日历缓存并强制刷新看板与当日详情（ai 要求 13）。
  */
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   createEvent,
   deleteEvent,
+  getEvent,
   updateEvent,
   type CalendarEventDetail,
   type EventType,
@@ -59,22 +60,17 @@ export default function CalendarManageView() {
     typeFilter,
     setTypeFilter,
     eventsByDay,
-    dayEvents,
     loading,
     error,
     reload,
-    reloadList,
-    detailId,
-    detail,
-    detailLoading,
-    detailError,
-    openDetail,
-    closeDetail,
+    dayDetails,
+    dayDetailsLoading,
+    dayDetailsError,
   } = useCalendarEvents()
 
   const [formModal, setFormModal] = useState<FormModal>(null)
   const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
   const [form] = Form.useForm<EventFormValues>()
 
   /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（ai 要求 9） */
@@ -94,19 +90,22 @@ export default function CalendarManageView() {
 
   // 详情拉取失败（如 404）弹窗提示状态码
   useEffect(() => {
-    if (detailError) showError(detailError)
-  }, [detailError, showError])
+    if (dayDetailsError) showError(dayDetailsError)
+  }, [dayDetailsError, showError])
 
   /** 打开新增弹窗：起止日期默认取当前选中日期（默认值，非业务数据） */
   const openCreate = () => {
     setFormModal({ mode: 'create', defaultDate: value.startOf('day') })
   }
 
-  /** 打开编辑弹窗：重新拉取最新详情后回填表单 */
-  const openEdit = async () => {
-    if (detailId === null) return
-    const full = await openDetail(detailId, true)
-    if (full) setFormModal({ mode: 'edit', event: full })
+  /** 打开编辑弹窗：按事件 id 重新拉取最新详情（绕过缓存）后回填表单 */
+  const openEdit = async (event: CalendarEventDetail) => {
+    try {
+      const full = await getEvent(event.id, true)
+      setFormModal({ mode: 'edit', event: full })
+    } catch (err) {
+      showError(err)
+    }
   }
 
   // 弹窗打开后回填表单初始值（新增用默认日期，编辑用事件详情）
@@ -160,20 +159,17 @@ export default function CalendarManageView() {
     }
   }
 
-  /** 删除当前详情事件 */
-  const removeCurrent = async () => {
-    if (detailId === null) return
-    setDeleting(true)
+  /** 删除指定事件：成功后强制刷新列表与当日详情（ai 要求 13） */
+  const removeEvent = async (id: number) => {
+    setDeletingId(id)
     try {
-      await deleteEvent(detailId)
+      await deleteEvent(id)
       message.success(t('calendar.deleteSuccess'))
-      closeDetail()
-      // 事件已删除：只刷新列表，不再联动刷新已关闭的详情
-      await reloadList(true)
+      await reload(true)
     } catch (err) {
       showError(err)
     } finally {
-      setDeleting(false)
+      setDeletingId(null)
     }
   }
 
@@ -186,15 +182,11 @@ export default function CalendarManageView() {
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
         eventsByDay={eventsByDay}
-        dayEvents={dayEvents}
+        dayDetails={dayDetails}
+        dayDetailsLoading={dayDetailsLoading}
         loading={loading}
         error={error}
         onRefresh={reload}
-        onSelectEvent={(id: number) => void openDetail(id)}
-        onBackToDay={closeDetail}
-        detailId={detailId}
-        detail={detail}
-        detailLoading={detailLoading}
         toolbarExtra={
           <Button
             size="small"
@@ -205,29 +197,28 @@ export default function CalendarManageView() {
             {t('calendar.createEvent')}
           </Button>
         }
-        detailActions={
+        renderEventActions={(event) => (
           <>
             <Tooltip title={t('calendar.editEvent')}>
               <Button
                 size="small"
                 icon={<EditOutlined />}
-                disabled={!detail}
-                onClick={() => void openEdit()}
+                onClick={() => void openEdit(event)}
               />
             </Tooltip>
             <Popconfirm
               title={t('calendar.deleteConfirm')}
               okText={t('common.confirm')}
               cancelText={t('common.cancel')}
-              okButtonProps={{ danger: true, loading: deleting }}
-              onConfirm={() => void removeCurrent()}
+              okButtonProps={{ danger: true, loading: deletingId === event.id }}
+              onConfirm={() => void removeEvent(event.id)}
             >
               <Tooltip title={t('calendar.deleteEvent')}>
-                <Button size="small" danger icon={<DeleteOutlined />} disabled={!detail} />
+                <Button size="small" danger icon={<DeleteOutlined />} />
               </Tooltip>
             </Popconfirm>
           </>
-        }
+        )}
       />
 
       <Modal

@@ -1,7 +1,7 @@
 /**
  * 学生端：校历日历（只读）。
  * 数据与交互全部复用 useCalendarEvents + CalendarBoard：
- * 左侧月历看板、右侧「当日事件」卡片，点击事件在卡片内展示详情。
+ * 左侧月历看板（含相邻月份日期格事件）、右侧选中日期当天全部事件的堆叠详情。
  */
 import { App as AntdApp } from 'antd'
 import { useEffect } from 'react'
@@ -18,24 +18,20 @@ export default function SchoolCalendarView() {
     typeFilter,
     setTypeFilter,
     eventsByDay,
-    dayEvents,
     loading,
     error,
     reload,
-    detailId,
-    detail,
-    detailLoading,
-    detailError,
-    openDetail,
-    closeDetail,
+    dayDetails,
+    dayDetailsLoading,
+    dayDetailsError,
   } = useCalendarEvents()
 
   // 详情拉取失败（如 404）弹窗提示状态码，便于调试（ai 要求 9）
   useEffect(() => {
-    if (detailError) {
-      message.error(detailError === 'network' ? t('common.networkError') : detailError)
+    if (dayDetailsError) {
+      message.error(dayDetailsError === 'network' ? t('common.networkError') : dayDetailsError)
     }
-  }, [detailError, message, t])
+  }, [dayDetailsError, message, t])
 
   return (
     <CalendarBoard
@@ -45,15 +41,11 @@ export default function SchoolCalendarView() {
       typeFilter={typeFilter}
       onTypeFilterChange={setTypeFilter}
       eventsByDay={eventsByDay}
-      dayEvents={dayEvents}
+      dayDetails={dayDetails}
+      dayDetailsLoading={dayDetailsLoading}
       loading={loading}
       error={error}
       onRefresh={reload}
-      onSelectEvent={(id: number) => void openDetail(id)}
-      onBackToDay={closeDetail}
-      detailId={detailId}
-      detail={detail}
-      detailLoading={detailLoading}
     />
   )
 }

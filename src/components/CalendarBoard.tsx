@@ -2,9 +2,10 @@
  * 校历日历看板（学生端 / 领导端共用，纯展示组件）：
  * - 左侧：月历看板，工具栏含「上一月 / 今天 / 下一月 / 月份选择 / 刷新 / 事件类型筛选」，
  *   日期格内按天展示事件条（多日事件逐天展开），超出折叠为「+N」；
- * - 右侧卡片：默认展示「当日事件」列表；点击某条事件后在**卡片内**展示该事件详情
- *   （名称、类型、时间范围、描述、创建时间），不再使用弹窗；
- * - 通过 toolbarExtra（工具栏右侧插槽）与 detailActions（详情态操作插槽）
+ *   相邻月份的日期格同样展示事件（数据层已把查询区间向后多取若干天）；
+ * - 右侧卡片：选中日期后**直接堆叠展示当天全部事件的完整详情**
+ *   （名称、类型、时间范围、描述、创建时间），某天有多个事件时上下堆叠，无需先点事件；
+ * - 通过 toolbarExtra（工具栏右侧插槽）与 renderEventActions（每个事件的操作插槽）
  *   让领导端挂载「新增 / 编辑 / 删除」，学生端不传即为只读；
  * - 数据与详情请求由 useCalendarEvents 提供，本组件只负责渲染与交互。
  * - 明暗主题：颜色取自 CSS 变量与 antd token，随全局主题切换。
@@ -14,7 +15,6 @@ import {
   LeftOutlined,
   ReloadOutlined,
   RightOutlined,
-  RollbackOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -30,7 +30,7 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import type { ReactNode } from 'react'
 import { useMemo } from 'react'
-import type { CalendarEventDetail, CalendarEventInfo, EventType } from '../api/calendars'
+import type { CalendarEventDetail, EventType } from '../api/calendars'
 import { CALENDAR_DAY_KEY, type CalendarTypeFilter, type CalendarEventsByDay } from '../composables/useCalendarEvents'
 import {
   CALENDAR_EVENT_COLOR,
@@ -50,23 +50,17 @@ interface CalendarBoardProps {
   typeFilter: CalendarTypeFilter
   onTypeFilterChange: (value: CalendarTypeFilter) => void
   eventsByDay: CalendarEventsByDay
-  /** 选中日期当天的事件列表 */
-  dayEvents: CalendarEventInfo[]
+  /** 选中日期当天事件的完整详情（多个事件上下堆叠展示） */
+  dayDetails: CalendarEventDetail[]
+  dayDetailsLoading: boolean
   loading: boolean
   error: string | null
   /** 手动刷新（force=true 绕过会话缓存） */
   onRefresh: (force?: boolean) => void
-  /** 点击事件 → 在右侧卡片内展示详情 */
-  onSelectEvent: (id: number) => void
-  /** 详情态返回当日列表 */
-  onBackToDay: () => void
-  detailId: number | null
-  detail: CalendarEventDetail | null
-  detailLoading: boolean
   /** 工具栏右侧插槽（如「新增事件」） */
   toolbarExtra?: ReactNode
-  /** 详情态操作插槽（如「编辑 / 删除」） */
-  detailActions?: ReactNode
+  /** 每个事件的操作插槽（如「编辑 / 删除」），领导端传入，学生端不传即只读 */
+  renderEventActions?: (event: CalendarEventDetail) => ReactNode
 }
 
 export default function CalendarBoard({
@@ -76,31 +70,23 @@ export default function CalendarBoard({
   typeFilter,
   onTypeFilterChange,
   eventsByDay,
-  dayEvents,
+  dayDetails,
+  dayDetailsLoading,
   loading,
   error,
   onRefresh,
-  onSelectEvent,
-  onBackToDay,
-  detailId,
-  detail,
-  detailLoading,
   toolbarExtra,
-  detailActions,
+  renderEventActions,
 }: CalendarBoardProps) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
 
-  const detailMode = detailId !== null
-
   const typeOptions = useMemo(
-    () => [
-      { value: 'all' as CalendarTypeFilter, label: t('calendar.filterAll') },
-      ...CALENDAR_EVENT_TYPES.map((type: EventType) => ({
-        value: type as CalendarTypeFilter,
+    () =>
+      CALENDAR_EVENT_TYPES.map((type: EventType) => ({
+        value: type,
         label: t(`calendar.type_${type}`),
       })),
-    ],
     [t],
   )
 
@@ -178,9 +164,13 @@ export default function CalendarBoard({
             </Tooltip>
             <Select<CalendarTypeFilter>
               size="small"
+              mode="multiple"
               className="calendar-type-filter"
               value={typeFilter}
               options={typeOptions}
+              placeholder={t('calendar.filterPlaceholder')}
+              allowClear
+              maxTagCount="responsive"
               onChange={(v: CalendarTypeFilter) => onTypeFilterChange(v)}
             />
           </div>
@@ -219,51 +209,18 @@ export default function CalendarBoard({
           <header className="panel-card-header">
             <h3 className="panel-card-title">
               <span className="calendar-day-bar" />
-              {detailMode
-                ? t('calendar.detailTitle')
-                : `${t('calendar.dayEvents')} · ${formatDayLabel(value, locale)}`}
+              {`${t('calendar.detailTitle')} · ${formatDayLabel(value, locale)}`}
             </h3>
-            {detailMode ? (
-              <div className="cal-detail-bar-actions">
-                {detailActions}
-                <Tooltip title={t('calendar.backToList')}>
-                  <Button size="small" icon={<RollbackOutlined />} onClick={onBackToDay} />
-                </Tooltip>
-              </div>
-            ) : (
-              <span className="cell-sub">
-                {t('calendar.eventCount', { count: dayEvents.length })}
-              </span>
-            )}
+            <span className="cell-sub">
+              {t('calendar.eventCount', { count: dayDetails.length })}
+            </span>
           </header>
           <div className="panel-card-body">
-            {detailMode ? (
-              detailLoading || !detail ? (
-                <Spin>
-                  <div className="cal-detail-loading">{t('common.loading')}</div>
-                </Spin>
-              ) : (
-                <div className="cal-detail">
-                  <div className="cal-detail-title">{detail.title}</div>
-                  <div className="cal-detail-meta">
-                    <Tag color={CALENDAR_EVENT_COLOR[detail.event_type]}>
-                      {t(`calendar.type_${detail.event_type}`)}
-                    </Tag>
-                  </div>
-                  <dl className="cal-detail-list">
-                    <dt>{t('calendar.fieldRange')}</dt>
-                    <dd>
-                      {formatDateTime(detail.start_date, locale)} ~{' '}
-                      {formatDateTime(detail.end_date, locale)}
-                    </dd>
-                    <dt>{t('calendar.fieldDescription')}</dt>
-                    <dd>{detail.description || t('calendar.noDescription')}</dd>
-                    <dt>{t('calendar.fieldCreatedAt')}</dt>
-                    <dd>{formatDateTime(detail.created_at, locale)}</dd>
-                  </dl>
-                </div>
-              )
-            ) : dayEvents.length === 0 ? (
+            {dayDetailsLoading ? (
+              <Spin>
+                <div className="cal-detail-loading">{t('common.loading')}</div>
+              </Spin>
+            ) : dayDetails.length === 0 ? (
               <div className="cal-day-empty">
                 <span className="cal-day-empty-icon">
                   <CalendarOutlined />
@@ -271,26 +228,31 @@ export default function CalendarBoard({
                 <span className="cal-day-empty-text">{t('calendar.emptyDay')}</span>
               </div>
             ) : (
-              <ul className="cal-day-list">
-                {dayEvents.map((event) => (
-                  <li key={event.id}>
-                    <button
-                      type="button"
-                      className="cal-day-item"
-                      data-type={event.event_type}
-                      onClick={() => onSelectEvent(event.id)}
-                    >
-                      <span className="cal-day-item-title">{event.title}</span>
-                      <span className="cal-day-item-meta">
-                        <Tag color={CALENDAR_EVENT_COLOR[event.event_type]}>
-                          {t(`calendar.type_${event.event_type}`)}
-                        </Tag>
-                        <span className="cell-sub">
-                          {formatDateTime(event.start_date, locale)} ~{' '}
-                          {formatDateTime(event.end_date, locale)}
-                        </span>
-                      </span>
-                    </button>
+              <ul className="cal-detail-stack">
+                {dayDetails.map((event) => (
+                  <li key={event.id} className="cal-detail cal-detail-card" data-type={event.event_type}>
+                    <div className="cal-detail-head">
+                      <span className="cal-detail-title">{event.title}</span>
+                      {renderEventActions && (
+                        <div className="cal-detail-bar-actions">{renderEventActions(event)}</div>
+                      )}
+                    </div>
+                    <div className="cal-detail-meta">
+                      <Tag color={CALENDAR_EVENT_COLOR[event.event_type]}>
+                        {t(`calendar.type_${event.event_type}`)}
+                      </Tag>
+                    </div>
+                    <dl className="cal-detail-list">
+                      <dt>{t('calendar.fieldRange')}</dt>
+                      <dd>
+                        {formatDateTime(event.start_date, locale)} ~{' '}
+                        {formatDateTime(event.end_date, locale)}
+                      </dd>
+                      <dt>{t('calendar.fieldDescription')}</dt>
+                      <dd>{event.description || t('calendar.noDescription')}</dd>
+                      <dt>{t('calendar.fieldCreatedAt')}</dt>
+                      <dd>{formatDateTime(event.created_at, locale)}</dd>
+                    </dl>
                   </li>
                 ))}
               </ul>

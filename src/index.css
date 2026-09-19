@@ -1561,7 +1561,7 @@ h3 {
 }
 
 .calendar-type-filter {
-  width: 110px;
+  min-width: 180px;
 }
 
 /* 日期格内的事件条容器 */
@@ -1716,6 +1716,55 @@ h3 {
   gap: 6px;
 }
 
+/* 当日事件详情堆叠列表：选中日期即展示当天全部事件的完整详情 */
+.cal-detail-stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.cal-detail-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cal-event-bar, #8c8c8c);
+  border-radius: 8px;
+  background: var(--card-bg);
+}
+
+.cal-detail-card[data-type='holiday'] {
+  --cal-event-bar: #2f54eb;
+}
+
+.cal-detail-card[data-type='exam'] {
+  --cal-event-bar: #cf1322;
+}
+
+.cal-detail-card[data-type='activity'] {
+  --cal-event-bar: #389e0d;
+}
+
+.cal-detail-card[data-type='other'] {
+  --cal-event-bar: #8c8c8c;
+}
+
+.cal-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cal-detail-head .cal-detail-title {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .cal-detail {
   display: flex;
   flex-direction: column;
@@ -1767,7 +1816,8 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .cal-day-list {
+  .cal-day-list,
+  .cal-detail-stack {
     max-height: none;
   }
 }
