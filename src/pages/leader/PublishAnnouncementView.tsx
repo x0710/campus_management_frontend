@@ -56,7 +56,7 @@ export default function PublishAnnouncementView() {
     () => (uid === null ? {} : { publisher_id: uid, ...(statusFilter === 'all' ? {} : { status: statusFilter }) }),
     [uid, statusFilter],
   )
-  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
+  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh, reload } =
     usePaginated<AnnouncementListItem, PublishListQuery>(queryAnnouncements, listQuery)
 
   // 初次加载：当前用户（用于按发布人过滤）
@@ -78,11 +78,11 @@ export default function PublishAnnouncementView() {
     }
   }, [])
 
-  // uid / 状态筛选就绪或变化后重新拉列表
+  // uid / 状态筛选就绪或变化后重新拉列表（走会话缓存，不强制绕过；手动刷新按钮才 force）
   useEffect(() => {
-    refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid, statusFilter])
+    if (uid === null) return
+    reload()
+  }, [uid, statusFilter, reload])
 
   // 跳转编辑页：新建无 id，编辑带 id；?from 透传来源模块，便于保存后返回本列表
   const openEditor = useCallback(

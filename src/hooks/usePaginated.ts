@@ -71,5 +71,10 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
     setReloadKey((k) => k + 1)
   }, [])
 
-  return { page, setPage, pageSize, setPageSize, refresh, ...state }
+  /** 重新加载当前查询（走会话缓存，不强制绕过）：用于筛选条件变化、依赖就绪等场景 */
+  const reload = useCallback(() => {
+    setReloadKey((k) => k + 1)
+  }, [])
+
+  return { page, setPage, pageSize, setPageSize, refresh, reload, ...state }
 }

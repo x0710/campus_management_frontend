@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import LoginPage from './pages/LoginPage'
 import AnnouncementDetailPage from './pages/main/AnnouncementDetailPage'
 import AnnouncementEditorPage from './pages/leader/AnnouncementEditorPage'
+import MemberDetailPage from './pages/leader/MemberDetailPage'
 import MainPage from './pages/main/MainPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalWorkspace from './pages/main/PortalWorkspace'
@@ -46,6 +47,8 @@ export default function App() {
           <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
           {/* /portal/:portalKey/announcements/:id：公告详情，沿用同一界面壳与侧栏 */}
           <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
+          {/* 领导端成员详情：从组织概览点击成员进入，沿用同一界面壳与侧栏 */}
+          <Route path="organization-members/:uid" element={<MemberDetailPage />} />
         </Route>
       </Route>
 

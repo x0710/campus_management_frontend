@@ -1,42 +1,60 @@
-import { Alert, Card, Col, Row, Select, Space, Statistic, Table, Tag } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { useMemo, useState } from 'react'
-import { useT } from '../../i18n'
-
 /**
- * 学生端：成绩查询（学期筛选 + 学分/均分/GPA 统计 + 成绩明细）。
- * 注意：当前为【模拟数据预览页】，后端尚无成绩接口。
- * 接口就绪后：把 MOCK_GRADES 替换为 src/api/ 中的请求，表格与统计逻辑无需改动。
+ * 学生端：成绩查询（仅本人成绩）。
+ *
+ * 数据流：当前登录用户 uid（GET /api/credentials/me，会话缓存）
+ *   → GET /api/examinations?uid=本人（分页取满，会话缓存）
+ *   → 课程 ID 批量解析课程名称/学分（useCourseDetails，会话缓存）。
+ *
+ * 范围限制：本页不提供任何 uid 输入，只使用登录态返回的 uid 查询，
+ * 因此学生只能看到本人成绩（后端 /api/examinations 需 examination.select 权限）。
+ *
+ * 交互：学期筛选（选项来自本人成绩数据）、学分/均分/GPA 统计、成绩明细表格
+ * （每页 20 行，支持直接输入页码跳转并显示总页数）、点击行经
+ * GET /api/examinations/{id} 查看该条成绩完整详情（ai 要求 14）。
  */
+/* eslint-disable react/set-state-in-effect */
+import { ReloadOutlined } from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Modal,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import axios from 'axios'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { getCurrentUser } from '../../api/auth'
+import { extractErrorWithStatus } from '../../api/common'
+import {
+  getScore,
+  listAllScoresForUser,
+  type CourseScoreDetail,
+  type CourseScoreInfo,
+  type ExamType,
+} from '../../api/examinations'
+import { useCourseDetails } from '../../composables/useCourseNames'
+import {
+  EXAM_TYPE_COLOR,
+  STUDENT_SCORE_PAGE_SIZE,
+  scoreColor,
+  scoreToGpa,
+} from '../../config/examination'
+import { useT } from '../../i18n'
+import { useSettingsStore } from '../../store/settings'
+import { formatDateTime } from '../../utils/datetime'
 
+/** 成绩状态（由 is_pass 与考试类型推导，对应 i18n grades.status_*） */
 type GradeStatus = 'pass' | 'fail' | 'makeup'
-
-interface MockGrade {
-  id: string
-  term: 'term_1' | 'term_2'
-  /** 对应 i18n 文案 grades.${nameKey} */
-  nameKey: string
-  code: string
-  credit: number
-  score: number
-  gpa: number
-  status: GradeStatus
-}
-
-const MOCK_GRADES: MockGrade[] = [
-  // 2024-2025 第二学期
-  { id: 'g1', term: 'term_2', nameKey: 'course_math', code: 'MATH101', credit: 5, score: 92, gpa: 4.0, status: 'pass' },
-  { id: 'g2', term: 'term_2', nameKey: 'course_english', code: 'ENG101', credit: 4, score: 85, gpa: 3.7, status: 'pass' },
-  { id: 'g3', term: 'term_2', nameKey: 'course_pe', code: 'PE101', credit: 1, score: 78, gpa: 3.0, status: 'pass' },
-  { id: 'g4', term: 'term_2', nameKey: 'course_history', code: 'HIST101', credit: 2, score: 88, gpa: 3.7, status: 'pass' },
-  // 2025-2026 第一学期
-  { id: 'g5', term: 'term_1', nameKey: 'course_data', code: 'CS201', credit: 4, score: 91, gpa: 4.0, status: 'pass' },
-  { id: 'g6', term: 'term_1', nameKey: 'course_english', code: 'ENG201', credit: 4, score: 82, gpa: 3.3, status: 'pass' },
-  { id: 'g7', term: 'term_1', nameKey: 'course_politics', code: 'POL102', credit: 3, score: 76, gpa: 2.7, status: 'pass' },
-  { id: 'g8', term: 'term_1', nameKey: 'course_program', code: 'CS202', credit: 2, score: 89, gpa: 3.7, status: 'pass' },
-  // 物理期末不及格，补考通过（成绩与绩点按补考记载）
-  { id: 'g9', term: 'term_1', nameKey: 'course_physics', code: 'PHY101', credit: 4, score: 58, gpa: 0, status: 'fail' },
-]
 
 const STATUS_COLOR: Record<GradeStatus, string> = {
   pass: 'green',
@@ -44,51 +62,184 @@ const STATUS_COLOR: Record<GradeStatus, string> = {
   makeup: 'orange',
 }
 
+/** 由后端字段推导展示状态：补考/重修且及格记为「补考通过」 */
+function toStatus(record: CourseScoreInfo): GradeStatus {
+  if (!record.is_pass) return 'fail'
+  return record.exam_type === 'makeup' || record.exam_type === 'retake' ? 'makeup' : 'pass'
+}
+
 export default function GradesView() {
   const t = useT()
-  const [term, setTerm] = useState<'all' | 'term_1' | 'term_2'>('all')
+  const locale = useSettingsStore((s) => s.locale)
+
+  const [scores, setScores] = useState<CourseScoreInfo[]>([])
+  const [loading, setLoading] = useState(true)
+  // 错误信息保留后端状态码，便于调试（如 "403 Forbidden"、"404 Not Found"）
+  const [error, setError] = useState<string | null>(null)
+  const [semester, setSemester] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  // 重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
+  const [reload, setReload] = useState<{ seq: number; force: boolean }>({
+    seq: 0,
+    force: false,
+  })
+
+  // ---- 单条成绩详情弹窗 ----
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detail, setDetail] = useState<CourseScoreDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
+  const errorText = useCallback(
+    (code: string) =>
+      code === 'network'
+        ? t('common.networkError')
+        : code === 'failed'
+          ? t('common.loadFailed')
+          : code,
+    [t],
+  )
+
+  // ============ 本人成绩加载 ============
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // 只使用登录态 uid 查询，学生无法指定他人
+      const me = await getCurrentUser()
+      setScores(await listAllScoresForUser(me.uid, reload.force))
+    } catch (err) {
+      // 401 由全局拦截器处理，这里不重复提示
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        setError(extractErrorWithStatus(err))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [reload.seq, reload.force]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // 学期筛选选项来自本人成绩数据（非硬编码学期）
+  const semesterOptions = useMemo(() => {
+    const values = [...new Set(scores.map((s) => s.semester))].sort()
+    return [
+      { value: 'all', label: t('grades.termAll') },
+      ...values.map((v) => ({ value: v, label: v })),
+    ]
+  }, [scores, t])
+
+  // 刷新后所选学期已不存在时按「全部学期」处理（派生值，避免额外副作用）
+  const activeSemester =
+    semester !== 'all' && !scores.some((s) => s.semester === semester) ? 'all' : semester
 
   const filtered = useMemo(
-    () => (term === 'all' ? MOCK_GRADES : MOCK_GRADES.filter((g) => g.term === term)),
-    [term],
+    () =>
+      activeSemester === 'all'
+        ? scores
+        : scores.filter((s) => s.semester === activeSemester),
+    [scores, activeSemester],
+  )
+
+  // 批量解析课程名称/学分（走会话缓存）
+  const courseDetails = useCourseDetails(
+    useMemo(() => scores.map((s) => s.course_id), [scores]),
   )
 
   // 学分：不及格不计已修学分；均分：全部修读记录的算术平均；
   // GPA：仅对获得学分的课程（通过/补考通过）做学分加权
   const stats = useMemo(() => {
-    const passed = filtered.filter((g) => g.status !== 'fail')
-    const credits = passed.reduce((sum, g) => sum + g.credit, 0)
-    const average =
-      filtered.length > 0
-        ? filtered.reduce((sum, g) => sum + g.score, 0) / filtered.length
-        : 0
-    const gpa =
-      credits > 0
-        ? passed.reduce((sum, g) => sum + g.gpa * g.credit, 0) / credits
-        : 0
-    return { credits, average, gpa }
-  }, [filtered])
+    let credits = 0
+    let scoreSum = 0
+    let gpaWeighted = 0
+    let gpaCredits = 0
+    for (const s of filtered) {
+      const value = Number(s.score)
+      const credit = Number(courseDetails.get(s.course_id)?.credit ?? 0) || 0
+      if (Number.isFinite(value)) scoreSum += value
+      if (s.is_pass) {
+        credits += credit
+        gpaCredits += credit
+        gpaWeighted += scoreToGpa(value) * credit
+      }
+    }
+    return {
+      credits,
+      average: filtered.length > 0 ? scoreSum / filtered.length : 0,
+      gpa: gpaCredits > 0 ? gpaWeighted / gpaCredits : 0,
+    }
+  }, [filtered, courseDetails])
 
-  const columns = useMemo<ColumnsType<MockGrade>>(
+  // ============ 单条成绩详情 ============
+  const openDetail = useCallback(
+    async (id: number) => {
+      setDetailOpen(true)
+      setDetail(null)
+      setDetailError(null)
+      setDetailLoading(true)
+      try {
+        setDetail(await getScore(id))
+      } catch (err) {
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+          setDetailError(extractErrorWithStatus(err))
+        }
+      } finally {
+        setDetailLoading(false)
+      }
+    },
+    [],
+  )
+
+  // ============ 列定义 ============
+  const columns = useMemo<ColumnsType<CourseScoreInfo>>(
     () => [
       {
         title: t('grades.colCourse'),
-        dataIndex: 'nameKey',
-        key: 'course',
-        render: (nameKey: string) => t(`grades.${nameKey}`),
+        dataIndex: 'course_id',
+        key: 'course_id',
+        ellipsis: true,
+        render: (id: number) =>
+          courseDetails.has(id)
+            ? (
+                <span title={courseDetails.get(id)?.course_name ?? undefined}>
+                  {courseDetails.get(id)?.course_name ?? `#${id}`}
+                </span>
+              )
+            : t('common.loading'),
       },
       {
         title: t('grades.colCode'),
-        dataIndex: 'code',
+        dataIndex: 'course_id',
         key: 'code',
         width: 130,
+        render: (id: number) => courseDetails.get(id)?.course_code || '—',
+      },
+      {
+        title: t('grades.colSemester'),
+        dataIndex: 'semester',
+        key: 'semester',
+        width: 180,
+        render: (v: string) => <span title={v}>{v}</span>,
+      },
+      {
+        title: t('grades.colExamType'),
+        dataIndex: 'exam_type',
+        key: 'exam_type',
+        width: 110,
+        align: 'center',
+        render: (v: ExamType) => (
+          <Tag color={EXAM_TYPE_COLOR[v]}>{t(`teacherGrades.examType_${v}`)}</Tag>
+        ),
       },
       {
         title: t('grades.colCredit'),
-        dataIndex: 'credit',
+        dataIndex: 'course_id',
         key: 'credit',
         width: 90,
         align: 'center',
+        render: (id: number) => courseDetails.get(id)?.credit ?? '—',
       },
       {
         title: t('grades.colScore'),
@@ -96,83 +247,194 @@ export default function GradesView() {
         key: 'score',
         width: 100,
         align: 'center',
-        render: (score: number) => (
-          <span style={{ fontWeight: 600, color: score < 60 ? '#cf1322' : score >= 90 ? '#389e0d' : undefined }}>
-            {score}
-          </span>
+        render: (v: string, record) => (
+          <span style={{ fontWeight: 600, color: scoreColor(v, record.is_pass) }}>{v}</span>
         ),
       },
       {
         title: t('grades.colGpa'),
-        dataIndex: 'gpa',
+        dataIndex: 'score',
         key: 'gpa',
         width: 90,
         align: 'center',
-        render: (gpa: number) => gpa.toFixed(1),
+        render: (v: string, record) =>
+          record.is_pass ? scoreToGpa(Number(v)).toFixed(1) : '—',
       },
       {
         title: t('grades.colStatus'),
-        dataIndex: 'status',
         key: 'status',
         width: 120,
         align: 'center',
-        render: (status: GradeStatus) => (
-          <Tag color={STATUS_COLOR[status]}>{t(`grades.status_${status}`)}</Tag>
-        ),
+        render: (_, record) => {
+          const status = toStatus(record)
+          return <Tag color={STATUS_COLOR[status]}>{t(`grades.status_${status}`)}</Tag>
+        },
       },
     ],
-    [t],
+    [t, courseDetails],
   )
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / STUDENT_SCORE_PAGE_SIZE))
 
   return (
     <div className="student-view">
+      <Alert type="info" showIcon title={t('grades.scopeHint')} />
+
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('grades.title')}</h3>
-          <Select
-            size="small"
-            value={term}
-            onChange={setTerm}
-            style={{ width: 220 }}
-            options={[
-              { value: 'all', label: t('grades.termAll') },
-              { value: 'term_1', label: t('grades.term_1') },
-              { value: 'term_2', label: t('grades.term_2') },
-            ]}
-          />
+          <div className="student-toolbar">
+            <Tooltip title={t('grades.semesterFilterHint')}>
+              <Select
+                size="small"
+                value={activeSemester}
+                onChange={(v: string) => {
+                  setSemester(v)
+                  setPage(1)
+                }}
+                style={{ width: 220 }}
+                options={semesterOptions}
+              />
+            </Tooltip>
+            <Tooltip title={t('grades.refreshHint')}>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+                loading={loading}
+              >
+                {t('common.refresh')}
+              </Button>
+            </Tooltip>
+          </div>
         </header>
         <div className="panel-card-body">
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Alert type="warning" showIcon title={t('common.mockHint')} />
-
-            <Row gutter={16}>
-              <Col xs={24} sm={8}>
-                <Card size="small">
-                  <Statistic title={t('grades.statCredits')} value={stats.credits} suffix="" />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Card size="small">
-                  <Statistic title={t('grades.statAverage')} value={stats.average} precision={1} />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Card size="small">
-                  <Statistic title={t('grades.statGpa')} value={stats.gpa} precision={2} />
-                </Card>
-              </Col>
-            </Row>
-
-            <Table<MockGrade>
-              rowKey="id"
-              columns={columns}
-              dataSource={filtered}
-              pagination={false}
-              scroll={{ x: 640 }}
+          {error ? (
+            <Alert
+              type="error"
+              showIcon
+              title={errorText(error)}
+              action={
+                <Button
+                  size="small"
+                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+                >
+                  {t('common.retry')}
+                </Button>
+              }
             />
-          </Space>
+          ) : (
+            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+              <Row gutter={16}>
+                <Col xs={24} sm={8}>
+                  <Card size="small">
+                    <Statistic title={t('grades.statCredits')} value={stats.credits} />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card size="small">
+                    <Statistic title={t('grades.statAverage')} value={stats.average} precision={1} />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card size="small">
+                    <Statistic title={t('grades.statGpa')} value={stats.gpa} precision={2} />
+                  </Card>
+                </Col>
+              </Row>
+
+              <Table<CourseScoreInfo>
+                rowKey="id"
+                loading={loading}
+                columns={columns}
+                dataSource={filtered}
+                locale={{ emptyText: t('common.noData') }}
+                scroll={{ x: 900 }}
+                onRow={(record: CourseScoreInfo) => ({
+                  onClick: () => void openDetail(record.id),
+                  title: t('grades.rowClickHint'),
+                  style: { cursor: 'pointer' },
+                })}
+                pagination={{
+                  current: page,
+                  pageSize: STUDENT_SCORE_PAGE_SIZE,
+                  total: filtered.length,
+                  showSizeChanger: false,
+                  showQuickJumper: true,
+                  showTotal: (n: number) =>
+                    `${t('common.total')} ${n} ${t('common.items')}，${t('grades.totalPages', { n: totalPages })}`,
+                  onChange: (p: number) => setPage(p),
+                }}
+              />
+            </Space>
+          )}
         </div>
       </section>
+
+      {/* 单条成绩详情 */}
+      <Modal
+        open={detailOpen}
+        title={t('grades.detailTitle')}
+        footer={<Button onClick={() => setDetailOpen(false)}>{t('common.close')}</Button>}
+        onCancel={() => setDetailOpen(false)}
+        destroyOnHidden
+      >
+        {detailError ? (
+          <Alert type="error" showIcon title={errorText(detailError)} />
+        ) : (
+          <Spin spinning={detailLoading}>
+            <Descriptions
+              bordered
+              column={1}
+              size="small"
+              items={[
+                {
+                  key: 'course',
+                  label: t('grades.colCourse'),
+                  children: detail
+                    ? (courseDetails.get(detail.course_id)?.course_name ??
+                      `#${detail.course_id}`)
+                    : '—',
+                },
+                {
+                  key: 'semester',
+                  label: t('grades.colSemester'),
+                  children: detail?.semester ?? '—',
+                },
+                {
+                  key: 'exam_type',
+                  label: t('grades.colExamType'),
+                  children: detail ? t(`teacherGrades.examType_${detail.exam_type}`) : '—',
+                },
+                {
+                  key: 'score',
+                  label: t('grades.colScore'),
+                  children: detail?.score ?? '—',
+                },
+                {
+                  key: 'status',
+                  label: t('grades.colStatus'),
+                  children: detail ? t(`grades.status_${toStatus(detail)}`) : '—',
+                },
+                {
+                  key: 'remark',
+                  label: t('grades.remark'),
+                  children: detail?.remark || '—',
+                },
+                {
+                  key: 'created_at',
+                  label: t('grades.createdAt'),
+                  children: detail ? formatDateTime(detail.created_at, locale) : '—',
+                },
+                {
+                  key: 'updated_at',
+                  label: t('grades.updatedAt'),
+                  children: detail ? formatDateTime(detail.updated_at, locale) : '—',
+                },
+              ]}
+            />
+          </Spin>
+        )}
+      </Modal>
     </div>
   )
 }

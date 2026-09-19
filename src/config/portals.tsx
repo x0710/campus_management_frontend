@@ -67,11 +67,11 @@ export const PORTALS: PortalDef[] = [
     gradient: 'linear-gradient(135deg, #2f54eb 0%, #597ef7 100%)',
     accent: '#2f54eb',
     modules: [
+      { key: 'student_m5', status: 'ready', icon: <UserOutlined /> },
       { key: 'student_m1', status: 'preview', icon: <ScheduleOutlined /> },
       { key: 'student_m2', status: 'ready', icon: <FormOutlined /> },
-      { key: 'student_m3', status: 'preview', icon: <TrophyOutlined /> },
+      { key: 'student_m3', status: 'ready', icon: <TrophyOutlined /> },
       { key: 'student_m4', status: 'ready', icon: <BellOutlined /> },
-      { key: 'student_m5', status: 'ready', icon: <UserOutlined /> },
       { key: 'student_m6', status: 'preview', icon: <HeartOutlined /> },
       { key: 'student_m7', status: 'preview', icon: <StarOutlined /> },
       { key: 'student_m8', status: 'ready', icon: <CalendarOutlined /> },
@@ -98,7 +98,7 @@ export const PORTALS: PortalDef[] = [
     modules: [
       { key: 'leader_m1', status: 'planned', icon: <AuditOutlined /> },
       { key: 'leader_m2', status: 'planned', icon: <LineChartOutlined /> },
-      { key: 'leader_m3', status: 'planned', icon: <ApartmentOutlined /> },
+      { key: 'leader_m3', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'leader_m4', status: 'ready', icon: <BellOutlined /> },
       { key: 'leader_m5', status: 'ready', icon: <CalendarOutlined /> },
       { key: 'leader_m6', status: 'ready', icon: <ReadOutlined /> },

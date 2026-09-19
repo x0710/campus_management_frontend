@@ -65,7 +65,9 @@ export default function PortalWorkspace() {
       return undefined
     }
     const third = segments[2]
-    if (third === 'announcements') {
+    // 详情类子路由（公告详情/编辑、成员详情）不在模块列表中，
+    // 通过 ?from=<moduleKey> 让侧栏仍高亮来源模块
+    if (third === 'announcements' || third === 'organization-members') {
       const from = new URLSearchParams(location.search).get('from')
       if (from && [...readyModules, ...previewModules].some((m) => m.key === from)) return from
       return undefined
