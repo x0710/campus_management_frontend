@@ -10,6 +10,9 @@
   --page-bg: #f5f7fb;
   --card-bg: #ffffff;
   --header-bg: #ffffff;
+  /* 富文本写作区：与卡片底色刻意区分，形成"输入槽"观感 */
+  --editor-bg: #f6f8fc;
+  --editor-line: #d9dfef;
 }
 
 :root[data-theme='dark'] {
@@ -19,6 +22,8 @@
   --page-bg: #10121a;
   --card-bg: #1a1d28;
   --header-bg: #171a23;
+  --editor-bg: #12141d;
+  --editor-line: #3a3f52;
 }
 
 * {
@@ -1168,7 +1173,7 @@ h3 {
 
 /* ========== Markdown 编辑器 ========== */
 .md-editor {
-  border: 1px solid var(--line);
+  border: 1px solid var(--editor-line);
   border-radius: 8px;
   overflow: hidden;
   background: var(--card-bg);
@@ -1181,8 +1186,8 @@ h3 {
   gap: 8px;
   flex-wrap: wrap;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(127, 127, 127, 0.04);
+  border-bottom: 1px solid var(--editor-line);
+  background: var(--card-bg);
 }
 
 .md-toolbar-group {
@@ -1221,48 +1226,146 @@ h3 {
   line-height: 1;
 }
 
-.md-editor-body {
-  display: grid;
-  grid-template-columns: 1fr;
-  min-height: 160px;
+/* 工具栏激活态（当前光标所在处已应用该格式） */
+.md-toolbar-btn.is-active {
+  color: var(--brand);
+  background: rgba(47, 84, 235, 0.1);
+  border-color: var(--brand-light);
 }
 
-.md-editor-split .md-editor-body {
-  grid-template-columns: 1fr 1fr;
+/* 字数统计 */
+.md-editor-count {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--ink-secondary);
+  white-space: nowrap;
 }
 
-.md-editor-textarea {
-  border: none !important;
-  border-radius: 0 !important;
+/* ========== 所见即所得正文区 ========== */
+/* 不设固定高度/内部滚动条：正文随内容自适应撑开，由整个页面滚动，尽量多展示内容 */
+.md-editor-rich-body .tiptap {
+  min-height: 320px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+  /* 与面板卡片底色区分开，明确"这里可以写字" */
+  background: var(--editor-bg);
+  outline: none;
+}
+
+/* 空内容占位提示 */
+.md-editor-rich-body .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--ink-secondary);
+  pointer-events: none;
+}
+
+/* 正文排版（与只读 MarkdownView 的观感保持一致） */
+.md-editor-rich-body .tiptap > *:first-child {
+  margin-top: 0;
+}
+
+.md-editor-rich-body .tiptap > *:last-child {
+  margin-bottom: 0;
+}
+
+.md-editor-rich-body .tiptap h1,
+.md-editor-rich-body .tiptap h2,
+.md-editor-rich-body .tiptap h3,
+.md-editor-rich-body .tiptap h4,
+.md-editor-rich-body .tiptap h5,
+.md-editor-rich-body .tiptap h6 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.md-editor-rich-body .tiptap h1 {
+  font-size: 24px;
+}
+.md-editor-rich-body .tiptap h2 {
+  font-size: 21px;
+}
+.md-editor-rich-body .tiptap h3 {
+  font-size: 18px;
+}
+.md-editor-rich-body .tiptap h4 {
+  font-size: 16px;
+}
+.md-editor-rich-body .tiptap h5 {
+  font-size: 15px;
+}
+.md-editor-rich-body .tiptap h6 {
+  font-size: 14px;
+}
+
+.md-editor-rich-body .tiptap p {
+  margin: 0 0 8px;
+}
+
+.md-editor-rich-body .tiptap ul,
+.md-editor-rich-body .tiptap ol {
+  margin: 0 0 8px;
+  padding-left: 24px;
+}
+
+.md-editor-rich-body .tiptap ul[data-type='taskList'] {
+  padding-left: 4px;
+  list-style: none;
+}
+
+.md-editor-rich-body .tiptap ul[data-type='taskList'] li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.md-editor-rich-body .tiptap ul[data-type='taskList'] li > label {
+  margin-top: 3px;
+}
+
+.md-editor-rich-body .tiptap blockquote {
+  margin: 0 0 8px;
+  padding: 4px 12px;
+  color: var(--ink-secondary);
+  background: rgba(127, 127, 127, 0.06);
+  border-left: 3px solid var(--brand-light);
+  border-radius: 0 6px 6px 0;
+}
+
+.md-editor-rich-body .tiptap code {
+  padding: 2px 6px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 13px;
-  line-height: 1.7;
+  background: rgba(127, 127, 127, 0.14);
+  border-radius: 4px;
 }
 
-.md-editor-split .md-editor-textarea {
-  border-right: 1px solid var(--line) !important;
+.md-editor-rich-body .tiptap pre {
+  margin: 0 0 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  background: rgba(127, 127, 127, 0.1);
+  border-radius: 8px;
 }
 
-.md-editor-preview {
-  padding: 10px 14px;
-  overflow-y: auto;
-  max-height: 360px;
-  background: var(--card-bg);
+.md-editor-rich-body .tiptap pre code {
+  padding: 0;
+  background: none;
 }
 
-.md-editor-preview-empty {
-  color: var(--ink-secondary);
-  font-size: 13px;
+.md-editor-rich-body .tiptap hr {
+  margin: 16px 0;
+  border: none;
+  border-top: 1px solid var(--line);
 }
 
-@media (max-width: 720px) {
-  .md-editor-split .md-editor-body {
-    grid-template-columns: 1fr;
-  }
-  .md-editor-split .md-editor-textarea {
-    border-right: none !important;
-    border-bottom: 1px solid var(--line) !important;
-  }
+.md-editor-rich-body .tiptap a {
+  color: var(--brand);
+  text-decoration: underline;
 }
 
 /* 公告详情页：醒目返回栏 */

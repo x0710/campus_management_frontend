@@ -3,6 +3,7 @@
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import LoginPage from './pages/LoginPage'
 import AnnouncementDetailPage from './pages/main/AnnouncementDetailPage'
+import AnnouncementEditorPage from './pages/leader/AnnouncementEditorPage'
 import MainPage from './pages/main/MainPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalWorkspace from './pages/main/PortalWorkspace'
@@ -39,6 +40,10 @@ export default function App() {
           <Route index element={<PortalModuleRoute />} />
           {/* /portal/:portalKey/:moduleKey：渲染具体模块视图 */}
           <Route path=":moduleKey" element={<PortalModuleRoute />} />
+          {/* 公告新建（必须先于 :id 声明，避免 /announcements/new 被当作 id="new" 匹配） */}
+          <Route path="announcements/new" element={<AnnouncementEditorPage />} />
+          {/* 公告编辑：带 id，走 GET/PATCH /api/announcements/{id} */}
+          <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
           {/* /portal/:portalKey/announcements/:id：公告详情，沿用同一界面壳与侧栏 */}
           <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
         </Route>

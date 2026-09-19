@@ -1,71 +1,54 @@
-import { ReloadOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  App as AntdApp,
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  Popconfirm,
-  Select,
-  Table,
-  Tag,
-} from 'antd'
+/** 领导端：我发布的通知（列表 + 管理）。
+ * - 列表：GET /api/announcements?publisher_id=<当前用户> 分页查询（会话缓存），支持状态筛选；
+ * - 新建：点击「发布通知」按钮跳转到独立编辑页（AnnouncementEditorPage，新建态）；
+ * - 编辑：操作列「编辑」跳转到独立编辑页（编辑态，内部走 GET/PATCH /api/announcements/{id}）；
+ * - 详情：点击表格整行跳转公告详情页（复用主端 AnnouncementDetailPage，按 id 单独请求全文）；
+ * - 删除：DELETE /api/announcements/{id}，永久移除且不可恢复（与「下线」不同，本页不提供软下线）。
+ *
+ * 约定（ai 要求）：分页每页最多 20 行并可跳页；行内操作按钮阻止冒泡避免误触行点击；
+ * 悬停提示见 Tooltip；错误提示带 HTTP 状态码。
+ */
+import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, App as AntdApp, Button, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import type { Dayjs } from 'dayjs'
 import axios from 'axios'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import {
-  createAnnouncement,
   deleteAnnouncement,
   queryAnnouncements,
-  updateAnnouncement,
   type AnnouncementListItem,
   type AnnouncementPriority,
   type AnnouncementStatus,
   type AnnouncementType,
 } from '../../api/announcements'
-import { queryOrganizations, type OrganizationInfo } from '../../api/organizations'
 import { getCurrentUser } from '../../api/auth'
-import type { PageQuery } from '../../api/common'
-import MarkdownEditor from '../../components/MarkdownEditor'
+import { extractErrorWithStatus, type PageQuery } from '../../api/common'
 import {
-  ANNOUNCEMENT_PRIORITIES,
   ANNOUNCEMENT_PRIORITY_COLOR,
   ANNOUNCEMENT_STATUS_COLOR,
   ANNOUNCEMENT_TYPE_COLOR,
-  ANNOUNCEMENT_TYPES,
 } from '../../config/announcement'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
-interface PublishFormValues {
-  title: string
-  e_type: AnnouncementType
-  priority: AnnouncementPriority
-  expire_time?: Dayjs | null
-  org_id: number[]
-  content: string
-}
-
 interface PublishListQuery extends PageQuery {
   publisher_id?: number
   status?: AnnouncementStatus
 }
 
-/** 领导端：发布通知（POST /api/announcements）+ 本人通知管理（GET/PATCH/DELETE） */
+/** 领导端：我发布的通知（列表 + 新建/编辑跳转 + 详情 + 删除） */
 export default function PublishAnnouncementView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
-  const [form] = Form.useForm<PublishFormValues>()
+  const navigate = useNavigate()
+  const { portalKey, moduleKey } = useParams<{ portalKey: string; moduleKey?: string }>()
 
   const [uid, setUid] = useState<number | null>(null)
-  const [orgs, setOrgs] = useState<OrganizationInfo[]>([])
-  const [orgError, setOrgError] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [uidError, setUidError] = useState(false)
   const [statusFilter, setStatusFilter] = useState<AnnouncementStatus | 'all'>('all')
   const [actingId, setActingId] = useState<number | null>(null)
 
@@ -76,22 +59,18 @@ export default function PublishAnnouncementView() {
   const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
     usePaginated<AnnouncementListItem, PublishListQuery>(queryAnnouncements, listQuery)
 
-  // 初次加载：当前用户（用于按发布人过滤）+ 可见组织选项
+  // 初次加载：当前用户（用于按发布人过滤）
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const [me, orgRes] = await Promise.all([
-          getCurrentUser(),
-          queryOrganizations({ page: 1, page_size: 100 }),
-        ])
+        const me = await getCurrentUser()
         if (cancelled) return
         setUid(me.uid)
-        setOrgs(orgRes.data)
       } catch (err) {
         if (cancelled) return
         if (axios.isAxiosError(err) && err.response?.status === 401) return
-        setOrgError(true)
+        setUidError(true)
       }
     })()
     return () => {
@@ -105,71 +84,27 @@ export default function PublishAnnouncementView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, statusFilter])
 
-  const typeOptions = useMemo(
-    () => ANNOUNCEMENT_TYPES.map((v) => ({ value: v, label: t(`announcement.type_${v}`) })),
-    [t],
-  )
-  const priorityOptions = useMemo(
-    () => ANNOUNCEMENT_PRIORITIES.map((v) => ({ value: v, label: t(`announcement.priority_${v}`) })),
-    [t],
-  )
-  const statusOptions = useMemo(
-    () =>
-      (['all', 'published', 'withdrawn', 'draft'] as const).map((v) => ({
-        value: v,
-        label: v === 'all' ? t('publish.filterAll') : t(`announcement.status_${v}`),
-      })),
-    [t],
-  )
-  const orgOptions = useMemo(
-    () => orgs.map((o) => ({ value: o.id, label: `${o.name}（${o.code}）` })),
-    [orgs],
-  )
-
-  const onFinish = async (values: PublishFormValues) => {
-    setSubmitting(true)
-    try {
-      await createAnnouncement({
-        title: values.title.trim(),
-        content: values.content.trim(),
-        e_type: values.e_type,
-        priority: values.priority,
-        expire_time: values.expire_time ? values.expire_time.toISOString() : null,
-        org_id: values.org_id,
-      })
-      message.success(t('publish.createSuccess'))
-      form.resetFields()
-      setPage(1)
-      refresh()
-    } catch (err) {
-      const data = axios.isAxiosError(err) ? err.response?.data : null
-      const detail = typeof data === 'string' && data.trim() ? data.trim() : null
-      if (detail) message.error(detail)
-      else if (axios.isAxiosError(err) && !err.response) message.error(t('common.networkError'))
-      else message.error(t('common.loadFailed'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const changeStatus = async (record: AnnouncementListItem, status: AnnouncementStatus) => {
-    setActingId(record.id)
-    try {
-      await updateAnnouncement(record.id, { status })
-      message.success(
-        status === 'published' ? t('publish.republishSuccess') : t('publish.withdrawSuccess'),
+  // 跳转编辑页：新建无 id，编辑带 id；?from 透传来源模块，便于保存后返回本列表
+  const openEditor = useCallback(
+    (id?: number) => {
+      const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
+      navigate(
+        id === undefined
+          ? `/portal/${portalKey}/announcements/new${search}`
+          : `/portal/${portalKey}/announcements/${id}/edit${search}`,
       )
-      refresh()
-    } catch (err) {
-      const data = axios.isAxiosError(err) ? err.response?.data : null
-      const detail = typeof data === 'string' && data.trim() ? data.trim() : null
-      if (detail) message.error(detail)
-      else if (axios.isAxiosError(err) && !err.response) message.error(t('common.networkError'))
-      else message.error(t('common.loadFailed'))
-    } finally {
-      setActingId(null)
-    }
-  }
+    },
+    [navigate, portalKey, moduleKey],
+  )
+
+  // 跳转公告详情页：复用主端详情页，点击整行触发
+  const openDetail = useCallback(
+    (id: number) => {
+      const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
+      navigate(`/portal/${portalKey}/announcements/${id}${search}`)
+    },
+    [navigate, portalKey, moduleKey],
+  )
 
   const remove = async (record: AnnouncementListItem) => {
     setActingId(record.id)
@@ -178,15 +113,21 @@ export default function PublishAnnouncementView() {
       message.success(t('publish.deleteSuccess'))
       refresh()
     } catch (err) {
-      const data = axios.isAxiosError(err) ? err.response?.data : null
-      const detail = typeof data === 'string' && data.trim() ? data.trim() : null
-      if (detail) message.error(detail)
-      else if (axios.isAxiosError(err) && !err.response) message.error(t('common.networkError'))
-      else message.error(t('common.loadFailed'))
+      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      message.error(extractErrorWithStatus(err))
     } finally {
       setActingId(null)
     }
   }
+
+  const statusOptions = useMemo(
+    () =>
+      (['all', 'published', 'withdrawn', 'draft'] as const).map((v) => ({
+        value: v,
+        label: v === 'all' ? t('publish.filterAll') : t(`announcement.status_${v}`),
+      })),
+    [t],
+  )
 
   const columns = useMemo<ColumnsType<AnnouncementListItem>>(
     () => [
@@ -194,7 +135,7 @@ export default function PublishAnnouncementView() {
         title: t('announcement.colTitle'),
         dataIndex: 'title',
         key: 'title',
-        width: 220,
+        width: 240,
         ellipsis: true,
       },
       {
@@ -241,32 +182,15 @@ export default function PublishAnnouncementView() {
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: 150,
+        width: 130,
+        // 行内操作：阻止冒泡，避免触发整行的「查看详情」跳转
         render: (_, record) => (
-          <div className="approval-actions">
-            {record.status === 'published' && (
-              <Popconfirm
-                title={t('publish.withdrawConfirm')}
-                okText={t('publish.withdraw')}
-                cancelText={t('approval.cancel')}
-                okButtonProps={{ loading: actingId === record.id }}
-                onConfirm={() => void changeStatus(record, 'withdrawn')}
-              >
-                <Button type="link" size="small">
-                  {t('publish.withdraw')}
-                </Button>
-              </Popconfirm>
-            )}
-            {record.status === 'withdrawn' && (
-              <Button
-                type="link"
-                size="small"
-                loading={actingId === record.id}
-                onClick={() => void changeStatus(record, 'published')}
-              >
-                {t('publish.republish')}
+          <div className="approval-actions" onClick={(e) => e.stopPropagation()}>
+            <Tooltip title={t('publish.editHint')}>
+              <Button type="link" size="small" onClick={() => openEditor(record.id)}>
+                {t('publish.edit')}
               </Button>
-            )}
+            </Tooltip>
             <Popconfirm
               title={t('publish.deleteConfirm')}
               okText={t('publish.delete')}
@@ -274,162 +198,89 @@ export default function PublishAnnouncementView() {
               okButtonProps={{ danger: true, loading: actingId === record.id }}
               onConfirm={() => void remove(record)}
             >
-              <Button type="link" size="small" danger>
-                {t('publish.delete')}
-              </Button>
+              <Tooltip title={t('publish.deleteHint')}>
+                <Button type="link" size="small" danger>
+                  {t('publish.delete')}
+                </Button>
+              </Tooltip>
             </Popconfirm>
           </div>
         ),
       },
     ],
-    [t, locale, actingId],
+    [t, locale, actingId, openEditor],
   )
 
   return (
-    <div className="student-view">
-      <section className="panel-card student-form-card">
-        <header className="panel-card-header">
-          <h3 className="panel-card-title">{t('publish.formTitle')}</h3>
-        </header>
-        <div className="panel-card-body">
-          {orgError && (
-            <Alert
-              type="warning"
-              showIcon
-              title={t('publish.orgLoadFailed')}
-              style={{ marginBottom: 12 }}
-            />
-          )}
-          <Form<PublishFormValues>
-            form={form}
-            layout="vertical"
-            requiredMark={false}
-            initialValues={{ e_type: 'system', priority: 'normal', org_id: [] }}
-            onFinish={(values: PublishFormValues) => void onFinish(values)}
-          >
-            <div className="leave-form-grid">
-              <Form.Item
-                name="title"
-                label={t('publish.fieldTitle')}
-                rules={[{ required: true, message: t('publish.titleRequired') }]}
-              >
-                <Input maxLength={200} showCount placeholder={t('publish.titlePlaceholder')} />
-              </Form.Item>
-
-              <Form.Item
-                name="org_id"
-                label={t('publish.fieldOrgs')}
-                rules={[{ required: true, message: t('publish.orgsRequired') }]}
-              >
-                <Select
-                  mode="multiple"
-                  options={orgOptions}
-                  placeholder={t('publish.orgsPlaceholder')}
-                  optionFilterProp="label"
-                  allowClear
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="e_type"
-                label={t('announcement.colType')}
-                rules={[{ required: true }]}
-              >
-                <Select options={typeOptions} />
-              </Form.Item>
-
-              <Form.Item
-                name="priority"
-                label={t('announcement.colPriority')}
-                rules={[{ required: true }]}
-              >
-                <Select options={priorityOptions} />
-              </Form.Item>
-
-              <Form.Item name="expire_time" label={t('publish.fieldExpire')}>
-                <DatePicker
-                  showTime
-                  style={{ width: '100%' }}
-                  placeholder={t('publish.expirePlaceholder')}
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="content"
-                label={t('publish.fieldContent')}
-                rules={[{ required: true, message: t('publish.contentRequired') }]}
-                style={{ gridColumn: '1 / -1' }}
-              >
-                <MarkdownEditor
-                  rows={10}
-                  maxLength={2000}
-                  showCount
-                  placeholder={t('publish.contentPlaceholder')}
-                />
-              </Form.Item>
-            </div>
-
-            <Form.Item className="leave-submit-item">
-              <Button type="primary" htmlType="submit" loading={submitting} disabled={orgError}>
-                {t('publish.submit')}
-              </Button>
-            </Form.Item>
-          </Form>
-        </div>
-      </section>
-
-      <section className="panel-card">
-        <header className="panel-card-header">
-          <h3 className="panel-card-title">{t('publish.myNotices')}</h3>
-          <div className="approval-toolbar">
-            <Select
-              value={statusFilter}
-              options={statusOptions}
-              style={{ width: 140 }}
-              onChange={(v: AnnouncementStatus | 'all') => {
-                setPage(1)
-                setStatusFilter(v)
-              }}
-            />
-            <Button icon={<ReloadOutlined />} onClick={refresh}>
-              {t('common.refresh')}
+    <section className="panel-card">
+      <header className="panel-card-header">
+        <h3 className="panel-card-title">{t('publish.myNotices')}</h3>
+        <div className="approval-toolbar">
+          <Select
+            value={statusFilter}
+            options={statusOptions}
+            style={{ width: 140 }}
+            onChange={(v: AnnouncementStatus | 'all') => {
+              setPage(1)
+              setStatusFilter(v)
+            }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={refresh}>
+            {t('common.refresh')}
+          </Button>
+          <Tooltip title={t('publish.createHint')}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>
+              {t('publish.createButton')}
             </Button>
-          </div>
-        </header>
-        <div className="panel-card-body">
-          {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-              action={
-                <Button size="small" onClick={refresh}>
-                  {t('common.retry')}
-                </Button>
-              }
-            />
-          ) : (
-            <Table<AnnouncementListItem>
-              rowKey="id"
-              loading={loading}
-              columns={columns}
-              dataSource={data}
-              locale={{ emptyText: t('common.noData') }}
-              pagination={{
-                current: page,
-                pageSize,
-                total,
-                showSizeChanger: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
-                onChange: (nextPage: number, nextSize: number) => {
-                  if (nextSize !== pageSize) setPageSize(nextSize)
-                  else setPage(nextPage)
-                },
-              }}
-            />
-          )}
+          </Tooltip>
         </div>
-      </section>
-    </div>
+      </header>
+      <div className="panel-card-body">
+        {uidError || error ? (
+          <Alert
+            type="error"
+            showIcon
+            title={
+              uidError
+                ? t('common.loadFailed')
+                : error === 'network'
+                  ? t('common.networkError')
+                  : t('common.loadFailed')
+            }
+            action={
+              <Button size="small" onClick={refresh}>
+                {t('common.retry')}
+              </Button>
+            }
+          />
+        ) : (
+          <Table<AnnouncementListItem>
+            rowKey="id"
+            loading={loading}
+            columns={columns}
+            dataSource={data}
+            locale={{ emptyText: t('common.noData') }}
+            scroll={{ x: 960 }}
+            onRow={(record) => ({
+              onClick: () => openDetail(record.id),
+              title: t('announcement.rowClickHint'),
+              style: { cursor: 'pointer' },
+            })}
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+              onChange: (nextPage: number, nextSize: number) => {
+                if (nextSize !== pageSize) setPageSize(nextSize)
+                else setPage(nextPage)
+              },
+            }}
+          />
+        )}
+      </div>
+    </section>
   )
 }
