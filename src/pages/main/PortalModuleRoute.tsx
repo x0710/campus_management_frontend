@@ -27,6 +27,7 @@ import CourseManageView from '../leader/CourseManageView'
 import UsersAdminView from '../admin/UsersAdminView'
 import OrgAdminView from '../admin/OrgAdminView'
 import RolesAdminView from '../admin/RolesAdminView'
+import PositionsAdminView from '../admin/PositionsAdminView'
 
 /**
  * 模块视图注册表。
@@ -50,6 +51,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'admin:admin_m1': UsersAdminView,
   'admin:admin_m2': RolesAdminView,
   'admin:admin_m3': OrgAdminView,
+  'admin:admin_m5': PositionsAdminView,
 }
 
 export default function PortalModuleRoute() {

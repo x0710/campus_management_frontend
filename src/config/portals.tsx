@@ -114,6 +114,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'admin_m2', status: 'ready', icon: <SafetyCertificateOutlined /> },
       { key: 'admin_m3', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'admin_m4', status: 'planned', icon: <FileSearchOutlined /> },
+      { key: 'admin_m5', status: 'ready', icon: <AuditOutlined /> },
     ],
   },
 ]
