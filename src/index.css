@@ -1662,6 +1662,33 @@ h3 {
   vertical-align: -2px;
 }
 
+/* 选中日期倒计时条（常驻于详情卡片头部下方）：未来 / 今天 / 过去 三态 */
+.cal-countdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cal-countdown-future {
+  color: var(--brand);
+}
+
+.cal-countdown-today {
+  color: #d46b08;
+  font-weight: 600;
+}
+
+:root[data-theme='dark'] .cal-countdown-today {
+  color: #ffc069;
+}
+
+.cal-countdown-past {
+  color: var(--ink-secondary);
+}
+
 /* 当日无事件：图标 + 文案的居中占位 */
 .cal-day-empty {
   display: flex;

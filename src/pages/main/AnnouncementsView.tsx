@@ -9,6 +9,7 @@ import { Alert, Button, Table, Tag, Typography } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import type { FilterValue } from 'antd/es/table/interface'
 import axios from 'axios'
+import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
@@ -153,9 +154,6 @@ export default function AnnouncementsView() {
     [t],
   )
 
-  // 任意筛选变化后回到第 1 页
-  const resetPage = () => setPage(1)
-
   const columns = useMemo<ColumnsType<AnnouncementListItem>>(
     () => [
       {
@@ -228,22 +226,25 @@ export default function AnnouncementsView() {
         dataIndex: 'created_at',
         key: 'created_at',
         width: 180,
+        // 本地排序：数据为一次性拉取的全量公告，antd 会先对全量排序再分页；
+        // 默认与接口归一化后的顺序一致（最新发布在前），点击表头可在 降序→升序→取消 间切换
+        sorter: (a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf(),
+        defaultSortOrder: 'descend',
+        sortDirections: ['descend', 'ascend'],
         render: (value: string) => formatDateTime(value, locale),
       },
     ],
     [t, locale, now, typeFilters, priorityFilters, statusFilters, typeFilter, priorityFilter, statusFilter, publisherNames],
   )
 
+  // 受控分页配置：页码 / 每页条数的变更统一由下方 Table 的 onChange 处理
+  // （分页、筛选、排序都会触发它；antd 在筛选或排序变化时会自动把 current 归 1）
   const paginationConfig: TablePaginationConfig = useMemo(
     () => ({
       current: page,
       pageSize,
       showSizeChanger: true,
       showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
-      onChange: (nextPage: number, nextSize: number) => {
-        setPage(nextPage)
-        setPageSize(nextSize)
-      },
     }),
     [page, pageSize, t],
   )
@@ -276,12 +277,16 @@ export default function AnnouncementsView() {
             dataSource={items}
             scroll={{ x: 960 }}
             pagination={paginationConfig}
-            onChange={(_pagination, filters) => {
-              // 受控筛选：任一条件变化即回到第 1 页
+            onChange={(nextPagination, filters) => {
+              // 分页 / 每页条数 / 筛选的唯一更新入口。
+              // 此前 pagination.onChange 里 setPage(目标页) 与这里无条件 setPage(1)
+              // 在同一次点击中被批处理、后者覆盖前者，导致翻页按钮看似无效。
+              // 筛选或排序变化时 antd 回传的 current 本身就是 1，无需再手动归页。
+              setPage(nextPagination.current ?? 1)
+              setPageSize(nextPagination.pageSize ?? pageSize)
               setTypeFilter(filters.e_type ?? null)
               setPriorityFilter(filters.priority ?? null)
               setStatusFilter(filters.status ?? null)
-              resetPage()
             }}
             onRow={(record) => ({
               onClick: () => openDetail(record.id),

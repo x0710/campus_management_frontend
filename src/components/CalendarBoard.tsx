@@ -5,6 +5,8 @@
  *   相邻月份的日期格同样展示事件（数据层已把查询区间向后多取若干天）；
  * - 右侧卡片：选中日期后**直接堆叠展示当天全部事件的完整详情**
  *   （名称、类型、时间范围、描述、创建时间），某天有多个事件时上下堆叠，无需先点事件；
+ *   卡片头部下方常驻「倒计时」条，展示选中日期距今天的天数（未来/今天/过去三态），
+ *   与当天是否有事件无关；
  * - 通过 toolbarExtra（工具栏右侧插槽）与 renderEventActions（每个事件的操作插槽）
  *   让领导端挂载「新增 / 编辑 / 删除」，学生端不传即为只读；
  * - 数据与详情请求由 useCalendarEvents 提供，本组件只负责渲染与交互。
@@ -12,6 +14,7 @@
  */
 import {
   CalendarOutlined,
+  ClockCircleOutlined,
   LeftOutlined,
   ReloadOutlined,
   RightOutlined,
@@ -89,6 +92,31 @@ export default function CalendarBoard({
       })),
     [t],
   )
+
+  /**
+   * 倒计时：选中日期与今天的天数差。
+   * 两侧都先归零到当天 0 点（本地时区），规避时分秒与 UTC 截断造成的误差。
+   * 拆成「未来 / 明天 / 今天 / 昨天 / 过去」五种文案，样式归为 future/today/past 三态。
+   */
+  const dayDiff = value.startOf('day').diff(dayjs().startOf('day'), 'day')
+  let countdownStatus: 'future' | 'today' | 'past'
+  let countdownText: string
+  if (dayDiff > 1) {
+    countdownStatus = 'future'
+    countdownText = t('calendar.countdownFuture', { days: dayDiff })
+  } else if (dayDiff === 1) {
+    countdownStatus = 'future'
+    countdownText = t('calendar.countdownTomorrow')
+  } else if (dayDiff === 0) {
+    countdownStatus = 'today'
+    countdownText = t('calendar.countdownToday')
+  } else if (dayDiff === -1) {
+    countdownStatus = 'past'
+    countdownText = t('calendar.countdownYesterday')
+  } else {
+    countdownStatus = 'past'
+    countdownText = t('calendar.countdownPast', { days: -dayDiff })
+  }
 
   /** 切换月份：定位到目标月首日，右侧当日事件同步切换 */
   const gotoMonth = (offset: number) => {
@@ -215,6 +243,10 @@ export default function CalendarBoard({
               {t('calendar.eventCount', { count: dayDetails.length })}
             </span>
           </header>
+          <div className={`cal-countdown cal-countdown-${countdownStatus}`}>
+            <ClockCircleOutlined />
+            <span>{countdownText}</span>
+          </div>
           <div className="panel-card-body">
             {dayDetailsLoading ? (
               <Spin>

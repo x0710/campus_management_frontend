@@ -1,5 +1,6 @@
 /** 公告模块, 提供公告相关 API */
 
+import dayjs from 'dayjs'
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import type { PageQuery, PaginatedResponse } from './common'
@@ -74,7 +75,8 @@ export interface AnnouncementUpdateRequest {
 /**
  * GET /api/announcements 分页查询公告列表（会话内缓存）。
  * api.json 契约为 PaginatedResponse，但当前运行中的后端实际返回裸数组，
- * 这里做一次归一化：裸数组时在前端按分页参数切片，兼容两种形态。
+ * 这里做一次归一化：裸数组时先按 created_at 倒序（最新发布在前）整体排序，
+ * 再按分页参数切片，兼容两种形态。
  * force=true 可绕过缓存（手动刷新）。
  */
 export async function queryAnnouncements(
@@ -86,15 +88,22 @@ export async function queryAnnouncements(
   >('/announcements', params as Record<string, unknown>, { force })
 
   if (Array.isArray(body)) {
+    // 后端裸数组默认按 id 升序（旧公告在前），这里统一归一为「最新发布在前」：
+    // 必须先整体排序、再按页切片；body 可能是会话缓存的共享引用，故先复制再排序，
+    // 避免原地 sort 污染缓存。created_at 相同的极端情况以 id 倒序兜底，保证顺序稳定。
+    const ordered = [...body].sort((a, b) => {
+      const byTime = dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf()
+      return byTime !== 0 ? byTime : b.id - a.id
+    })
     const page = params.page ?? 1
     const pageSize = params.page_size ?? 20
     const start = (page - 1) * pageSize
     return {
-      data: body.slice(start, start + pageSize),
-      total: body.length,
+      data: ordered.slice(start, start + pageSize),
+      total: ordered.length,
       page,
       page_size: pageSize,
-      total_pages: Math.max(1, Math.ceil(body.length / pageSize)),
+      total_pages: Math.max(1, Math.ceil(ordered.length / pageSize)),
     }
   }
   return body
