@@ -833,6 +833,34 @@ h3 {
   margin-bottom: 0;
 }
 
+/* 请假时间冲突预检提示（填写时间后自动检查，无提示时不占位） */
+.leave-conflict-alert:empty {
+  display: none;
+}
+
+.leave-conflict-alert {
+  margin-bottom: 16px;
+}
+
+.leave-conflict-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* 请假详情弹窗底部：左侧操作、右侧关闭 */
+.leave-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.leave-detail-footer-extra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* 教师端审批视图 */
 .approval-toolbar {
   display: flex;

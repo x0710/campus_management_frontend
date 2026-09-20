@@ -35,3 +35,9 @@ export const LEAVE_TYPE_KEY_SUFFIX: Record<LeaveType, string> = {
   public: 'public',
   other: 'other',
 }
+
+/**
+ * 填写请假时间后触发冲突检查的防抖延迟（毫秒）。
+ * 时间选择器（日期 + 时分）改动频繁，延迟合并可避免每次改动都请求 check-conflict。
+ */
+export const LEAVE_CONFLICT_CHECK_DEBOUNCE_MS = 500

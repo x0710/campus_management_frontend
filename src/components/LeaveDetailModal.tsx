@@ -1,7 +1,7 @@
-/** 请假详情弹窗 */
+/** 请假详情弹窗（学生端 / 教师端共用，只读详情 + 可选操作插槽） */
 import { Alert, Button, Descriptions, Modal, Skeleton, Tag, Typography } from 'antd'
 import axios from 'axios'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { getLeave, type LeaveDetail } from '../api/leaves'
 import { LEAVE_TYPE_COLOR } from '../config/leave'
 import { useT } from '../i18n'
@@ -15,13 +15,18 @@ interface Props {
   /** 请假记录标识（审批列表行的 instance_id，即请假记录的 approval_id） */
   leaveId: number | null
   onClose: () => void
+  /**
+   * 弹窗底部左侧的操作插槽（如学生端的「撤回 / 删除」）。
+   * 不传即为纯只读详情，教师端审批视图沿用该默认行为。
+   */
+  footerExtra?: ReactNode
 }
 
 /**
  * 可复用的请假详情弹窗：教师审批列表点击行后展示请假完整信息。
  * 数据通过 getLeave 走会话级缓存；单个详情加载失败时弹窗内显示带状态码的错误并支持重试。
  */
-export default function LeaveDetailModal({ open, leaveId, onClose }: Props) {
+export default function LeaveDetailModal({ open, leaveId, onClose, footerExtra }: Props) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
 
@@ -69,7 +74,12 @@ export default function LeaveDetailModal({ open, leaveId, onClose }: Props) {
     <Modal
       open={open}
       title={t('leaveDetail.title')}
-      footer={<Button onClick={onClose}>{t('common.close')}</Button>}
+      footer={
+        <div className="leave-detail-footer">
+          <div className="leave-detail-footer-extra">{footerExtra}</div>
+          <Button onClick={onClose}>{t('common.close')}</Button>
+        </div>
+      }
       onCancel={onClose}
       destroyOnHidden
       width={640}

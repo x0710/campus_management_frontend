@@ -1,3 +1,9 @@
+/**
+ * 学生端：请假申请（表单 + 本人请假记录）。
+ * - 填写完请假时间后自动调用 GET /api/leaves/check-conflict 做冲突预检并内联提示；
+ * - 提交时再次预检（防时间被改动后状态过期），命中冲突直接拦截；
+ * - 点击记录行打开请假详情弹窗（复用 LeaveDetailModal），在弹窗内可撤回 / 删除该申请。
+ */
 import { ReloadOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -7,22 +13,30 @@ import {
   DatePicker,
   Form,
   Input,
+  Popconfirm,
   Select,
   Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import axios from 'axios'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
+  cancelLeave,
   checkLeaveConflict,
   createLeave,
+  deleteLeave,
   queryLeaves,
+  type LeaveConflict,
   type LeaveCreateRequest,
   type LeaveInfo,
   type LeaveType,
 } from '../../api/leaves'
+import { extractErrorWithStatus } from '../../api/common'
+import LeaveDetailModal from '../../components/LeaveDetailModal'
+import { LEAVE_CONFLICT_CHECK_DEBOUNCE_MS } from '../../config/leave'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
@@ -46,6 +60,9 @@ interface LeaveFormValues {
   parent_confirm: boolean
 }
 
+/** 详情弹窗内正在执行的操作（用于按钮 loading 与禁用） */
+type DetailAction = 'cancel' | 'delete' | null
+
 /** 学生端：请假申请表单 + 本人请假记录（POST /api/leaves，GET /api/leaves） */
 export default function LeaveApplyView() {
   const t = useT()
@@ -54,6 +71,15 @@ export default function LeaveApplyView() {
   const [form] = Form.useForm<LeaveFormValues>()
   const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
     usePaginated<LeaveInfo>(queryLeaves)
+
+  /** 点击记录行打开详情弹窗（携带请假记录 id） */
+  const [detailId, setDetailId] = useState<number | null>(null)
+  const [acting, setActing] = useState<DetailAction>(null)
+
+  /** 时间填写后的冲突预检结果：null 表示尚未检查或时间不完整 */
+  const [conflict, setConflict] = useState<LeaveConflict | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [conflictError, setConflictError] = useState<string | null>(null)
 
   const typeOptions = useMemo(
     () =>
@@ -105,6 +131,114 @@ export default function LeaveApplyView() {
     [t, locale],
   )
 
+  /** 统一错误提示：网络错误走文案，其余回显带状态码的后端信息（ai 要求 9） */
+  const showError = (err: unknown) => {
+    const code = extractErrorWithStatus(err)
+    message.error(code === 'network' ? t('common.networkError') : code)
+  }
+
+  // 监听请假时间：填写完整且合法后，防抖调用 check-conflict 做冲突预检
+  const range = Form.useWatch('range', form)
+  const startIso = range?.[0]?.toISOString() ?? ''
+  const endIso = range?.[1]?.toISOString() ?? ''
+  /** 时间是否已填写完整且开始早于结束（不满足时不展示预检结果） */
+  const rangeValid = Boolean(startIso && endIso && startIso < endIso)
+
+  useEffect(() => {
+    if (!rangeValid) return
+    let cancelled = false
+    const timer = setTimeout(() => {
+      setChecking(true)
+      checkLeaveConflict({ start_time: startIso, end_time: endIso })
+        .then((res) => {
+          if (cancelled) return
+          setConflict(res)
+          setConflictError(null)
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          setConflict(null)
+          setConflictError(extractErrorWithStatus(err))
+        })
+        .finally(() => {
+          if (!cancelled) setChecking(false)
+        })
+    }, LEAVE_CONFLICT_CHECK_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [rangeValid, startIso, endIso])
+
+  /** 冲突预检提示（含冲突记录的时间段，便于学生调整） */
+  const conflictAlert = () => {
+    if (!rangeValid) return null
+    if (checking) {
+      return <Alert type="info" showIcon title={t('leaveApply.conflictChecking')} />
+    }
+    if (conflictError) {
+      return (
+        <Alert
+          type="error"
+          showIcon
+          title={t('leaveApply.conflictCheckFailed')}
+          description={conflictError}
+        />
+      )
+    }
+    if (!conflict) return null
+    if (!conflict.has_conflict) {
+      return <Alert type="success" showIcon title={t('leaveApply.conflictNone')} />
+    }
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        title={t('leaveApply.conflictFound', { count: conflict.conflicts.length })}
+        description={
+          <ul className="leave-conflict-list">
+            {conflict.conflicts.map((item) => (
+              <li key={item.id}>
+                {t(`leave.type_${item.leave_type}`)}：{formatDateTime(item.start_time, locale)} ~{' '}
+                {formatDateTime(item.end_time, locale)}
+              </li>
+            ))}
+          </ul>
+        }
+      />
+    )
+  }
+
+  /** 撤回请假申请：成功后关闭弹窗并刷新列表（ai 要求 13） */
+  const withdrawLeave = async (id: number) => {
+    setActing('cancel')
+    try {
+      await cancelLeave(id)
+      message.success(t('leaveApply.withdrawSuccess'))
+      setDetailId(null)
+      refresh()
+    } catch (err) {
+      showError(err)
+    } finally {
+      setActing(null)
+    }
+  }
+
+  /** 删除请假记录：成功后关闭弹窗并刷新列表（ai 要求 13） */
+  const removeLeave = async (id: number) => {
+    setActing('delete')
+    try {
+      await deleteLeave(id)
+      message.success(t('leaveApply.deleteSuccess'))
+      setDetailId(null)
+      refresh()
+    } catch (err) {
+      showError(err)
+    } finally {
+      setActing(null)
+    }
+  }
+
   const onFinish = async (values: LeaveFormValues) => {
     const payload: LeaveCreateRequest = {
       leave_type: values.leave_type,
@@ -119,11 +253,11 @@ export default function LeaveApplyView() {
 
     // 提交前做时间冲突预检，命中冲突直接拦截（后端创建时也会再校验一次）
     try {
-      const conflict = await checkLeaveConflict({
+      const precheck = await checkLeaveConflict({
         start_time: payload.start_time,
         end_time: payload.end_time,
       })
-      if (conflict.has_conflict) {
+      if (precheck.has_conflict) {
         message.warning(t('leaveApply.conflictWarn'))
         return
       }
@@ -201,6 +335,9 @@ export default function LeaveApplyView() {
               </Form.Item>
             </div>
 
+            {/* 时间填写后的冲突预检结果（ai 要求 9：检查失败时展示状态码） */}
+            <div className="leave-conflict-alert">{conflictAlert()}</div>
+
             <Form.Item name="parent_confirm" valuePropName="checked">
               <Checkbox>{t('leaveApply.parentConfirm')}</Checkbox>
             </Form.Item>
@@ -240,6 +377,11 @@ export default function LeaveApplyView() {
               columns={columns}
               dataSource={data}
               scroll={{ x: 760 }}
+              onRow={(record) => ({
+                onClick: () => setDetailId(record.id),
+                title: t('leaveApply.rowClickHint'),
+                style: { cursor: 'pointer' },
+              })}
               pagination={{
                 current: page,
                 pageSize,
@@ -255,6 +397,45 @@ export default function LeaveApplyView() {
           )}
         </div>
       </section>
+
+      {/* 请假详情：点击记录行打开，底部提供「撤回 / 删除」操作 */}
+      <LeaveDetailModal
+        open={detailId !== null}
+        leaveId={detailId}
+        onClose={() => setDetailId(null)}
+        footerExtra={
+          detailId !== null ? (
+            <>
+              <Popconfirm
+                title={t('leaveApply.withdrawConfirm')}
+                okText={t('common.confirm')}
+                cancelText={t('common.cancel')}
+                okButtonProps={{ loading: acting === 'cancel' }}
+                onConfirm={() => void withdrawLeave(detailId)}
+              >
+                <Tooltip title={t('leaveApply.withdrawHint')}>
+                  <Button size="small" disabled={acting === 'delete'}>
+                    {t('leaveApply.withdraw')}
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+              <Popconfirm
+                title={t('leaveApply.deleteConfirm')}
+                okText={t('common.confirm')}
+                cancelText={t('common.cancel')}
+                okButtonProps={{ danger: true, loading: acting === 'delete' }}
+                onConfirm={() => void removeLeave(detailId)}
+              >
+                <Tooltip title={t('leaveApply.deleteHint')}>
+                  <Button size="small" danger disabled={acting === 'cancel'}>
+                    {t('leaveApply.delete')}
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+            </>
+          ) : null
+        }
+      />
     </div>
   )
 }

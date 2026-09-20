@@ -1,3 +1,7 @@
+/**
+ * 请假接口层：请假记录查询/详情、创建、撤回、软删除与时间冲突检查。
+ * 查询类走会话缓存 cachedGet，写操作后失效 'GET /leaves' 缓存，保证列表取到最新数据。
+ */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import type { PageQuery, PaginatedResponse } from './common'
@@ -107,4 +111,26 @@ export function checkLeaveConflict(params: {
  */
 export function getLeave(id: number, force?: boolean) {
   return cachedGet<LeaveDetail>(`/leaves/${id}`, undefined, { force })
+}
+
+/**
+ * PATCH /api/leaves/{id}/cancel 撤回请假申请（仅本人、仅待审批状态，成功返回 204）。
+ * 400 表示状态非待审批，403 表示非本人，错误信息由调用方展示。
+ */
+export function cancelLeave(id: number): Promise<void> {
+  return http.patch(`/leaves/${id}/cancel`).then((res) => {
+    invalidate('GET /leaves')
+    return res.data
+  })
+}
+
+/**
+ * DELETE /api/leaves/{id} 软删除请假记录（仅本人、仅已驳回/已撤回可删，成功返回 204）。
+ * 400 表示当前状态不允许删除，错误信息由调用方展示。
+ */
+export function deleteLeave(id: number): Promise<void> {
+  return http.delete(`/leaves/${id}`).then((res) => {
+    invalidate('GET /leaves')
+    return res.data
+  })
 }
