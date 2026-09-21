@@ -1,11 +1,14 @@
 /**
- * 学生/教师端「校园公告」列表：
+ * 「校园公告」列表，学生/教师端只读浏览，领导端复用为「公告管理」：
  * - 一次性拉取全量公告（走会话缓存），类型/等级/展示态多选筛选与分页均在前端完成；
  * - 整行点击进入公告详情页；
- * - 状态列按 expire_time 推导为「已发布 / 已过期」。
+ * - 状态列按 expire_time 推导为「已发布 / 已过期」；
+ * - manage=true（领导端）时追加操作列：任意公告可删除（后端仅校验 announcement.delete 权限），
+ *   编辑仅限本人发布的公告（后端无归属校验与审计，改他人已发布内容会造成内容归属错乱，
+ *   故非本人公告的「编辑」按钮置灰并悬停说明原因）。
  */
 import { ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Table, Tag, Typography } from 'antd'
+import { Alert, App as AntdApp, Button, Popconfirm, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import type { FilterValue } from 'antd/es/table/interface'
 import axios from 'axios'
@@ -13,11 +16,14 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
+  deleteAnnouncement,
   listAllAnnouncements,
   type AnnouncementListItem,
   type AnnouncementPriority,
   type AnnouncementType,
 } from '../../api/announcements'
+import { getCurrentUser } from '../../api/auth'
+import { extractErrorWithStatus } from '../../api/common'
 import {
   ANNOUNCEMENT_DISPLAY_STATUS_COLOR,
   ANNOUNCEMENT_PRIORITIES,
@@ -41,9 +47,10 @@ const DEFAULT_PAGE_SIZE = 10
 type TypeFilterValue = AnnouncementType
 type PriorityFilterValue = AnnouncementPriority
 
-export default function AnnouncementsView() {
+export default function AnnouncementsView({ manage = false }: { manage?: boolean }) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
+  const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const { portalKey, moduleKey } = useParams<{
     portalKey: string  // 门户键名，来源：/home/portal/:key，必填
@@ -54,12 +61,34 @@ export default function AnnouncementsView() {
   const [loading, setLoading] = useState(true)
   const [errorText, setErrorText] = useState<string | null>(null)
 
+  // 当前用户 uid：管理模式下用于判断某条公告是否本人发布（决定「编辑」是否可用）
+  const [myUid, setMyUid] = useState<number | null>(null)
+  // 正在删除的公告 id，用于 Popconfirm 确认按钮的 loading 态
+  const [actingId, setActingId] = useState<number | null>(null)
+
   // 当前时间戳：每分钟刷新一次，使「已过期」状态随时间自动翻转
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  // 管理模式下获取当前用户（走会话缓存）；401 由 http 拦截器统一处理，这里静默跳过
+  useEffect(() => {
+    if (!manage) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const me = await getCurrentUser()
+        if (!cancelled) setMyUid(me.uid)
+      } catch {
+        // 获取失败时 myUid 保持 null，「编辑」按钮一律置灰，不影响浏览与删除
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [manage])
 
   // 受控筛选值（null 表示该列未筛选），同时驱动表头漏斗高亮
   const [typeFilter, setTypeFilter] = useState<FilterValue | null>(null)
@@ -113,12 +142,42 @@ export default function AnnouncementsView() {
 
   // 跳详情时带上来源门户/模块（portalKey 在路径中，moduleKey 通过 ?from 透传），
   // 详情页据此精确返回公告列表，并使父布局侧栏仍高亮原模块入口。
-  const openDetail = (id: number) => {
-    const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''  
-    // 跳转公告详情页，带来源门户/模块（portalKey 在路径中，moduleKey 通过 ?from 透传）
-    // 详情页据此精确返回公告列表，并使父布局侧栏仍高亮原模块入口。
-    navigate(`/portal/${portalKey}/announcements/${id}${search}`)
-  }
+  const openDetail = useCallback(
+    (id: number) => {
+      const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
+      // 跳转公告详情页，带来源门户/模块（portalKey 在路径中，moduleKey 通过 ?from 透传）
+      // 详情页据此精确返回公告列表，并使父布局侧栏仍高亮原模块入口。
+      navigate(`/portal/${portalKey}/announcements/${id}${search}`)
+    },
+    [navigate, portalKey, moduleKey],
+  )
+
+  // 跳转独立编辑页（仅管理模式下由操作列触发）；?from 透传来源模块，保存后返回本列表
+  const openEditor = useCallback(
+    (id: number) => {
+      const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
+      navigate(`/portal/${portalKey}/announcements/${id}/edit${search}`)
+    },
+    [navigate, portalKey, moduleKey],
+  )
+
+  // 删除公告：后端仅校验 announcement.delete 权限，不限制发布人；删除后强制刷新列表绕过缓存
+  const remove = useCallback(
+    async (id: number) => {
+      setActingId(id)
+      try {
+        await deleteAnnouncement(id)
+        message.success(t('publish.deleteSuccess'))
+        await load(true)
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) return
+        message.error(extractErrorWithStatus(err))
+      } finally {
+        setActingId(null)
+      }
+    },
+    [message, t, load],
+  )
 
   // 筛选项配置（选项文本支持悬停查看完整名称）
   const typeFilters = useMemo(
@@ -233,8 +292,56 @@ export default function AnnouncementsView() {
         sortDirections: ['descend', 'ascend'],
         render: (value: string) => formatDateTime(value, locale),
       },
+      // 管理模式下追加操作列：编辑（仅本人发布）+ 删除（任意公告）
+      ...(manage
+        ? [
+            {
+              title: t('approval.colAction'),
+              key: 'action',
+              width: 130,
+              // 行内操作：阻止冒泡，避免触发整行的「查看详情」跳转
+              render: (_: unknown, record: AnnouncementListItem) => {
+                const isOwn = myUid !== null && record.publisher_id === myUid
+                return (
+                  <div className="approval-actions" onClick={(e) => e.stopPropagation()}>
+                    <Tooltip
+                      title={
+                        isOwn ? t('publish.editHint') : t('announcement.editOwnOnlyHint')
+                      }
+                    >
+                      {/* 非本人公告禁用编辑：span 包裹保证禁用态下 Tooltip 仍可悬停触发 */}
+                      <span>
+                        <Button
+                          type="link"
+                          size="small"
+                          disabled={!isOwn}
+                          onClick={() => openEditor(record.id)}
+                        >
+                          {t('publish.edit')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Popconfirm
+                      title={t('publish.deleteConfirm')}
+                      okText={t('publish.delete')}
+                      cancelText={t('approval.cancel')}
+                      okButtonProps={{ danger: true, loading: actingId === record.id }}
+                      onConfirm={() => void remove(record.id)}
+                    >
+                      <Tooltip title={t('publish.deleteHint')}>
+                        <Button type="link" size="small" danger>
+                          {t('publish.delete')}
+                        </Button>
+                      </Tooltip>
+                    </Popconfirm>
+                  </div>
+                )
+              },
+            } satisfies ColumnsType<AnnouncementListItem>[number],
+          ]
+        : []),
     ],
-    [t, locale, now, typeFilters, priorityFilters, statusFilters, typeFilter, priorityFilter, statusFilter, publisherNames],
+    [t, locale, now, typeFilters, priorityFilters, statusFilters, typeFilter, priorityFilter, statusFilter, publisherNames, manage, myUid, actingId, openEditor, remove],
   )
 
   // 受控分页配置：页码 / 每页条数的变更统一由下方 Table 的 onChange 处理
@@ -252,7 +359,9 @@ export default function AnnouncementsView() {
   return (
     <section className="panel-card" style={{ width: '100%' }}>
       <header className="panel-card-header">
-        <h3 className="panel-card-title">{t('announcement.title')}</h3>
+        <h3 className="panel-card-title">
+          {t(manage ? 'announcement.manageTitle' : 'announcement.title')}
+        </h3>
         <Button icon={<ReloadOutlined />} onClick={() => void load(true)}>
           {t('common.refresh')}
         </Button>
@@ -275,7 +384,7 @@ export default function AnnouncementsView() {
             loading={loading}
             columns={columns}
             dataSource={items}
-            scroll={{ x: 960 }}
+            scroll={{ x: manage ? 1090 : 960 }}
             pagination={paginationConfig}
             onChange={(nextPagination, filters) => {
               // 分页 / 每页条数 / 筛选的唯一更新入口。

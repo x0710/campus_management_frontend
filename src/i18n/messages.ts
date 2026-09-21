@@ -110,6 +110,7 @@ const messages = {
       leader_m4: '公告发布',
       leader_m5: '校历管理',
       leader_m6: '课程管理',
+      leader_m7: '公告管理',
       admin_name: '管理端',
       admin_desc: '账户、角色权限、组织架构与系统运维管理',
       admin_m1: '用户与账户',
@@ -162,6 +163,8 @@ const messages = {
       clickToView: '点击查看全文',
       rowClickHint: '点击查看公告详情',
       backToList: '返回公告列表',
+      manageTitle: '公告管理',
+      editOwnOnlyHint: '仅可编辑本人发布的公告，他人公告只能查看或删除',
     },
     mdEditor: {
       heading: '标题',
@@ -904,6 +907,7 @@ const messages = {
       leader_m4: 'Publish Notice',
       leader_m5: 'Calendar Management',
       leader_m6: 'Course Management',
+      leader_m7: 'Notice Management',
       admin_name: 'Admin',
       admin_desc: 'Accounts, roles, organization structure and system ops',
       admin_m1: 'Users & Accounts',
@@ -956,6 +960,8 @@ const messages = {
       clickToView: 'Click to view full text',
       rowClickHint: 'Click to view announcement',
       backToList: 'Back to announcements',
+      manageTitle: 'Notice Management',
+      editOwnOnlyHint: 'You can only edit notices you published; others’ notices can only be viewed or deleted',
     },
     mdEditor: {
       heading: 'Heading',

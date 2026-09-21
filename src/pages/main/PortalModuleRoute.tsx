@@ -31,6 +31,13 @@ import RolesAdminView from '../admin/RolesAdminView'
 import PositionsAdminView from '../admin/PositionsAdminView'
 
 /**
+ * 领导端「公告管理」：复用学生端公告列表并开启管理模式
+ * （可查看全部公告、删除任意公告，编辑仅限本人发布的公告）。
+ * 提取为模块级常量，保证组件引用稳定，避免每次渲染都重新挂载列表。
+ */
+const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
+
+/**
  * 模块视图注册表。
  * key 形如 `${portalKey}:${moduleKey}`；
  * ready 模块接真实接口，preview 模块为模拟数据预览页，接口就绪后替换数据源即可。
@@ -50,6 +57,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'leader:leader_m4': PublishAnnouncementView,
   'leader:leader_m5': CalendarManageView,
   'leader:leader_m6': CourseManageView,
+  'leader:leader_m7': LeaderAnnouncementManageView,
   'admin:admin_m1': UsersAdminView,
   'admin:admin_m2': RolesAdminView,
   'admin:admin_m3': OrgAdminView,
