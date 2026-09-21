@@ -22,7 +22,7 @@ export interface CalendarEventInfo {
 
 /** 日历事件详情（api.json: CalendarEventDetail） */
 export interface CalendarEventDetail extends CalendarEventInfo {
-  description: string | null
+  description: string | null  
   created_at: string
 }
 

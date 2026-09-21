@@ -217,7 +217,7 @@ export default function LeaveApprovalView() {
 
   return (
     <div className="student-view">
-      <Alert type="info" showIcon title={t('approval.scopeHint')} />
+      
 
       <section className="panel-card">
         <header className="panel-card-header">

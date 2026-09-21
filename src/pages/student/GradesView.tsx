@@ -8,9 +8,12 @@
  * 范围限制：本页不提供任何 uid 输入，只使用登录态返回的 uid 查询，
  * 因此学生只能看到本人成绩（后端 /api/examinations 需 examination.select 权限）。
  *
- * 交互：学期筛选（选项来自本人成绩数据）、学分/均分/GPA 统计、成绩明细表格
+ * 交互：学期筛选（选项来自本人成绩数据）、学分/均分统计、成绩明细表格
  * （每页 20 行，支持直接输入页码跳转并显示总页数）、点击行经
  * GET /api/examinations/{id} 查看该条成绩完整详情（ai 要求 14）。
+ *
+ * 绩点：后端未提供绩点字段（也无换算规则接口），因此不做任何前端换算，
+ * 界面统一展示「暂无法查询」，避免用约定表填充出虚假数据（ai 要求 8）。
  */
 /* eslint-disable react/set-state-in-effect */
 import { ReloadOutlined } from '@ant-design/icons'
@@ -47,7 +50,6 @@ import {
   EXAM_TYPE_COLOR,
   STUDENT_SCORE_PAGE_SIZE,
   scoreColor,
-  scoreToGpa,
 } from '../../config/examination'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
@@ -148,27 +150,20 @@ export default function GradesView() {
     useMemo(() => scores.map((s) => s.course_id), [scores]),
   )
 
-  // 学分：不及格不计已修学分；均分：全部修读记录的算术平均；
-  // GPA：仅对获得学分的课程（通过/补考通过）做学分加权
+  // 学分：不及格不计已修学分；均分：全部修读记录的算术平均。
+  // 绩点：后端未提供该字段，不做前端换算（换算结果属于虚假数据），界面统一显示「暂无法查询」。
   const stats = useMemo(() => {
     let credits = 0
     let scoreSum = 0
-    let gpaWeighted = 0
-    let gpaCredits = 0
     for (const s of filtered) {
       const value = Number(s.score)
       const credit = Number(courseDetails.get(s.course_id)?.credit ?? 0) || 0
       if (Number.isFinite(value)) scoreSum += value
-      if (s.is_pass) {
-        credits += credit
-        gpaCredits += credit
-        gpaWeighted += scoreToGpa(value) * credit
-      }
+      if (s.is_pass) credits += credit
     }
     return {
       credits,
       average: filtered.length > 0 ? scoreSum / filtered.length : 0,
-      gpa: gpaCredits > 0 ? gpaWeighted / gpaCredits : 0,
     }
   }, [filtered, courseDetails])
 
@@ -252,15 +247,6 @@ export default function GradesView() {
         ),
       },
       {
-        title: t('grades.colGpa'),
-        dataIndex: 'score',
-        key: 'gpa',
-        width: 90,
-        align: 'center',
-        render: (v: string, record) =>
-          record.is_pass ? scoreToGpa(Number(v)).toFixed(1) : '—',
-      },
-      {
         title: t('grades.colStatus'),
         key: 'status',
         width: 120,
@@ -278,7 +264,7 @@ export default function GradesView() {
 
   return (
     <div className="student-view">
-      <Alert type="info" showIcon title={t('grades.scopeHint')} />
+     
 
       <section className="panel-card">
         <header className="panel-card-header">
@@ -337,7 +323,15 @@ export default function GradesView() {
                 </Col>
                 <Col xs={24} sm={8}>
                   <Card size="small">
-                    <Statistic title={t('grades.statGpa')} value={stats.gpa} precision={2} />
+                    {/* 绩点后端未提供，不做前端换算，直接展示「暂无法查询」 */}
+                    <Tooltip title={t('grades.gpaUnavailableHint')}>
+                      <span>
+                        <Statistic
+                          title={t('grades.statGpa')}
+                          value={t('grades.gpaUnavailable')}
+                        />
+                      </span>
+                    </Tooltip>
                   </Card>
                 </Col>
               </Row>
@@ -348,7 +342,7 @@ export default function GradesView() {
                 columns={columns}
                 dataSource={filtered}
                 locale={{ emptyText: t('common.noData') }}
-                scroll={{ x: 900 }}
+                scroll={{ x: 810 }}
                 onRow={(record: CourseScoreInfo) => ({
                   onClick: () => void openDetail(record.id),
                   title: t('grades.rowClickHint'),

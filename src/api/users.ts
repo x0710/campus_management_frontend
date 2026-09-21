@@ -1,3 +1,4 @@
+/** 用户相关接口 */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import type { PaginatedResponse, PageQuery } from './common'
@@ -72,6 +73,16 @@ export async function queryUsers(
 /** GET /api/users/{id} 用户详情（会话内缓存） */
 export async function getUser(id: number): Promise<UserDetail> {
   return cachedGet<UserDetail>(`/users/${id}`)
+}
+
+/**
+ * GET /api/users/me 获取当前登录用户的详细资料（含真实姓名 name）。
+ * 与 /users/{id} 不同，该接口仅需登录认证、不要求 user.read 权限，
+ * 因此顶栏等全局位置可用它把账户名换成真实姓名；走会话缓存，
+ * 退出登录时由 invalidate() 统一清空，避免下一个用户读到上一位用户的资料（ai 要求 17）。
+ */
+export function getMyProfile(): Promise<UserDetail> {
+  return cachedGet<UserDetail>('/users/me')
 }
 
 /** POST /api/users 批量创建用户 */

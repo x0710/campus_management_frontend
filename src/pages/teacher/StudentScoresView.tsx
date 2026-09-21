@@ -431,7 +431,7 @@ export default function StudentScoresView() {
 
   return (
     <div className="student-view">
-      <Alert type="info" showIcon title={t('teacherGrades.scopeHint')} />
+     
 
       <section className="panel-card">
         <header className="panel-card-header">

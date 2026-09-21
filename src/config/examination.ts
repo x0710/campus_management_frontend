@@ -37,26 +37,3 @@ export function scoreColor(score: string, isPass: boolean): string | undefined {
 
 /** 学生端本人成绩列表每页条数（ai 要求 12：表格每页最多 20 行） */
 export const STUDENT_SCORE_PAGE_SIZE = 20
-
-/**
- * 百分制分数 → 绩点（4.0 制）换算表，用于学生端「平均绩点」统计与绩点列展示。
- * 后端不提供绩点字段，此处为前端展示约定；区间按「下限降序」匹配。
- */
-export const SCORE_GPA_TABLE: { min: number; gpa: number }[] = [
-  { min: 90, gpa: 4.0 },
-  { min: 85, gpa: 3.7 },
-  { min: 82, gpa: 3.3 },
-  { min: 78, gpa: 3.0 },
-  { min: 75, gpa: 2.7 },
-  { min: 72, gpa: 2.3 },
-  { min: 68, gpa: 2.0 },
-  { min: 64, gpa: 1.5 },
-  { min: 60, gpa: 1.0 },
-  { min: 0, gpa: 0 },
-]
-
-/** 百分制分数换算为绩点（非法分数返回 0） */
-export function scoreToGpa(score: number): number {
-  if (!Number.isFinite(score)) return 0
-  return SCORE_GPA_TABLE.find((row) => score >= row.min)?.gpa ?? 0
-}
