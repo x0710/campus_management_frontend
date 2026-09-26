@@ -27,6 +27,7 @@ import {
   TeamOutlined,
   TrophyOutlined,
   UserOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -77,6 +78,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'student_m6', status: 'preview', icon: <HeartOutlined /> },
       { key: 'student_m7', status: 'preview', icon: <StarOutlined /> },
       { key: 'student_m8', status: 'ready', icon: <CalendarOutlined /> },
+      { key: 'student_m9', status: 'ready', icon: <WarningOutlined /> },
     ],
   },
   {
