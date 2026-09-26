@@ -1,5 +1,9 @@
 /**
- * 领导端：成员详情页（从「组织概览」点击成员行进入，渲染在 PortalWorkspace 布局壳内）。
+ * 成员详情页（领导端「组织概览」与老师端「班级管理」共用，渲染在 PortalWorkspace 布局壳内）。
+ *
+ * 入口与来源：?from=<moduleKey>（leader_m3 / teacher_m3），决定「返回」目标与侧栏高亮；
+ * 来自只读来源（见 MEMBER_DETAIL_READONLY_FROM_MODULES，如老师端）时隐藏成绩/违规编辑入口，
+ * 仅提供查询，避免展示无权限的编辑按钮。
  *
  * 四个 Tab：
  *   1. 基本信息：GET /api/users/{id}
@@ -47,7 +51,7 @@ import axios from 'axios'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { queryApprovals } from '../../api/approvals'
 import type { ApprovalStepStatus } from '../../api/types/approvals'
 import { extractErrorWithStatus } from '../../api/common'
@@ -82,7 +86,7 @@ import {
   EXAM_TYPE_ORDER,
   scoreColor,
 } from '../../config/examination'
-import { MEMBER_DETAIL_PAGE_SIZE } from '../../config/leaderOrg'
+import { MEMBER_DETAIL_PAGE_SIZE, MEMBER_DETAIL_READONLY_FROM_MODULES } from '../../config/leaderOrg'
 import { LEAVE_STATUS_COLOR, LEAVE_TYPE_COLOR } from '../../config/leave'
 import {
   VIOLATION_CATEGORY_MAX_LENGTH,
@@ -134,6 +138,11 @@ export default function MemberDetailPage() {
   const locale = useSettingsStore((s) => s.locale)
   const navigate = useNavigate()
   const { portalKey, uid } = useParams<{ portalKey: string; uid: string }>()
+  const [searchParams] = useSearchParams()
+  // 来源模块（侧栏高亮 + 返回目标）：领导端组织概览 leader_m3 / 老师端班级管理 teacher_m3
+  const fromModuleKey = searchParams.get('from') ?? 'leader_m3'
+  // 只读来源（如老师端班级管理）隐藏成绩/违规编辑入口，避免无权限操作（错误处理只作兜底）
+  const readOnly = MEMBER_DETAIL_READONLY_FROM_MODULES.includes(fromModuleKey)
   const userId = Number(uid)
 
   const [user, setUser] = useState<UserDetail | null>(null)
@@ -163,7 +172,7 @@ export default function MemberDetailPage() {
     void loadUser()
   }, [loadUser])
 
-  const backToList = () => navigate(`/portal/${portalKey}/leader_m3`)
+  const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey}`)
 
   /** 性别文案（与个人资料页一致） */
   const genderLabel = useMemo(() => {
@@ -220,7 +229,7 @@ export default function MemberDetailPage() {
               {
                 key: 'grades',
                 label: t('memberDetail.tabGrades'),
-                children: <GradesTab uid={userId} t={t} />,
+                children: <GradesTab uid={userId} t={t} readOnly={readOnly} />,
               },
               {
                 key: 'leave',
@@ -230,7 +239,7 @@ export default function MemberDetailPage() {
               {
                 key: 'violation',
                 label: t('memberDetail.tabViolation'),
-                children: <ViolationTab uid={userId} t={t} />,
+                children: <ViolationTab uid={userId} t={t} readOnly={readOnly} />,
               },
             ]}
           />
@@ -432,8 +441,11 @@ function BasicInfoPanel({
   )
 }
 
-/** 成绩信息 Tab：展示成员全部成绩，点击行编辑（PATCH /api/examinations/{id}） */
-function GradesTab({ uid, t }: { uid: number; t: TranslateFn }) {
+/**
+ * 成绩信息 Tab：展示成员全部成绩，点击行编辑（PATCH /api/examinations/{id}）。
+ * readOnly=true（如老师端班级管理进入）时隐藏编辑入口与行点击编辑，仅作查询（代码要求 14）。
+ */
+function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
   const { message } = AntdApp.useApp()
 
   const [scores, setScores] = useState<CourseScoreInfo[]>([])
@@ -525,8 +537,8 @@ function GradesTab({ uid, t }: { uid: number; t: TranslateFn }) {
     }
   }
 
-  const columns = useMemo<ColumnsType<CourseScoreInfo>>(
-    () => [
+  const columns = useMemo<ColumnsType<CourseScoreInfo>>(() => {
+    const cols: ColumnsType<CourseScoreInfo> = [
       {
         title: t('teacherGrades.colCourse'),
         dataIndex: 'course_id',
@@ -577,11 +589,14 @@ function GradesTab({ uid, t }: { uid: number; t: TranslateFn }) {
           </Tag>
         ),
       },
-      {
+      ]
+    // 只读来源（老师端班级管理）不展示成绩编辑入口
+    if (!readOnly) {
+      cols.push({
         title: t('approval.colAction'),
         key: 'action',
         width: 100,
-        render: (_, record) => (
+        render: (_: unknown, record: CourseScoreInfo) => (
           <Tooltip title={t('memberDetail.scoreEditHint')}>
             <Button
               type="link"
@@ -593,10 +608,10 @@ function GradesTab({ uid, t }: { uid: number; t: TranslateFn }) {
             </Button>
           </Tooltip>
         ),
-      },
-    ],
-    [t, courseDetails, openEdit],
-  )
+      })
+    }
+    return cols
+  }, [t, courseDetails, openEdit, readOnly])
 
   return (
     <>
@@ -631,15 +646,20 @@ function GradesTab({ uid, t }: { uid: number; t: TranslateFn }) {
           dataSource={scores}
           locale={{ emptyText: t('common.noData') }}
           scroll={{ x: 900 }}
-          onRow={(record) => ({
-            onClick: (e: React.MouseEvent) => {
-              const target = e.target as HTMLElement
-              if (target.closest('button')) return
-              void openEdit(record)
-            },
-            title: t('memberDetail.scoreEditHint'),
-            style: { cursor: 'pointer' },
-          })}
+          /* 只读来源不响应行点击编辑（老师端仅查询） */
+          onRow={
+            readOnly
+              ? undefined
+              : (record) => ({
+                  onClick: (e: React.MouseEvent) => {
+                    const target = e.target as HTMLElement
+                    if (target.closest('button')) return
+                    void openEdit(record)
+                  },
+                  title: t('memberDetail.scoreEditHint'),
+                  style: { cursor: 'pointer' },
+                })
+          }
           pagination={{
             current: page,
             pageSize: MEMBER_DETAIL_PAGE_SIZE,
@@ -927,8 +947,11 @@ function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
   )
 }
 
-/** 违规信息 Tab：分页展示成员违规记录，点击行查看详细，支持编辑（PATCH /api/violations/{id}） */
-function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
+/**
+ * 违规信息 Tab：分页展示成员违规记录，点击行查看详细，支持编辑（PATCH /api/violations/{id}）。
+ * readOnly=true（如老师端班级管理进入）时隐藏编辑入口，仅可查看详情（代码要求 14）。
+ */
+function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
   const { message } = AntdApp.useApp()
   const locale = useSettingsStore((s) => s.locale)
 
@@ -1024,8 +1047,8 @@ function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
     }
   }
 
-  const columns = useMemo<ColumnsType<ViolationDto>>(
-    () => [
+  const columns = useMemo<ColumnsType<ViolationDto>>(() => {
+    const cols: ColumnsType<ViolationDto> = [
       { title: t('memberDetail.colCategory'), dataIndex: 'category', key: 'category', width: 130 },
       {
         title: t('memberDetail.colTitle'),
@@ -1057,11 +1080,14 @@ function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
         width: 160,
         render: (v: string | null) => v || '—',
       },
-      {
+      ]
+    // 只读来源（老师端班级管理）不展示违规编辑入口
+    if (!readOnly) {
+      cols.push({
         title: t('approval.colAction'),
         key: 'action',
         width: 100,
-        render: (_, record) => (
+        render: (_: unknown, record: ViolationDto) => (
           <Tooltip title={t('memberDetail.editViolation')}>
             <Button
               type="link"
@@ -1073,10 +1099,10 @@ function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
             </Button>
           </Tooltip>
         ),
-      },
-    ],
-    [t, locale, openEdit],
-  )
+      })
+    }
+    return cols
+  }, [t, locale, openEdit, readOnly])
 
   return (
     <>
@@ -1138,17 +1164,22 @@ function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
         title={t('memberDetail.violationDetailTitle')}
         onCancel={() => setDetail(null)}
         footer={[
-          <Button
-            key="edit"
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => {
-              if (detail) openEdit(detail)
-              setDetail(null)
-            }}
-          >
-            {t('memberDetail.edit')}
-          </Button>,
+          // 只读来源（老师端班级管理）仅提供关闭按钮
+          ...(readOnly
+            ? []
+            : [
+                <Button
+                  key="edit"
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    if (detail) openEdit(detail)
+                    setDetail(null)
+                  }}
+                >
+                  {t('memberDetail.edit')}
+                </Button>,
+              ]),
           <Button key="close" onClick={() => setDetail(null)}>
             {t('common.close')}
           </Button>,

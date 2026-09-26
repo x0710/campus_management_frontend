@@ -22,6 +22,7 @@ import SecondClassCreditsView from '../student/SecondClassCreditsView'
 import ViolationQueryView from '../student/ViolationQueryView'
 import LeaveApprovalView from '../teacher/LeaveApprovalView'
 import StudentScoresView from '../teacher/StudentScoresView'
+import ClassManageView from '../teacher/ClassManageView'
 import PublishAnnouncementView from '../leader/PublishAnnouncementView'
 import CalendarManageView from '../leader/CalendarManageView'
 import CourseManageView from '../leader/CourseManageView'
@@ -55,6 +56,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'student:student_m8': SchoolCalendarView,
   'student:student_m9': ViolationQueryView,
   'teacher:teacher_m2': LeaveApprovalView,
+  'teacher:teacher_m3': ClassManageView,
   'teacher:teacher_m5': StudentScoresView,
   'leader:leader_m3': LeaderOrgView,
   'leader:leader_m4': PublishAnnouncementView,

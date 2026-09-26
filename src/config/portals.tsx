@@ -89,7 +89,7 @@ export const PORTALS: PortalDef[] = [
     modules: [
       { key: 'teacher_m1', status: 'planned', icon: <BookOutlined /> },
       { key: 'teacher_m2', status: 'ready', icon: <CheckCircleOutlined /> },
-      { key: 'teacher_m3', status: 'planned', icon: <TeamOutlined /> },
+      { key: 'teacher_m3', status: 'ready', icon: <TeamOutlined /> },
       { key: 'teacher_m4', status: 'planned', icon: <FormOutlined /> },
       { key: 'teacher_m5', status: 'ready', icon: <TrophyOutlined /> },
     ],

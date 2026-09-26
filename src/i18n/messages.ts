@@ -846,6 +846,12 @@ const messages = {
       violationUpdateSuccess: '违规记录已更新',
       violationRefreshHint: '刷新违规列表',
     },
+    orgExplorer: {
+      emptyOrgs: '未查询到您所在的组织，请联系管理员确认组织归属',
+    },
+    teacherClass: {
+      scopeHint: '仅展示您所在组织的全部人员，点击任意一行可查看该成员的成绩、请假与违规信息',
+    },
     counseling: {
       title: '心理咨询预约',
       formType: '咨询类型',
@@ -1711,6 +1717,13 @@ const messages = {
       occurredAtRequired: 'Please select the occurred time',
       violationUpdateSuccess: 'Violation record updated',
       violationRefreshHint: 'Refresh the violation list',
+    },
+    orgExplorer: {
+      emptyOrgs: 'No organization found for your account. Please contact an administrator.',
+    },
+    teacherClass: {
+      scopeHint:
+        'Shows all members of your own organizations. Click any row to view that member’s grades, leave and violation records',
     },
     teacherGrades: {
       title: 'Student Grades',
