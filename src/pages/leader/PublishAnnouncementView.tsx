@@ -5,7 +5,7 @@
  * - 详情：点击表格整行跳转公告详情页（复用主端 AnnouncementDetailPage，按 id 单独请求全文）；
  * - 删除：DELETE /api/announcements/{id}，永久移除且不可恢复（与「下线」不同，本页不提供软下线）。
  *
- * 约定（ai 要求）：分页每页最多 20 行并可跳页；行内操作按钮阻止冒泡避免误触行点击；
+ * 约定（代码要求）：分页每页最多 20 行并可跳页；行内操作按钮阻止冒泡避免误触行点击；
  * 悬停提示见 Tooltip；错误提示带 HTTP 状态码。
  */
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -17,13 +17,16 @@ import { useNavigate, useParams } from 'react-router'
 import {
   deleteAnnouncement,
   queryAnnouncements,
-  type AnnouncementListItem,
-  type AnnouncementPriority,
-  type AnnouncementStatus,
-  type AnnouncementType,
 } from '../../api/announcements'
+import type {
+  AnnouncementListItem,
+  AnnouncementPriority,
+  AnnouncementStatus,
+  AnnouncementType,
+} from '../../api/types/announcements'
 import { getCurrentUser } from '../../api/auth'
-import { extractErrorWithStatus, type PageQuery } from '../../api/common'
+import { extractErrorWithStatus } from '../../api/common'
+import type { PageQuery } from '../../api/types/common'
 import {
   ANNOUNCEMENT_PRIORITY_COLOR,
   ANNOUNCEMENT_STATUS_COLOR,

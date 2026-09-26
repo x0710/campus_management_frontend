@@ -16,7 +16,8 @@
  *   useCourseNames   —— 只需课程名称时的轻量封装（内部复用 useCourseDetails）
  */
 import { useEffect, useMemo, useState } from 'react'
-import { getCourse, type CourseDetail } from '../api/courses'
+import { getCourse } from '../api/courses'
+import type { CourseDetail } from '../api/types/courses'
 
 /** 批量解析课程详情：Map<courseId, CourseDetail | null> */
 export function useCourseDetails(ids: number[]): Map<number, CourseDetail | null> {

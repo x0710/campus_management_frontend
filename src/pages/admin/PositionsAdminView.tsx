@@ -34,8 +34,8 @@ import {
   getPosition,
   queryPositions,
   updatePosition,
-  type PositionDetail,
 } from '../../api/positions'
+import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorWithStatus } from '../../api/common'
 import {
   POSITION_CODE_MAX_LENGTH,
@@ -85,7 +85,7 @@ export default function PositionsAdminView() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  /** 统一错误提示：带 HTTP 状态码（ai 要求 9） */
+  /** 统一错误提示：带 HTTP 状态码（代码要求 9） */
   const showError = useCallback(
     (err: unknown) => {
       const code = extractErrorWithStatus(err)

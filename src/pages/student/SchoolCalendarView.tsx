@@ -26,7 +26,7 @@ export default function SchoolCalendarView() {
     dayDetailsError,
   } = useCalendarEvents()
 
-  // 详情拉取失败（如 404）弹窗提示状态码，便于调试（ai 要求 9）
+  // 详情拉取失败（如 404）弹窗提示状态码，便于调试（代码要求 9）
   useEffect(() => {
     if (dayDetailsError) {
       message.error(dayDetailsError === 'network' ? t('common.networkError') : dayDetailsError)

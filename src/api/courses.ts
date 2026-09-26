@@ -14,50 +14,14 @@
  */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PageQuery, PaginatedResponse } from './common'
-
-/** 课程类型（api.json: CourseType） */
-export type CourseType = 'compulsory' | 'elective' | 'general'
-
-/** 课程列表项（api.json: CourseInfo） */
-export interface CourseInfo {
-  id: number
-  /** 课程代码（可为空） */
-  course_code: string | null
-  course_name: string
-  course_type: CourseType
-  /** 学分（后端 Decimal → 字符串，如 "3.00"） */
-  credit: string
-}
-
-/** 课程详情（api.json: CourseDetail） */
-export interface CourseDetail extends CourseInfo {
-  /** 及格分数（后端 Decimal → 字符串） */
-  pass_score: string
-  created_at: string
-  updated_at: string
-}
-
-/** 课程分页查询参数 */
-export interface CourseQuery extends PageQuery {
-  /** 按课程代码或课程名称模糊搜索 */
-  keyword?: string
-  course_type?: CourseType
-}
-
-/** 创建课程请求（POST /api/courses） */
-export interface CourseCreateRequest {
-  course_code?: string | null
-  course_name: string
-  course_type: CourseType
-  /** 学分，需以字符串提交（后端 Decimal 由字符串反序列化） */
-  credit: string
-  /** 及格分数（不传由后端默认 60） */
-  pass_score?: string | null
-}
-
-/** 更新课程请求（PATCH /api/courses/{id}，字段均可选） */
-export type CourseUpdateRequest = Partial<CourseCreateRequest>
+import type { PaginatedResponse } from './types/common'
+import type {
+  CourseCreateRequest,
+  CourseDetail,
+  CourseInfo,
+  CourseQuery,
+  CourseUpdateRequest,
+} from './types/courses'
 
 /** GET /api/courses 分页查询课程（force=true 绕过会话缓存） */
 export function queryCourses(params: CourseQuery = {}, force?: boolean) {

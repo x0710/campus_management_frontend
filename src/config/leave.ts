@@ -1,7 +1,7 @@
 /** 请假相关常量，供列表标签、详情弹窗等多处复用。 */
  
-import type { LeaveType } from '../api/leaves'
-import type { ApprovalStepStatus } from '../api/approvals'
+import type { LeaveType } from '../api/types/leaves'
+import type { ApprovalStepStatus } from '../api/types/approvals'
 
 /**
  * 请假相关常量集中定义，供列表标签、详情弹窗等多处复用。

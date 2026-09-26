@@ -24,6 +24,7 @@ import StudentScoresView from '../teacher/StudentScoresView'
 import PublishAnnouncementView from '../leader/PublishAnnouncementView'
 import CalendarManageView from '../leader/CalendarManageView'
 import CourseManageView from '../leader/CourseManageView'
+import ApprovalTemplateManageView from '../leader/ApprovalTemplateManageView'
 import LeaderOrgView from '../leader/LeaderOrgView'
 import UsersAdminView from '../admin/UsersAdminView'
 import OrgAdminView from '../admin/OrgAdminView'
@@ -58,6 +59,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'leader:leader_m5': CalendarManageView,
   'leader:leader_m6': CourseManageView,
   'leader:leader_m7': LeaderAnnouncementManageView,
+  'leader:leader_m8': ApprovalTemplateManageView,
   'admin:admin_m1': UsersAdminView,
   'admin:admin_m2': RolesAdminView,
   'admin:admin_m3': OrgAdminView,

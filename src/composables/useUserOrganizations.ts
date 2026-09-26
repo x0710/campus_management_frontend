@@ -9,10 +9,8 @@
  * 已解析 ID 再次进入时由 API 层缓存直接返回，不会产生额外网络请求。
  */
 import { useEffect, useMemo, useState } from 'react'
-import {
-  listUserOrganizations,
-  type UserOrganization,
-} from '../api/organizations'
+import { listUserOrganizations } from '../api/organizations'
+import type { UserOrganization } from '../api/types/organizations'
 
 export function useUserOrganizations(
   ids: number[],

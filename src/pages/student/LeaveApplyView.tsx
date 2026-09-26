@@ -29,11 +29,13 @@ import {
   createLeave,
   deleteLeave,
   queryLeaves,
-  type LeaveConflict,
-  type LeaveCreateRequest,
-  type LeaveInfo,
-  type LeaveType,
 } from '../../api/leaves'
+import type {
+  LeaveConflict,
+  LeaveCreateRequest,
+  LeaveInfo,
+  LeaveType,
+} from '../../api/types/leaves'
 import { extractErrorWithStatus } from '../../api/common'
 import LeaveDetailModal from '../../components/LeaveDetailModal'
 import { LEAVE_CONFLICT_CHECK_DEBOUNCE_MS } from '../../config/leave'
@@ -131,7 +133,7 @@ export default function LeaveApplyView() {
     [t, locale],
   )
 
-  /** 统一错误提示：网络错误走文案，其余回显带状态码的后端信息（ai 要求 9） */
+  /** 统一错误提示：网络错误走文案，其余回显带状态码的后端信息（代码要求 9） */
   const showError = (err: unknown) => {
     const code = extractErrorWithStatus(err)
     message.error(code === 'network' ? t('common.networkError') : code)
@@ -209,7 +211,7 @@ export default function LeaveApplyView() {
     )
   }
 
-  /** 撤回请假申请：成功后关闭弹窗并刷新列表（ai 要求 13） */
+  /** 撤回请假申请：成功后关闭弹窗并刷新列表（代码要求 13） */
   const withdrawLeave = async (id: number) => {
     setActing('cancel')
     try {
@@ -224,7 +226,7 @@ export default function LeaveApplyView() {
     }
   }
 
-  /** 删除请假记录：成功后关闭弹窗并刷新列表（ai 要求 13） */
+  /** 删除请假记录：成功后关闭弹窗并刷新列表（代码要求 13） */
   const removeLeave = async (id: number) => {
     setActing('delete')
     try {
@@ -335,7 +337,7 @@ export default function LeaveApplyView() {
               </Form.Item>
             </div>
 
-            {/* 时间填写后的冲突预检结果（ai 要求 9：检查失败时展示状态码） */}
+            {/* 时间填写后的冲突预检结果（代码要求 9：检查失败时展示状态码） */}
             <div className="leave-conflict-alert">{conflictAlert()}</div>
 
             <Form.Item name="parent_confirm" valuePropName="checked">

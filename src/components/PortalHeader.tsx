@@ -57,7 +57,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   ]
 
   const handleLogout = () => {
-    // ai 要求 17：退出登录先清空接口会话缓存，避免下一个登录用户看到上一个用户的残留数据
+    // 代码要求 17：退出登录先清空接口会话缓存，避免下一个登录用户看到上一个用户的残留数据
     // （如 /credentials/me 被缓存时，会把上一位用户的 uid 带给新用户）
     invalidate()
     clearAuth()
@@ -102,7 +102,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
 
         <div className="header-user">
           <Avatar size="small" style={{ backgroundColor: '#2f54eb' }} icon={<UserOutlined />} />
-          {/* 展示真实姓名；鼠标悬停提示对应的账户名（ai 要求 10） */}
+          {/* 展示真实姓名；鼠标悬停提示对应的账户名（代码要求 10） */}
           <Tooltip
             title={
               displayName === username

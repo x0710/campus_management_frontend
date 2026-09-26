@@ -4,7 +4,7 @@
  * - 工具栏「新增事件」→ POST /api/calendars（权限 calendar.create）；
  * - 右侧卡片中每个事件详情的「编辑」→ PATCH /api/calendars/{id}（权限 calendar.update）；
  * - 右侧卡片中每个事件详情的「删除」→ DELETE /api/calendars/{id}（权限 calendar.delete，删除前二次确认）；
- * - 每次保存/删除后失效日历缓存并强制刷新看板与当日详情（ai 要求 13）。
+ * - 每次保存/删除后失效日历缓存并强制刷新看板与当日详情（代码要求 13）。
  */
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
@@ -26,9 +26,11 @@ import {
   deleteEvent,
   getEvent,
   updateEvent,
-  type CalendarEventDetail,
-  type EventType,
 } from '../../api/calendars'
+import type {
+  CalendarEventDetail,
+  EventType,
+} from '../../api/types/calendars'
 import { extractError } from '../../api/common'
 import CalendarBoard from '../../components/CalendarBoard'
 import { useCalendarEvents } from '../../composables/useCalendarEvents'
@@ -73,7 +75,7 @@ export default function CalendarManageView() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [form] = Form.useForm<EventFormValues>()
 
-  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（ai 要求 9） */
+  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
   const showError = useCallback(
     (err: unknown) => {
       const code = typeof err === 'string' ? err : extractError(err)
@@ -130,7 +132,7 @@ export default function CalendarManageView() {
     })
   }, [formModal, form])
 
-  /** 提交表单：新增或更新事件，成功后强制刷新看板（ai 要求 13） */
+  /** 提交表单：新增或更新事件，成功后强制刷新看板（代码要求 13） */
   const submitForm = async () => {
     const values = await form.validateFields()
     const [start, end] = values.range
@@ -159,7 +161,7 @@ export default function CalendarManageView() {
     }
   }
 
-  /** 删除指定事件：成功后强制刷新列表与当日详情（ai 要求 13） */
+  /** 删除指定事件：成功后强制刷新列表与当日详情（代码要求 13） */
   const removeEvent = async (id: number) => {
     setDeletingId(id)
     try {

@@ -4,7 +4,7 @@
  * - edit  ：打开时用 GET /api/courses/{id} 拉取详情回填，提交调用 PATCH /api/courses/{id}；
  * - view  ：同样的详情接口，用只读的描述列表（Descriptions）展示，而非禁用状态的表单，
  *          并额外展示创建/更新时间；若传入 onEdit，弹窗底部提供「编辑」按钮，可在同一弹窗内切换到编辑模式；
- * 保存成功后回调 onSaved，由调用方强制刷新课程列表（ai 要求 13）。
+ * 保存成功后回调 onSaved，由调用方强制刷新课程列表（代码要求 13）。
  * 学分与及格分数使用 InputNumber 的 stringMode，与后端 Decimal（JSON 字符串）保持一致。
  */
 import { EditOutlined } from '@ant-design/icons'
@@ -23,13 +23,8 @@ import {
   Typography,
 } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
-import {
-  createCourse,
-  getCourse,
-  updateCourse,
-  type CourseDetail,
-  type CourseType,
-} from '../api/courses'
+import { createCourse, getCourse, updateCourse } from '../api/courses'
+import type { CourseDetail, CourseType } from '../api/types/courses'
 import { extractError } from '../api/common'
 import {
   COURSE_CODE_MAX_LENGTH,
@@ -90,7 +85,7 @@ export default function CourseFormModal({
   const readOnly = mode === 'view'
   const isEdit = mode === 'edit'
 
-  /** 错误提示：网络错误走文案，其余回显后端状态码/信息（ai 要求 9） */
+  /** 错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
   const showError = useCallback(
     (code: string) => {
       message.error(

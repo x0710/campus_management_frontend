@@ -1,8 +1,8 @@
 /**
- * 违规记录相关常量（ai 要求 7：常量集中放 config/，便于复用）。
+ * 违规记录相关常量（代码要求 7：常量集中放 config/，便于复用）。
  * 文案走 i18n（memberDetail.severity_*），这里只放枚举顺序、配色与分页/长度限制。
  */
-import type { ViolationSeverity } from '../api/violations'
+import type { ViolationSeverity } from '../api/types/violations'
 
 /** 违规严重程度枚举顺序（筛选下拉与编辑表单共用） */
 export const VIOLATION_SEVERITY_ORDER: ViolationSeverity[] = ['low', 'medium', 'high', 'critical']
@@ -15,7 +15,7 @@ export const VIOLATION_SEVERITY_COLOR: Record<ViolationSeverity, string> = {
   critical: 'red',
 }
 
-/** 违规记录列表每页条数（ai 要求 12：表格每页最多 20 行） */
+/** 违规记录列表每页条数（代码要求 12：表格每页最多 20 行） */
 export const VIOLATION_PAGE_SIZE = 20
 
 /** 违规编辑表单字段长度上限 */

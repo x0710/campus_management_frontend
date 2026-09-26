@@ -1,8 +1,8 @@
 /**
- * 校历日历常量集中定义（ai 要求：常量统一放 config/，供日历看板、筛选等视图复用）。
+ * 校历日历常量集中定义（代码要求：常量统一放 config/，供日历看板、筛选等视图复用）。
  * 文案走 i18n（calendar.type_*），这里仅放配色、枚举顺序与分页/展示相关的数值。
  */
-import type { EventType } from '../api/calendars'
+import type { EventType } from '../api/types/calendars'
 
 /** 事件类型 → Tag 配色（夜间模式下 antd Tag 自动适配） */
 export const CALENDAR_EVENT_COLOR: Record<EventType, string> = {

@@ -22,12 +22,15 @@ import {
   addOrgMember,
   listUserOrganizations,
   removeOrgMember,
-  type OrganizationInfo,
-  type UserOrganization,
 } from '../../api/organizations'
-import { type PositionDetail } from '../../api/positions'
+import type {
+  OrganizationInfo,
+  UserOrganization,
+} from '../../api/types/organizations'
+import type { PositionDetail } from '../../api/types/positions'
 import { assignUserRoles, queryUserRoleRelations } from '../../api/rbac'
-import { getUser, updateUser, type UserDetail, type Gender } from '../../api/users'
+import { getUser, updateUser } from '../../api/users'
+import type { UserDetail, Gender } from '../../api/types/users'
 import { extractError } from '../../api/common'
 import { useT } from '../../i18n'
 

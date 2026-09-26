@@ -10,10 +10,10 @@
  *
  * 交互：学期筛选（选项来自本人成绩数据）、学分/均分统计、成绩明细表格
  * （每页 20 行，支持直接输入页码跳转并显示总页数）、点击行经
- * GET /api/examinations/{id} 查看该条成绩完整详情（ai 要求 14）。
+ * GET /api/examinations/{id} 查看该条成绩完整详情（代码要求 14）。
  *
  * 绩点：后端未提供绩点字段（也无换算规则接口），因此不做任何前端换算，
- * 界面统一展示「暂无法查询」，避免用约定表填充出虚假数据（ai 要求 8）。
+ * 界面统一展示「暂无法查询」，避免用约定表填充出虚假数据（代码要求 8）。
  */
 /* eslint-disable react/set-state-in-effect */
 import { ReloadOutlined } from '@ant-design/icons'
@@ -38,13 +38,12 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorWithStatus } from '../../api/common'
-import {
-  getScore,
-  listAllScoresForUser,
-  type CourseScoreDetail,
-  type CourseScoreInfo,
-  type ExamType,
-} from '../../api/examinations'
+import { getScore, listAllScoresForUser } from '../../api/examinations'
+import type {
+  CourseScoreDetail,
+  CourseScoreInfo,
+  ExamType,
+} from '../../api/types/examinations'
 import { useCourseDetails } from '../../composables/useCourseNames'
 import {
   EXAM_TYPE_COLOR,

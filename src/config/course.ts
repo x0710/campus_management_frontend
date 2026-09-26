@@ -1,8 +1,8 @@
 /**
- * 课程管理常量集中定义（ai 要求 7：常量统一放 config/，便于复用）。
+ * 课程管理常量集中定义（代码要求 7：常量统一放 config/，便于复用）。
  * 文案走 i18n（course.type_*），这里只放配色、枚举顺序、分页与输入长度限制。
  */
-import type { CourseType } from '../api/courses'
+import type { CourseType } from '../api/types/courses'
 
 /** 课程类型 → Tag 配色（夜间模式下 antd Tag 自动适配） */
 export const COURSE_TYPE_COLOR: Record<CourseType, string> = {
@@ -14,7 +14,7 @@ export const COURSE_TYPE_COLOR: Record<CourseType, string> = {
 /** 课程类型枚举顺序（筛选项与表单下拉选项共用） */
 export const COURSE_TYPE_OPTIONS: CourseType[] = ['compulsory', 'elective', 'general']
 
-/** 课程列表每页条数（ai 要求 12：表格每页最多 20 行） */
+/** 课程列表每页条数（代码要求 12：表格每页最多 20 行） */
 export const COURSE_PAGE_SIZE = 20
 
 /** 课程代码最大长度（表单输入限制） */

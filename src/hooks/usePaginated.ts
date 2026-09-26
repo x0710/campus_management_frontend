@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import type { PaginatedResponse, PageQuery } from '../api/common'
+import type { PaginatedResponse, PageQuery } from '../api/types/common'
 
 interface PaginatedState<T> {
   data: T[]

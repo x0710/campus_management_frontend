@@ -1,8 +1,8 @@
 /**
- * 成绩相关常量集中定义（ai 要求 7：常量统一放 config/，便于复用）。
+ * 成绩相关常量集中定义（代码要求 7：常量统一放 config/，便于复用）。
  * 文案走 i18n（teacherGrades.examType_*），这里只放枚举顺序、配色与分页限制。
  */
-import type { ExamType } from '../api/examinations'
+import type { ExamType } from '../api/types/examinations'
 
 /** 考试类型枚举顺序（筛选下拉与表格文案共用） */
 export const EXAM_TYPE_ORDER: ExamType[] = ['start', 'middle', 'final', 'makeup', 'retake']
@@ -17,7 +17,7 @@ export const EXAM_TYPE_COLOR: Record<ExamType, string> = {
 }
 
 /**
- * 学生列表每页人数（ai 要求 12：表格每页最多 20 行）
+ * 学生列表每页人数（代码要求 12：表格每页最多 20 行）
  * （数据范围改为组织内的全体成员，不再按职位筛选学生）
  */
 export const SCORE_STUDENT_PAGE_SIZE = 20
@@ -35,5 +35,5 @@ export function scoreColor(score: string, isPass: boolean): string | undefined {
   return Number.isFinite(value) && value >= SCORE_EXCELLENT ? '#389e0d' : undefined
 }
 
-/** 学生端本人成绩列表每页条数（ai 要求 12：表格每页最多 20 行） */
+/** 学生端本人成绩列表每页条数（代码要求 12：表格每页最多 20 行） */
 export const STUDENT_SCORE_PAGE_SIZE = 20

@@ -13,13 +13,12 @@
 import axios from 'axios'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  getEvent,
-  queryEventsInRange,
-  type CalendarEventDetail,
-  type CalendarEventInfo,
-  type EventType,
-} from '../api/calendars'
+import { getEvent, queryEventsInRange } from '../api/calendars'
+import type {
+  CalendarEventDetail,
+  CalendarEventInfo,
+  EventType,
+} from '../api/types/calendars'
 import { extractError } from '../api/common'
 import { CALENDAR_LOOKBACK_DAYS, CALENDAR_TRAILING_DAYS } from '../config/calendar'
 

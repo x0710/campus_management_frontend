@@ -4,10 +4,10 @@ import type {
   AnnouncementPriority,
   AnnouncementStatus,
   AnnouncementType,
-} from '../api/announcements'
+} from '../api/types/announcements'
 
 /**
- * 公告相关常量集中定义（ai 要求：常量统一放 config/，供列表、详情、发布等视图复用）。
+ * 公告相关常量集中定义（代码要求：常量统一放 config/，供列表、详情、发布等视图复用）。
  * 文案走 i18n（announcement.type_* / priority_* / status_*），这里仅放样式与枚举顺序。
  */
 

@@ -7,7 +7,7 @@
  *   3. 请假信息：GET /api/approvals?applicant_id=成员 取审批实例 → GET /api/leaves/{id} 取详情
  *   4. 违规信息（查看详细 + 编辑）：GET /api/violations?user_id=成员 → GET/PATCH /api/violations/{id}
  *
- * 约定（ai 要求）：
+ * 约定（代码要求）：
  * - 表格每页最多 20 行，支持页码跳转与总数展示（要求 12）；
  * - 点击表格行查看详细信息（要求 14），编辑保存后刷新表格（要求 13）；
  * - 错误提示经 extractErrorWithStatus 附带 HTTP 状态码（要求 9），按钮/选项带悬停提示（要求 10）；
@@ -48,27 +48,34 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { queryApprovals, type ApprovalStepStatus } from '../../api/approvals'
+import { queryApprovals } from '../../api/approvals'
+import type { ApprovalStepStatus } from '../../api/types/approvals'
 import { extractErrorWithStatus } from '../../api/common'
-import { listUserOrganizations, type UserOrganization } from '../../api/organizations'
-import { getPosition, type PositionDetail } from '../../api/positions'
-import { getRole, queryUserRoleRelations, type RoleInfo } from '../../api/rbac'
+import { listUserOrganizations } from '../../api/organizations'
+import type { UserOrganization } from '../../api/types/organizations'
+import { getPosition } from '../../api/positions'
+import type { PositionDetail } from '../../api/types/positions'
+import { getRole, queryUserRoleRelations } from '../../api/rbac'
+import type { RoleInfo } from '../../api/types/rbac'
 import {
   getScore,
   listAllScoresForUser,
   updateScore,
-  type CourseScoreInfo,
-  type ExamType,
 } from '../../api/examinations'
-import { getLeave, type LeaveDetail } from '../../api/leaves'
-import { getUser, type UserDetail } from '../../api/users'
+import type { CourseScoreInfo, ExamType } from '../../api/types/examinations'
+import { getLeave } from '../../api/leaves'
+import type { LeaveDetail } from '../../api/types/leaves'
+import { getUser } from '../../api/users'
+import type { UserDetail } from '../../api/types/users'
 import {
   getViolation,
   queryViolations,
   updateViolation,
-  type ViolationDto,
-  type ViolationSeverity,
 } from '../../api/violations'
+import type {
+  ViolationDto,
+  ViolationSeverity,
+} from '../../api/types/violations'
 import { useCourseDetails } from '../../composables/useCourseNames'
 import {
   EXAM_TYPE_COLOR,
@@ -508,7 +515,7 @@ function GradesTab({ uid, t }: { uid: number; t: TranslateFn }) {
       })
       message.success(t('memberDetail.scoreUpdateSuccess'))
       setEditTarget(null)
-      // 保存后强制刷新，展示最新成绩（ai 要求 13）
+      // 保存后强制刷新，展示最新成绩（代码要求 13）
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
@@ -1007,7 +1014,7 @@ function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
       })
       message.success(t('memberDetail.violationUpdateSuccess'))
       setEditTarget(null)
-      // 保存后强制刷新，展示最新数据（ai 要求 13）
+      // 保存后强制刷新，展示最新数据（代码要求 13）
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
@@ -1125,7 +1132,7 @@ function ViolationTab({ uid, t }: { uid: number; t: TranslateFn }) {
         />
       )}
 
-      {/* 违规详情：点击行查看（ai 要求 14） */}
+      {/* 违规详情：点击行查看（代码要求 14） */}
       <Modal
         open={detail !== null}
         title={t('memberDetail.violationDetailTitle')}

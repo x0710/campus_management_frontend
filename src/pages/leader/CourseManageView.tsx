@@ -6,9 +6,9 @@
  * - GET    /api/courses/{id}                                详情（权限 course.select）
  * - PATCH  /api/courses/{id}                                更新（权限 course.update）
  * - DELETE /api/courses/{id}                                删除（权限 course.delete）
- * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（ai 要求 5、13）。
+ * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
  * 交互：工具栏可按课程类型筛选；点击表格任意一行或「详情」按钮查看课程详情，
- * 详情弹窗内可切换到编辑模式，编辑保存后弹窗回到详情态并刷新列表（ai 要求 13）。
+ * 详情弹窗内可切换到编辑模式，编辑保存后弹窗回到详情态并刷新列表（代码要求 13）。
  * 表单弹窗为可复用组件 CourseFormModal（新增/编辑/详情三模式共用）。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -16,12 +16,8 @@ import { Alert, App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, T
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  deleteCourse,
-  queryCourses,
-  type CourseInfo,
-  type CourseType,
-} from '../../api/courses'
+import { deleteCourse, queryCourses } from '../../api/courses'
+import type { CourseInfo, CourseType } from '../../api/types/courses'
 import { extractError } from '../../api/common'
 import CourseFormModal, { type CourseFormMode } from '../../components/CourseFormModal'
 import { COURSE_PAGE_SIZE, COURSE_TYPE_COLOR, COURSE_TYPE_OPTIONS } from '../../config/course'
@@ -56,7 +52,7 @@ export default function CourseManageView() {
   const [modal, setModal] = useState<ModalState | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（ai 要求 9） */
+  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
   const showError = useCallback(
     (err: unknown) => {
       const code = extractError(err)
@@ -100,7 +96,7 @@ export default function CourseManageView() {
     void load()
   }, [load])
 
-  /** 删除课程：成功后失效课程缓存并强制刷新列表（ai 要求 13） */
+  /** 删除课程：成功后失效课程缓存并强制刷新列表（代码要求 13） */
   const doDelete = useCallback(
     async (id: number) => {
       setDeletingId(id)

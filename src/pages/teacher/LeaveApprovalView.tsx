@@ -14,13 +14,12 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  queryApprovals,
-  submitApproval,
-  type ApprovalDecision,
-  type ApprovalInstanceStep,
-  type ApprovalStepStatus,
-} from '../../api/approvals'
+import { queryApprovals, submitApproval } from '../../api/approvals'
+import type {
+  ApprovalDecision,
+  ApprovalInstanceStep,
+  ApprovalStepStatus,
+} from '../../api/types/approvals'
 import { getCurrentUser } from '../../api/auth'
 import LeaveDetailModal from '../../components/LeaveDetailModal'
 import { useT } from '../../i18n'

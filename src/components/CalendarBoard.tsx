@@ -33,7 +33,7 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import type { ReactNode } from 'react'
 import { useMemo } from 'react'
-import type { CalendarEventDetail, EventType } from '../api/calendars'
+import type { CalendarEventDetail, EventType } from '../api/types/calendars'
 import { CALENDAR_DAY_KEY, type CalendarTypeFilter, type CalendarEventsByDay } from '../composables/useCalendarEvents'
 import {
   CALENDAR_EVENT_COLOR,

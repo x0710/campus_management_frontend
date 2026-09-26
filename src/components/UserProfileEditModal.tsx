@@ -4,7 +4,8 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { getUser, updateUser, type Gender, type UserDetail } from '../api/users'
+import { getUser, updateUser } from '../api/users'
+import type { Gender, UserDetail } from '../api/types/users'
 import { useT } from '../i18n'
 
 interface ProfileFormValues {

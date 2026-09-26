@@ -15,7 +15,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import MarkdownView from '../../components/MarkdownView'
 import { useUserNames } from '../../composables/useUserNames'
-import { getAnnouncement, type AnnouncementDetail } from '../../api/announcements'
+import { getAnnouncement } from '../../api/announcements'
+import type { AnnouncementDetail } from '../../api/types/announcements'
 import {
   ANNOUNCEMENT_PRIORITY_COLOR,
   ANNOUNCEMENT_STATUS_COLOR,
@@ -64,7 +65,7 @@ export default function AnnouncementDetailPage() {
 
   const buildErrorText = useCallback(
     (err: unknown): string => {
-      // 按 ai 要求：错误提示包含 HTTP 状态码（如 404、500），便于调试
+      // 按 代码要求：错误提示包含 HTTP 状态码（如 404、500），便于调试
       if (axios.isAxiosError(err) && err.response) {
         const body =
           typeof err.response.data === 'string' && err.response.data.trim()

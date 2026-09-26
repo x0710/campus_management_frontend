@@ -29,14 +29,19 @@ import {
   deleteUser,
   queryUsers,
   resetUserPassword,
-  type Gender,
-  type UserCreateRequest,
-  type UserInfo,
-  type UserStatus,
 } from '../../api/users'
-import { queryRoles, queryUserRoles, type RoleInfo } from '../../api/rbac'
-import { listAllOrganizations, type OrganizationInfo } from '../../api/organizations'
-import { queryPositions, type PositionDetail } from '../../api/positions'
+import type {
+  Gender,
+  UserCreateRequest,
+  UserInfo,
+  UserStatus,
+} from '../../api/types/users'
+import { queryRoles, queryUserRoles } from '../../api/rbac'
+import type { RoleInfo } from '../../api/types/rbac'
+import { listAllOrganizations } from '../../api/organizations'
+import type { OrganizationInfo } from '../../api/types/organizations'
+import { queryPositions } from '../../api/positions'
+import type { PositionDetail } from '../../api/types/positions'
 import { getCurrentUser } from '../../api/auth'
 import { extractError } from '../../api/common'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'

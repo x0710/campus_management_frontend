@@ -1,43 +1,14 @@
+/** 组织模块, 提供组织、组织成员与用户任职相关 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PaginatedResponse, PageQuery } from './common'
-
-/** 组织信息（api.json: OrganizationInfoDto） */
-export interface OrganizationInfo {
-  id: number
-  code: string
-  name: string
-  parent_id: number | null
-  created_at: string
-  updated_at: string
-}
-
-/** 组织成员（POST/DELETE body；position 为字符串编码） */
-export interface OrganizationMember {
-  user_id: number
-  position: string
-  workplace: string | null
-}
-
-/** 用户-组织任职详情（GET /organizations/users/{uid}） */
-export interface UserOrganization extends OrganizationMember {
-  id: number
-  organization_id: number
-  organization_name: string
-  created_at: string
-}
-
-export interface OrganizationQuery {
-  page?: number
-  page_size?: number
-  keyword?: string
-  parent_id?: number
-}
-
-export interface OrganizationMemberQuery extends PageQuery {
-  position?: string
-  user_id?: number
-}
+import type { PaginatedResponse } from './types/common'
+import type {
+  OrganizationInfo,
+  OrganizationMember,
+  OrganizationMemberQuery,
+  OrganizationQuery,
+  UserOrganization,
+} from './types/organizations'
 
 /** GET /api/organizations 分页查询组织（会话内缓存；force=true 手动刷新绕过缓存） */
 export async function queryOrganizations(

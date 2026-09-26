@@ -1,36 +1,13 @@
+/** 职位模块, 提供职位查询与增删改 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PaginatedResponse, PageQuery } from './common'
-
-/** 职位（api.json: PositionDetailDto，code 为主键） */
-export interface PositionDetail {
-  code: string
-  name: string
-  description: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface PositionQuery extends PageQuery {
-  keyword?: string
-}
-
-/** 职位创建请求体（code 由前端指定，创建后不可修改） */
-export interface PositionCreateRequest {
-  code: string
-  name: string
-  description?: string
-}
-
-/**
- * 职位更新请求体（code 为主键不可改）。
- * 注意：后端将 description: None 视为「保留原值」，因此清空描述无法通过本接口实现，
- * 空值时应省略该字段（见 updatePosition 调用方）。
- */
-export interface PositionUpdateRequest {
-  name?: string
-  description?: string
-}
+import type { PaginatedResponse } from './types/common'
+import type {
+  PositionCreateRequest,
+  PositionDetail,
+  PositionQuery,
+  PositionUpdateRequest,
+} from './types/positions'
 
 /** GET /api/positions 分页查询职位（会话内缓存；force=true 手动刷新绕过缓存） */
 export async function queryPositions(

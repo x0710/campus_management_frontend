@@ -1,59 +1,14 @@
-/** 用户相关接口 */
+/** 用户模块, 提供用户查询、创建、更新、删除与密码重置 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PaginatedResponse, PageQuery } from './common'
-
-export type UserStatus = 'active' | 'disabled'
-export type Gender = 'male' | 'female'
-
-/** GET /api/users 列表项（后端仅返回 uid/name） */
-export interface UserInfo {
-  uid: number
-  name: string | null
-}
-
-/** GET /api/users/{id} 用户详情 */
-export interface UserDetail {
-  id: number
-  name: string | null
-  email: string | null
-  phone: string | null
-  /** YYYY-MM-DD */
-  birthday: string | null
-  gender: string | null
-  avatar: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface UserQuery extends PageQuery {
-  keyword?: string
-  status?: UserStatus
-}
-
-/** POST /api/users 请求元素（body 为数组，支持批量创建） */
-export interface UserCreateRequest {
-  username: string
-  /** 不填后端自动生成随机密码 */
-  password?: string
-  name?: string
-  gender?: Gender
-  /** 任职组织（与 pos/workplaces 按下标并行） */
-  org?: number[]
-  pos?: string[]
-  workplaces?: string[]
-}
-
-/** PATCH /api/users/{id} 可更新字段 */
-export interface UserUpdateRequest {
-  name?: string
-  email?: string
-  phone?: string
-  /** YYYY-MM-DD */
-  birthday?: string | null
-  gender?: Gender
-  avatar?: string
-}
+import type { PaginatedResponse } from './types/common'
+import type {
+  UserCreateRequest,
+  UserDetail,
+  UserInfo,
+  UserQuery,
+  UserUpdateRequest,
+} from './types/users'
 
 /**
  * GET /api/users 分页查询（权限 user.read，会话内缓存）。
@@ -79,7 +34,7 @@ export async function getUser(id: number): Promise<UserDetail> {
  * GET /api/users/me 获取当前登录用户的详细资料（含真实姓名 name）。
  * 与 /users/{id} 不同，该接口仅需登录认证、不要求 user.read 权限，
  * 因此顶栏等全局位置可用它把账户名换成真实姓名；走会话缓存，
- * 退出登录时由 invalidate() 统一清空，避免下一个用户读到上一位用户的资料（ai 要求 17）。
+ * 退出登录时由 invalidate() 统一清空，避免下一个用户读到上一位用户的资料（代码要求 17）。
  */
 export function getMyProfile(): Promise<UserDetail> {
   return cachedGet<UserDetail>('/users/me')

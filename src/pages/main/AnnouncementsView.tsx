@@ -18,10 +18,12 @@ import { useNavigate, useParams } from 'react-router'
 import {
   deleteAnnouncement,
   listAllAnnouncements,
-  type AnnouncementListItem,
-  type AnnouncementPriority,
-  type AnnouncementType,
 } from '../../api/announcements'
+import type {
+  AnnouncementListItem,
+  AnnouncementPriority,
+  AnnouncementType,
+} from '../../api/types/announcements'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorWithStatus } from '../../api/common'
 import {
@@ -99,7 +101,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
 
   const buildErrorText = useCallback(
     (err: unknown): string => {
-      // 按 ai 要求：错误提示包含 HTTP 状态码（如 403、500），便于调试
+      // 按 代码要求：错误提示包含 HTTP 状态码（如 403、500），便于调试
       if (axios.isAxiosError(err) && err.response) {
         const body =
           typeof err.response.data === 'string' && err.response.data.trim()

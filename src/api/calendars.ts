@@ -6,41 +6,15 @@
 import { CALENDAR_PAGE_SIZE_MAX } from '../config/calendar'
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PageQuery, PaginatedResponse } from './common'
-
-/** 日历事件类型（api.json: EventType） */
-export type EventType = 'holiday' | 'exam' | 'activity' | 'other'
-
-/** 日历事件列表项（api.json: CalendarEventInfo） */
-export interface CalendarEventInfo {
-  id: number
-  start_date: string
-  end_date: string
-  title: string
-  event_type: EventType
-}
-
-/** 日历事件详情（api.json: CalendarEventDetail） */
-export interface CalendarEventDetail extends CalendarEventInfo {
-  description: string | null  
-  created_at: string
-}
-
-export interface CalendarQuery extends PageQuery {
-  event_type?: EventType
-  from_date?: string
-  to_date?: string
-  keyword?: string
-}
-
-/** 日期区间查询条件（用于按月/按自定义区间拉取全部事件） */
-export interface CalendarRangeQuery {
-  /** 起始日期下界（含，RFC3339） */
-  from_date: string
-  /** 起始日期上界（含，RFC3339） */
-  to_date: string
-  event_type?: EventType
-}
+import type { PaginatedResponse } from './types/common'
+import type {
+  CalendarCreateRequest,
+  CalendarEventDetail,
+  CalendarEventInfo,
+  CalendarQuery,
+  CalendarRangeQuery,
+  CalendarUpdateRequest,
+} from './types/calendars'
 
 /** GET /api/calendars 分页查询校园日历事件（force=true 绕过会话缓存） */
 export function queryEvents(params: CalendarQuery = {}, force?: boolean) {
@@ -54,24 +28,6 @@ export function queryEvents(params: CalendarQuery = {}, force?: boolean) {
 /** GET /api/calendars/{id} 获取指定日历事件详情 */
 export function getEvent(id: number, force?: boolean) {
   return cachedGet<CalendarEventDetail>(`/calendars/${id}`, undefined, { force })
-}
-
-/** 创建日历事件请求体（POST /api/calendars） */
-export interface CalendarCreateRequest {
-  start_date: string
-  end_date: string
-  title: string
-  event_type: EventType
-  description?: string | null
-}
-
-/** 更新日历事件请求体（PATCH /api/calendars/{id}，字段均可选） */
-export interface CalendarUpdateRequest {
-  start_date?: string
-  end_date?: string
-  title?: string
-  event_type?: EventType
-  description?: string | null
 }
 
 /**

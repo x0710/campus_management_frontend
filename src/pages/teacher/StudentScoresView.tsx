@@ -11,7 +11,7 @@
  *
  * 交互：
  *   - 表格每页 20 名学生，支持上一页/下一页与直接输入页码跳转，并显示学生总数与总页数；
- *   - 点击学生行打开「学生成绩明细」弹窗（ai 要求 14）；
+ *   - 点击学生行打开「学生成绩明细」弹窗（代码要求 14）；
  *   - 弹窗内点击某条成绩，通过 GET /api/examinations/{id} 加载该条成绩的完整详情。
  */
 import { ReloadOutlined } from '@ant-design/icons'
@@ -21,13 +21,12 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentUser } from '../../api/auth'
 import { extractError } from '../../api/common'
-import {
-  getScore,
-  listAllScoresForUser,
-  type CourseScoreDetail,
-  type CourseScoreInfo,
-  type ExamType,
-} from '../../api/examinations'
+import { getScore, listAllScoresForUser } from '../../api/examinations'
+import type {
+  CourseScoreDetail,
+  CourseScoreInfo,
+  ExamType,
+} from '../../api/types/examinations'
 import { useCourseNames } from '../../composables/useCourseNames'
 import { useOrgStudents, type OrgStudent } from '../../composables/useOrgStudents'
 import { useUserNames } from '../../composables/useUserNames'
@@ -45,7 +44,7 @@ interface StudentStat {
 
 /**
  * 成绩明细表：课程名称 / 学期 / 考试类型 / 成绩 / 是否及格。
- * 学生行展开与「学生成绩明细」弹窗共用，点击行可按 id 拉取该条成绩的完整详情（ai 要求 14）。
+ * 学生行展开与「学生成绩明细」弹窗共用，点击行可按 id 拉取该条成绩的完整详情（代码要求 14）。
  */
 function ScoreDetailTable({
   scores,

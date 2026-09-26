@@ -6,7 +6,7 @@
  *   - 成员表：GET /api/organizations/{id}/members（分页，每页 20 行）
  *   - 成员姓名：GET /api/users/{id}（useUserNames 批量解析，走会话缓存）
  *
- * 交互（ai 要求 14）：点击成员行跳转到「成员详情」页（成绩/请假/违规信息），
+ * 交互（代码要求 14）：点击成员行跳转到「成员详情」页（成绩/请假/违规信息），
  * 携带 ?from=leader_m3 使侧栏仍高亮本模块。
  */
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -17,12 +17,11 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { extractErrorWithStatus } from '../../api/common'
-import {
-  listAllOrganizations,
-  queryOrgMembers,
-  type OrganizationInfo,
-  type OrganizationMember,
-} from '../../api/organizations'
+import { listAllOrganizations, queryOrgMembers } from '../../api/organizations'
+import type {
+  OrganizationInfo,
+  OrganizationMember,
+} from '../../api/types/organizations'
 import { useUserNames } from '../../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../../config/leaderOrg'
 import { useT } from '../../i18n'
@@ -45,7 +44,7 @@ export default function LeaderOrgView() {
   const [memberPage, setMemberPage] = useState(1)
   const [memberTotal, setMemberTotal] = useState(0)
 
-  /** 统一错误提示：带 HTTP 状态码（ai 要求 9） */
+  /** 统一错误提示：带 HTTP 状态码（代码要求 9） */
   const errorText = useCallback(
     (code: string) =>
       code === 'network'

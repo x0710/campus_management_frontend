@@ -12,53 +12,13 @@
  */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PageQuery, PaginatedResponse } from './common'
-
-/** 考试类型（api.json: ExamType，后端枚举序列化为 snake_case） */
-export type ExamType = 'start' | 'middle' | 'final' | 'makeup' | 'retake'
-
-/** 成绩列表项（api.json: CourseScoreInfo） */
-export interface CourseScoreInfo {
-  id: number
-  /** 学生 ID（对应 users.id） */
-  uid: number
-  course_id: number
-  /** 学期标识，后端可能为多学期合并串（如 "2025-2026-1,2025-2026-2"） */
-  semester: string
-  /** 成绩（后端 Decimal → 字符串，如 "70.00"） */
-  score: string
-  is_pass: boolean
-  exam_type: ExamType
-}
-
-/** 成绩详情（api.json: CourseScoreDetail） */
-export interface CourseScoreDetail extends CourseScoreInfo {
-  remark: string
-  created_at: string
-  updated_at: string
-}
-
-/**
- * 成绩更新请求（api.json: CourseScoreUpdateRequest）。
- * 唯一键 uid/course_id/semester 不可修改，其余字段可选；省略即保留原值。
- * score 提交为字符串（后端 Decimal 按字符串解析，避免浮点精度丢失）。
- */
-export interface CourseScoreUpdateRequest {
-  score?: string
-  is_pass?: boolean
-  exam_type?: ExamType
-  remark?: string
-}
-
-/** 成绩分页查询参数（api.json: CourseScoreQueryParams） */
-export interface CourseScoreQuery extends PageQuery {
-  /** 按学生 ID 筛选（接口仅支持单个 uid，不支持数组） */
-  uid?: number
-  course_id?: number
-  semester?: string
-  exam_type?: ExamType
-  is_pass?: boolean
-}
+import type { PaginatedResponse } from './types/common'
+import type {
+  CourseScoreDetail,
+  CourseScoreInfo,
+  CourseScoreQuery,
+  CourseScoreUpdateRequest,
+} from './types/examinations'
 
 /** GET /api/examinations 分页查询成绩（force=true 绕过会话缓存） */
 export function queryScores(params: CourseScoreQuery = {}, force?: boolean) {

@@ -40,11 +40,15 @@ import {
   queryOrgMembers,
   removeOrgMember,
   updateOrganization,
-  type OrganizationInfo,
-  type OrganizationMember,
 } from '../../api/organizations'
-import { queryPositions, type PositionDetail } from '../../api/positions'
-import { queryRoles, type RoleInfo } from '../../api/rbac'
+import type {
+  OrganizationInfo,
+  OrganizationMember,
+} from '../../api/types/organizations'
+import { queryPositions } from '../../api/positions'
+import type { PositionDetail } from '../../api/types/positions'
+import { queryRoles } from '../../api/rbac'
+import type { RoleInfo } from '../../api/types/rbac'
 import { extractError } from '../../api/common'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'

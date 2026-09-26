@@ -2,7 +2,8 @@
 import { Alert, Button, Descriptions, Modal, Skeleton, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { getLeave, type LeaveDetail } from '../api/leaves'
+import { getLeave } from '../api/leaves'
+import type { LeaveDetail } from '../api/types/leaves'
 import { LEAVE_TYPE_COLOR } from '../config/leave'
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
@@ -36,7 +37,7 @@ export default function LeaveDetailModal({ open, leaveId, onClose, footerExtra }
 
   const buildErrorText = useCallback(
     (err: unknown): string => {
-      // 按 ai 要求：错误提示包含 HTTP 状态码（如 404、500），便于调试
+      // 按 代码要求：错误提示包含 HTTP 状态码（如 404、500），便于调试
       if (axios.isAxiosError(err) && err.response) {
         const body =
           typeof err.response.data === 'string' && err.response.data.trim()

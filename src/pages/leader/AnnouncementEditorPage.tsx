@@ -2,9 +2,9 @@
  * - 新建：POST /api/announcements?no=leader_m4 —— 发布后直接进入 published 状态，保存后回列表
  * - 编辑：GET  /api/announcements/{id} 预填当前值 → PATCH /api/announcements/{id} 更新 → 回列表
  *
- * 复用与约定（ai 要求）：
+ * 复用与约定（代码要求）：
  * - 表单字段与校验规则沿用原发布表单；正文用 RichTextEditor（所见即所得，存 Markdown）；
- * - 错误提示经 extractErrorWithStatus 附带 HTTP 状态码（ai 要求 9）；
+ * - 错误提示经 extractErrorWithStatus 附带 HTTP 状态码（代码要求 9）；
  * - 可见组织（org_id）不可通过 PATCH 修改，编辑态隐藏该字段；
  * - 本页渲染在 PortalWorkspace 布局壳内，只输出内容区，不重复渲染顶栏/侧栏。
  */
@@ -26,10 +26,13 @@ import {
   createAnnouncement,
   getAnnouncement,
   updateAnnouncement,
-  type AnnouncementPriority,
-  type AnnouncementType,
 } from '../../api/announcements'
-import { queryOrganizations, type OrganizationInfo } from '../../api/organizations'
+import type {
+  AnnouncementPriority,
+  AnnouncementType,
+} from '../../api/types/announcements'
+import { queryOrganizations } from '../../api/organizations'
+import type { OrganizationInfo } from '../../api/types/organizations'
 import { extractErrorWithStatus } from '../../api/common'
 import RichTextEditor from '../../components/RichTextEditor'
 import {

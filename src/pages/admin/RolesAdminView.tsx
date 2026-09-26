@@ -32,9 +32,11 @@ import {
   queryRoles,
   updatePermission,
   updateRole,
-  type Permission as PermInfo,
-  type RoleInfo,
 } from '../../api/rbac'
+import type {
+  Permission as PermInfo,
+  RoleInfo,
+} from '../../api/types/rbac'
 import { extractError } from '../../api/common'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
