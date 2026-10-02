@@ -1,6 +1,8 @@
 /** 认证模块, 提供登录、注册与当前登录用户信息查询 API */
 import { cachedGet } from './cache'
 import { http } from './http'
+import { queryUserRoles } from './rbac'
+import type { UserRoleInfo } from './types/rbac'
 import type {
   LoginRequest,
   LoginResponse,
@@ -27,4 +29,15 @@ export function register(data: RegisterRequest) {
 /** 拉取当前登录用户信息（会话内缓存一次） */
 export function getCurrentUser() {
   return cachedGet<UserInfo>('/credentials/me')
+}
+
+/**
+ * 获取当前登录用户的所有角色。
+ * @param force 是否跳过已解析缓存强制刷新，默认 false
+ * @returns 当前用户角色列表
+ */
+export async function getMyRoles(force?: boolean): Promise<UserRoleInfo[]> {
+  const me = await getCurrentUser()
+  const roles = await queryUserRoles([me.uid], force)
+  return roles.filter((role) => role.uid === me.uid)
 }

@@ -78,7 +78,7 @@ export default function PortalModuleRoute() {
   const portal = getPortal(portalKey)
 
   if (!portal) {
-    return <Navigate to="/home" replace />
+    return <Navigate to="/" replace />
   }
 
   const readyModules = portal.modules.filter((m) => m.status === 'ready')

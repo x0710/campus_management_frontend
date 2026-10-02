@@ -125,9 +125,17 @@ export async function removeRolePermission(
 
 // ==================== 用户-角色关联 ====================
 
-/** GET /api/rbac/users/roles?uids=1,2,3 查询用户角色（会话内缓存） */
-export async function queryUserRoles(uids: number[]): Promise<UserRoleInfo[]> {
-  return cachedGet<UserRoleInfo[]>('/rbac/users/roles', { uids: uids.join(',') })
+/**
+ * GET /api/rbac/users/roles?uids=1,2,3 查询用户角色（会话内缓存）。
+ * @param uids 用户 ID 数组（必填，不能为空）
+ * @param force 是否跳过已解析缓存强制刷新，默认 false
+ * @returns 用户角色列表
+ */
+export async function queryUserRoles(
+  uids: number[],
+  force?: boolean,
+): Promise<UserRoleInfo[]> {
+  return cachedGet<UserRoleInfo[]>('/rbac/users/roles', { uids: uids.join(',') }, { force })
 }
 
 /** GET /api/rbac/users/{uid}/role-relations 查询用户角色关联列表（会话内缓存） */

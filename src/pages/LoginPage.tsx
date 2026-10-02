@@ -1,3 +1,9 @@
+/**
+ * 登录页：
+ * 提供用户名密码登录、记住用户名、语言切换和主题切换。
+ * 登录成功后写入登录态，并跳转到 / 角色解析页；
+ * 已登录用户访问本页时直接重定向到 /。
+ */
 import {
   ApartmentOutlined,
   AuditOutlined,
@@ -50,9 +56,9 @@ export default function LoginPage() {
   const theme = useSettingsStore((s) => s.theme)
   const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
-  // 已登录用户访问 /login 时直接进入主页
+  // 已登录用户访问 /login 时直接进入角色解析页
   if (token) {
-    return <Navigate to="/home" replace />
+    return <Navigate to="/" replace />
   }
 
   const features = [1, 2, 3, 4].map((i) => ({
@@ -77,8 +83,8 @@ export default function LoginPage() {
       } else {
         localStorage.removeItem(REMEMBER_KEY)
       }
-      // 登录成功：先进入账户信息过渡页，3 秒后自动进入主页面
-      navigate('/welcome', { replace: true })
+      // 登录成功：进入 /，由 PortalRedirect 请求角色并跳转到对应门户
+      navigate('/', { replace: true })
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status

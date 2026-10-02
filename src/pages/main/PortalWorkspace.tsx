@@ -13,7 +13,6 @@
  * 侧栏收起状态持久化到 settings store（localStorage），跨门户与刷新保持。
  */
 import {
-  ArrowLeftOutlined,
   DoubleLeftOutlined,
   DoubleRightOutlined,
 } from '@ant-design/icons'
@@ -78,7 +77,7 @@ export default function PortalWorkspace() {
   // 仅当 portal 不存在时回首页；模块路由跳转交给子路由处理，避免与子路由抢跳转
   useEffect(() => {
     if (!portal) {
-      navigate('/home', { replace: true })
+      navigate('/', { replace: true })
     }
   }, [portal, navigate])
 
@@ -155,7 +154,7 @@ export default function PortalWorkspace() {
   }, [readyModules, previewModules, pendingModules, plannedModules, t])
 
   if (!portal) {
-    return <Navigate to="/home" replace />
+    return <Navigate to="/" replace />
   }
 
   const name = t(`portal.${portal.key}_name`)
@@ -163,16 +162,6 @@ export default function PortalWorkspace() {
   return (
     <div className="workspace-page">
       <PortalHeader
-        left={
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            className="workspace-back"
-            onClick={() => navigate('/home')}
-          >
-            {t('portal.back')}
-          </Button>
-        }
       />
 
       <div className="workspace-body">

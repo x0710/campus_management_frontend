@@ -53,6 +53,44 @@ h3 {
   color: var(--ink);
 }
 
+/* ============ 登录后门户解析加载页 ============ */
+
+.portal-redirect {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--page-bg);
+}
+
+.portal-redirect-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 240px;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+
+.portal-redirect-logo {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2f54eb 0%, #597ef7 100%);
+  color: #ffffff;
+  font-size: 24px;
+}
+
+.portal-redirect-text {
+  color: var(--ink-secondary);
+}
+
 /* ============ 登录页 ============ */
 
 .login-page {

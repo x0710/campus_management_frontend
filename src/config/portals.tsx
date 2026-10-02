@@ -128,3 +128,64 @@ export const PORTALS: PortalDef[] = [
 export function getPortal(key: string | undefined): PortalDef | undefined {
   return PORTALS.find((p) => p.key === key)
 }
+
+/**
+ * 后端角色 code -> 前端门户 key。
+ * 后端 code 统一按小写比较；教师端由 DEPARTMENT_HEAD / COUNSELOR / TECHNICIAN 共用。
+ */
+const ROLE_TO_PORTAL: Record<string, PortalKey> = {
+  super_admin: 'admin',
+  admin: 'admin',
+  leader: 'leader',
+  department_head: 'teacher',
+  counselor: 'teacher',
+  technician: 'teacher',
+  student: 'student',
+}
+
+/** 登录自动跳转时按此顺序选择唯一门户，排在前面的优先 */
+const ROLE_PORTAL_PRIORITY = Object.keys(ROLE_TO_PORTAL)
+
+/**
+ * 根据角色代码获取登录后应进入的门户端。
+ * 如果多个角色代码匹配，返回优先级最高的门户端。
+ * @param roleCodes 当前用户的角色 code 列表（必填）
+ * @returns 对应的 PortalKey；无匹配角色时返回 undefined
+ */
+export function getPortalKeyByRoleCodes(roleCodes: string[]): PortalKey | undefined {
+  const normalized = new Set(roleCodes.map((code) => code.trim().toLowerCase()))
+  const matchedRole = ROLE_PORTAL_PRIORITY.find((role) => normalized.has(role))
+  return matchedRole ? ROLE_TO_PORTAL[matchedRole] : undefined
+}
+
+/**
+ * 根据角色代码获取当前用户可访问的全部门户 key。
+ * 返回顺序与 PORTALS 定义顺序一致，便于下拉菜单按学生/教师/领导/管理排列。
+ * @param roleCodes 当前用户的角色 code 列表（必填）
+ * @returns 可访问的 PortalKey 数组；无匹配角色时返回空数组
+ */
+export function getPortalKeysByRoleCodes(roleCodes: string[]): PortalKey[] {
+  const normalized = new Set(roleCodes.map((code) => code.trim().toLowerCase()))
+  const allowedPortals = new Set<PortalKey>()
+  for (const role of ROLE_PORTAL_PRIORITY) {
+    if (normalized.has(role)) {
+      allowedPortals.add(ROLE_TO_PORTAL[role])
+    }
+  }
+  return PORTALS.filter((portal) => allowedPortals.has(portal.key)).map((portal) => portal.key)
+}
+
+/** 无角色信息时默认进入的门户端：登录后查询不到可匹配角色时，默认进入学生端 */
+export const DEFAULT_PORTAL_KEY: PortalKey = 'student'
+
+/**
+ * 根据角色代码获取当前用户可访问的门户，无匹配角色时回退为学生端。
+ * 与「登录后无角色信息默认进入学生端」保持一致，供登录跳转与顶栏门户菜单共用，
+ * 避免出现「已进入学生端、但门户菜单却提示无可用工作端」的不一致。
+ * @param roleCodes 当前用户的角色 code 列表（必填）
+ * @returns 非空的 PortalKey 数组（必返回）；无匹配角色时返回 [DEFAULT_PORTAL_KEY]
+ */
+export function getAccessiblePortalKeys(roleCodes: string[]): PortalKey[] {
+  const keys = getPortalKeysByRoleCodes(roleCodes)
+  return keys.length > 0 ? keys : [DEFAULT_PORTAL_KEY]
+}
