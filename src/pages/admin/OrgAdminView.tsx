@@ -50,13 +50,15 @@ import type { PositionDetail } from '../../api/types/positions'
 import { queryRoles } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
 import { extractError } from '../../api/common'
+import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
 import UserEditPanel from './UserEditPanel'
 
-const MEMBER_PAGE_SIZE = 10
+/** 组织成员表每页条数（代码要求 12：表格每页最多 100 行） */
+const MEMBER_PAGE_SIZE = 100
 
 interface OrgFormValues {
   code: string
@@ -241,6 +243,8 @@ export default function OrgAdminView() {
   const memberIds = useMemo(() => members.map((m) => m.user_id), [members])
   const memberNames = useUserNames(memberIds)
   const memberOrgs = useUserOrganizations(memberIds)
+  // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
+  const positionNames = usePositionNames()
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
     setSelectedId(keys.length ? Number(keys[0]) : null)
@@ -386,7 +390,12 @@ export default function OrgAdminView() {
         dataIndex: 'position',
         key: 'position',
         width: 160,
-        render: (v: string) => <Tag color="blue">{v}</Tag>,
+        // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
+        render: (v: string) => (
+          <Tooltip title={v}>
+            <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
+          </Tooltip>
+        ),
       },
       {
         title: t('adminOrg.colWorkplace'),
@@ -427,7 +436,7 @@ export default function OrgAdminView() {
         ),
       },
     ],
-    [t, actingKey, memberNames, memberOrgs, selectedId],
+    [t, actingKey, memberNames, memberOrgs, positionNames, selectedId],
   )
 
   return (

@@ -41,7 +41,8 @@ import { extractError } from '../../api/common'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
 
-const PAGE_SIZE = 10
+/** 角色/权限关联表每页条数（代码要求 12：表格每页最多 100 行） */
+const PAGE_SIZE = 100
 
 type RoleFormValues = {
   code: string

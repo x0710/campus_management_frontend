@@ -16,8 +16,8 @@ export const VIOLATION_SEVERITY_COLOR: Record<ViolationSeverity, string> = {
   critical: 'red',
 }
 
-/** 违规记录列表每页条数（代码要求 12：表格每页最多 20 行） */
-export const VIOLATION_PAGE_SIZE = 20
+/** 违规记录列表每页条数（代码要求 12：表格每页最多 100 行） */
+export const VIOLATION_PAGE_SIZE = 100
 
 /**
  * 前端一次拉取的违规记录条数上限。

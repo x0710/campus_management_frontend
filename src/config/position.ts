@@ -3,8 +3,8 @@
  * 文案走 i18n（adminPositions.*），这里只放分页与输入长度限制。
  */
 
-/** 职位列表每页条数（代码要求 12：表格每页最多 20 行） */
-export const POSITION_PAGE_SIZE = 20
+/** 职位列表每页条数（代码要求 12：表格每页最多 100 行） */
+export const POSITION_PAGE_SIZE = 100
 
 /** 职位编码最大长度（与后端 code 字段约束对齐） */
 export const POSITION_CODE_MAX_LENGTH = 64

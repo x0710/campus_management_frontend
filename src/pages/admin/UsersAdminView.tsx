@@ -48,7 +48,8 @@ import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import UserEditPanel from './UserEditPanel'
 
-const PAGE_SIZE = 10
+/** 用户列表每页条数（代码要求 12：表格每页最多 100 行） */
+const PAGE_SIZE = 100
 
 interface CreateFormValues {
   username: string

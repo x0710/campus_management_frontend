@@ -24,8 +24,8 @@ export const APPROVAL_BUSINESS_TYPE_COLOR: Record<string, string> = {
   other: 'default',
 }
 
-/** 模板列表每页展示条数（代码要求 12：表格每页最多 20 行） */
-export const APPROVAL_TEMPLATE_PAGE_SIZE = 20
+/** 模板列表每页展示条数（代码要求 12：表格每页最多 100 行） */
+export const APPROVAL_TEMPLATE_PAGE_SIZE = 100
 
 /**
  * 前端一次拉取的模板条数上限。

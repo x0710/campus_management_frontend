@@ -3,6 +3,8 @@
  * 提供用户名密码登录、记住用户名、语言切换和主题切换。
  * 登录成功后写入登录态，并跳转到 / 角色解析页；
  * 已登录用户访问本页时直接重定向到 /。
+ * 由其他页面（如角色解析页在后端未启动时）跳转而来时，读取路由 state 中的 loginError
+ * 并展示失败原因（含状态码），便于定位问题。
  */
 import {
   ApartmentOutlined,
@@ -20,7 +22,7 @@ import type { MenuProps } from 'antd'
 import axios from 'axios'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 import { login } from '../api/auth'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
@@ -44,10 +46,13 @@ const FEATURE_ICONS: ReactNode[] = [
 export default function LoginPage() {
   const t = useT()
   const [form] = Form.useForm<LoginFormValues>()
-  const [submitting, setSubmitting] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
   const navigate = useNavigate()
+  const location = useLocation()
+  // 其他页面跳转过来时携带的失败原因（如角色解析页遇到后端未启动）
+  const routeError = (location.state as { loginError?: string } | null)?.loginError ?? null
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(routeError)
+
   const token = useAuthStore((s) => s.token)
   const setAuth = useAuthStore((s) => s.setAuth)
 

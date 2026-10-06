@@ -54,12 +54,18 @@ export function extractErrorWithStatus(err: unknown): string {
  * @param err 捕获到的异常（必填）
  * @param t 翻译函数（必填，来自 useT()）
  * @returns string 形如「412 不满足操作前置条件（引用的数据不存在）：Failed to add a child row」；
- *                 无响应返回 t('common.networkError')；非 axios 异常返回 t('common.loadFailed')
+ *                 无响应返回「无法连接服务器…（后端服务未启动或不可达，ECONNREFUSED）」；
+ *                 非 axios 异常返回 t('common.loadFailed')
  */
 export function extractErrorReason(err: unknown, t: TranslateFn): string {
   if (!axios.isAxiosError(err)) return t('common.loadFailed')
   const res = err.response
-  if (!res) return t('common.networkError')
+  if (!res) {
+    // 无响应：后端未启动（连接被拒绝）、网络不通或请求超时。
+    // 附上 axios 错误码（如 ECONNREFUSED、ETIMEDOUT、ERR_NETWORK）便于定位具体原因。
+    const code = err.code ? `，${err.code}` : ''
+    return `${t('common.networkError')}（${t('common.backendUnreachable')}${code}）`
+  }
   const reason = t(HTTP_STATUS_REASON_KEYS[res.status] ?? 'common.errUnknown')
   const detail =
     typeof res.data === 'string' && res.data.trim() ? res.data.trim() : ''

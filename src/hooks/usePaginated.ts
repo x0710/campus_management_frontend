@@ -21,7 +21,8 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
   initialQuery?: Omit<Q, 'page' | 'page_size'>,
 ) {
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSizeState] = useState(10)
+  // 默认每页 100 行（代码要求 12：表格每页最多 100 行）
+  const [pageSize, setPageSizeState] = useState(100)
   const [state, setState] = useState<PaginatedState<T>>({
     data: [],
     total: 0,

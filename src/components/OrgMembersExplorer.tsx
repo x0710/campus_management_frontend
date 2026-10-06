@@ -20,6 +20,7 @@ import { useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
 import type { OrganizationMember } from '../api/types/organizations'
+import { usePositionNames } from '../composables/usePositionNames'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
@@ -47,7 +48,7 @@ interface OrgMembersExplorerProps {
   onReloadOrgs: (force?: boolean) => void
   /** 侧栏高亮与详情页返回目标使用的模块 key（必填，如 'leader_m3'、'teacher_m3'） */
   fromModuleKey: string
-  /** 成员表每页条数（可选，默认 LEADER_ORG_MEMBER_PAGE_SIZE = 20） */
+  /** 成员表每页条数（可选，默认 LEADER_ORG_MEMBER_PAGE_SIZE = 100） */
   memberPageSize?: number
   /** 组织加载完成后是否自动选中第一个组织（可选，默认 false） */
   autoSelectFirst?: boolean
@@ -155,6 +156,8 @@ export default function OrgMembersExplorer({
   )
 
   const memberNames = useUserNames(useMemo(() => members.map((m) => m.user_id), [members]))
+  // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
+  const positionNames = usePositionNames()
 
   /** 点击成员行 → 进入成员详情页（?from 用于侧栏高亮来源模块） */
   const openMember = useCallback(
@@ -181,9 +184,10 @@ export default function OrgMembersExplorer({
         dataIndex: 'position',
         key: 'position',
         width: 160,
+        // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
         render: (v: string) => (
           <Tooltip title={v}>
-            <Tag color="blue">{v}</Tag>
+            <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
           </Tooltip>
         ),
       },
@@ -206,7 +210,7 @@ export default function OrgMembersExplorer({
         ),
       },
     ],
-    [t, memberNames, openMember],
+    [t, memberNames, positionNames, openMember],
   )
 
   return (

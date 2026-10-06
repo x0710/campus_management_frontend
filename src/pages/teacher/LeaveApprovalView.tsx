@@ -26,7 +26,8 @@ import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
-const PAGE_SIZE = 20
+/** 请假审批表每页条数（代码要求 12：表格每页最多 100 行） */
+const PAGE_SIZE = 100
 
 const STATUS_COLOR: Record<ApprovalStepStatus, string> = {
   waiting: 'default',

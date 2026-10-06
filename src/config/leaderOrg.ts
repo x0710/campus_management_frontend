@@ -3,14 +3,14 @@
  * - 组织概览页的成员列表每页条数（领导端「组织概览」与老师端「班级管理」共用组件）
  * - 成员详情页内各列表（成绩/请假/违规）每页条数
  * - 成员详情页「只读来源」模块清单（领导端可编辑，老师端仅查询）
- * 分页均取 20，满足 代码要求 12：表格每页最多 20 行。
+ * 分页均取 100，满足 代码要求 12：表格每页最多 100 行。
  */
 
 /** 组织概览：组织成员表每页条数 */
-export const LEADER_ORG_MEMBER_PAGE_SIZE = 20
+export const LEADER_ORG_MEMBER_PAGE_SIZE = 100
 
 /** 成员详情页：成绩 / 请假 / 违规列表每页条数 */
-export const MEMBER_DETAIL_PAGE_SIZE = 20
+export const MEMBER_DETAIL_PAGE_SIZE = 100
 
 /**
  * 成员详情页的「只读来源」模块 key：

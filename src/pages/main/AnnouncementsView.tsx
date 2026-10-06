@@ -42,8 +42,8 @@ import { useUserNames } from '../../composables/useUserNames'
 
 const { Text } = Typography
 
-/** 前端分页默认每页条数 */
-const DEFAULT_PAGE_SIZE = 10
+/** 前端分页默认每页条数（代码要求 12：表格每页最多 100 行） */
+const DEFAULT_PAGE_SIZE = 100
 
 /** 表头多选筛选项（value 为字符串，onFilter 时还原类型） */
 type TypeFilterValue = AnnouncementType

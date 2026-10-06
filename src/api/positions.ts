@@ -21,6 +21,21 @@ export async function queryPositions(
   )
 }
 
+/**
+ * 拉取全部职位（分页接口循环取完），供「职位编码 → 职位名称」映射使用；
+ * force=true 整体绕过缓存。返回值为职位详情数组（可能为空）。
+ */
+export async function listAllPositions(force?: boolean): Promise<PositionDetail[]> {
+  const pageSize = 100
+  const all: PositionDetail[] = []
+  for (let page = 1; ; page += 1) {
+    const res = await queryPositions({ page, page_size: pageSize }, force)
+    all.push(...res.data)
+    if (page >= res.total_pages) break
+  }
+  return all
+}
+
 /** GET /api/positions/management/{code} 查询职位详情（会话内缓存） */
 export async function getPosition(code: string): Promise<PositionDetail> {
   return cachedGet<PositionDetail>(`/positions/management/${code}`)

@@ -14,8 +14,8 @@ export const COURSE_TYPE_COLOR: Record<CourseType, string> = {
 /** 课程类型枚举顺序（筛选项与表单下拉选项共用） */
 export const COURSE_TYPE_OPTIONS: CourseType[] = ['compulsory', 'elective', 'general']
 
-/** 课程列表每页条数（代码要求 12：表格每页最多 20 行） */
-export const COURSE_PAGE_SIZE = 20
+/** 课程列表每页条数（代码要求 12：表格每页最多 100 行） */
+export const COURSE_PAGE_SIZE = 100
 
 /** 课程代码最大长度（表单输入限制） */
 export const COURSE_CODE_MAX_LENGTH = 50

@@ -24,6 +24,9 @@
   --header-bg: #171a23;
   --editor-bg: #12141d;
   --editor-line: #3a3f52;
+  /* 原生滚动条滑块（不受 antd 主题影响，暗色下需单独配色） */
+  --scrollbar-thumb: #3a3f52;
+  --scrollbar-thumb-hover: #4a5064;
 }
 
 * {
@@ -1960,4 +1963,29 @@ h3 {
   .calendar-type-filter {
     width: 100%;
   }
+}
+
+/* ============ 夜间模式滚动条适配（代码要求 6） ============ */
+/* 原生滚动条不随 antd 暗色算法改变配色，窄屏时表格底部的横向滚动条等仍为浅色轨道，
+   此处统一改为与卡片底色协调的深色；颜色取 :root[data-theme='dark'] 中的滚动条变量。
+   兼容 Chromium（::-webkit-scrollbar-*）与 Firefox（scrollbar-color）。 */
+:root[data-theme='dark'] * {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-corner {
+  background-color: transparent;
 }
