@@ -32,6 +32,16 @@ export function getCurrentUser() {
 }
 
 /**
+ * 查询指定用户的账户认证信息（含用户名）。
+ * GET /api/credentials/{uid}：本人或具备 credential.read 权限（并在数据范围内）时可查；走会话内缓存。
+ * @param uid 目标用户 ID（必填，正整数）
+ * @returns Promise<UserInfo> 含 uid/username/status/last_login_at（必返回）
+ */
+export function getCredential(uid: number): Promise<UserInfo> {
+  return cachedGet<UserInfo>(`/credentials/${uid}`)
+}
+
+/**
  * 获取当前登录用户的所有角色。
  * @param force 是否跳过已解析缓存强制刷新，默认 false
  * @returns 当前用户角色列表
