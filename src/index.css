@@ -465,6 +465,42 @@ h3 {
   white-space: nowrap;
 }
 
+.portal-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.portal-switcher:hover {
+  border-color: var(--line);
+  background: rgba(47, 84, 235, 0.08);
+}
+
+.portal-switcher-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 16px;
+  color: var(--brand);
+}
+
+.portal-switcher-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-switcher-arrow {
+  margin-left: 2px;
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
 .workspace-back {
   font-size: 14px;
 }
@@ -1050,6 +1086,10 @@ h3 {
 
   .header-brand-name {
     display: none;
+  }
+
+  .portal-switcher-name {
+    max-width: 96px;
   }
 
   .header-brand {

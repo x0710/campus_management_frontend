@@ -69,6 +69,8 @@ import {
 import type { CourseScoreInfo, ExamType } from '../../api/types/examinations'
 import { getLeave } from '../../api/leaves'
 import type { LeaveDetail } from '../../api/types/leaves'
+import { queryProfileDetails } from '../../api/profileDetails'
+import type { ProfileDetail } from '../../api/types/profileDetails'
 import { getUser } from '../../api/users'
 import type { UserDetail } from '../../api/types/users'
 import {
@@ -225,6 +227,11 @@ export default function MemberDetailPage() {
                     t={t}
                   />
                 ),
+              },
+              {
+                key: 'profile',
+                label: t('memberDetail.tabProfile'),
+                children: <ProfileDetailTab uid={userId} locale={locale} t={t} />,
               },
               {
                 key: 'grades',
@@ -438,6 +445,149 @@ function BasicInfoPanel({
         )}
       </Card>
     </Space>
+  )
+}
+
+/** 详细信息面板：读取 /api/profile-details 中该用户的档案详情 */
+function ProfileDetailTab({
+  uid,
+  locale,
+  t,
+}: {
+  uid: number
+  locale: 'zh' | 'en'
+  t: TranslateFn
+}) {
+  const [profile, setProfile] = useState<ProfileDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadProfile = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await queryProfileDetails({ user_id: uid, page: 1, page_size: 20 })
+      setProfile(res.data[0] ?? null)
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        setError(extractErrorWithStatus(err))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [uid])
+
+  useEffect(() => {
+    void loadProfile()
+  }, [loadProfile])
+
+  if (loading) return <Skeleton active paragraph={{ rows: 8 }} />
+
+  if (error) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        title={t('memberDetail.profileLoadFailed')}
+        description={error}
+        action={
+          <Button size="small" onClick={() => void loadProfile()}>
+            {t('common.retry')}
+          </Button>
+        }
+      />
+    )
+  }
+
+  if (!profile) {
+    return <Alert type="info" showIcon title={t('memberDetail.profileEmpty')} />
+  }
+
+  return (
+    <Descriptions
+      bordered
+      size="small"
+      column={2}
+      items={[
+        { key: 'id_card', label: t('memberDetail.fieldIdCard'), children: profile.id_card },
+        { key: 'ethnic', label: t('memberDetail.fieldEthnic'), children: profile.ethnic },
+        {
+          key: 'birth_date',
+          label: t('memberDetail.fieldBirthDate'),
+          children: profile.birth_date,
+        },
+        {
+          key: 'class_id',
+          label: t('memberDetail.fieldClassId'),
+          children: profile.class_id,
+        },
+        {
+          key: 'native_place',
+          label: t('memberDetail.fieldNativePlace'),
+          children: profile.native_place ?? t('profile.noData'),
+        },
+        {
+          key: 'household_location',
+          label: t('memberDetail.fieldHouseholdLocation'),
+          children: profile.household_location ?? t('profile.noData'),
+        },
+        {
+          key: 'household_type',
+          label: t('memberDetail.fieldHouseholdType'),
+          children: profile.household_type ?? t('profile.noData'),
+        },
+        {
+          key: 'phone',
+          label: t('profile.phone'),
+          children: profile.phone ?? t('profile.noData'),
+        },
+        {
+          key: 'email',
+          label: t('profile.email'),
+          children: profile.email ?? t('profile.noData'),
+        },
+        {
+          key: 'father_name',
+          label: t('memberDetail.fieldFatherName'),
+          children: profile.father_name ?? t('profile.noData'),
+        },
+        {
+          key: 'father_phone',
+          label: t('memberDetail.fieldFatherPhone'),
+          children: profile.father_phone ?? t('profile.noData'),
+        },
+        {
+          key: 'father_company',
+          label: t('memberDetail.fieldFatherCompany'),
+          children: profile.father_company ?? t('profile.noData'),
+        },
+        {
+          key: 'mother_name',
+          label: t('memberDetail.fieldMotherName'),
+          children: profile.mother_name ?? t('profile.noData'),
+        },
+        {
+          key: 'mother_phone',
+          label: t('memberDetail.fieldMotherPhone'),
+          children: profile.mother_phone ?? t('profile.noData'),
+        },
+        {
+          key: 'mother_company',
+          label: t('memberDetail.fieldMotherCompany'),
+          children: profile.mother_company ?? t('profile.noData'),
+        },
+        {
+          key: 'created_at',
+          label: t('memberDetail.fieldProfileCreatedAt'),
+          children: profile.created_at ? formatDateTime(profile.created_at, locale) : t('profile.noData'),
+        },
+        {
+          key: 'updated_at',
+          label: t('memberDetail.fieldProfileUpdatedAt'),
+          children: profile.updated_at ? formatDateTime(profile.updated_at, locale) : t('profile.noData'),
+        },
+      ]}
+    />
   )
 }
 

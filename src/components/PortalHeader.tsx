@@ -1,6 +1,7 @@
 /** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
 import {
   AppstoreOutlined,
+  DownOutlined,
   LogoutOutlined,
   MoonOutlined,
   SafetyCertificateOutlined,
@@ -13,7 +14,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { invalidate } from '../api/cache'
 import { getMyRoles } from '../api/auth'
 import { getMyProfile } from '../api/users'
-import { getAccessiblePortalKeys, getPortal, type PortalKey } from '../config/portals'
+import { getAccessiblePortalKeys, getPortal, PORTALS, type PortalKey } from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
@@ -79,6 +80,19 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     return match ? (match[1] as PortalKey) : undefined
   }, [location.pathname])
 
+  /** 当前门户定义与名称，供左上角门户切换按钮展示 */
+  const currentPortal = useMemo(() => getPortal(currentPortalKey), [currentPortalKey])
+  const currentPortalName = currentPortal ? t(`portal.${currentPortal.key}_name`) : t('portal.selectPortal')
+
+  /** 左上角门户切换菜单：固定平铺列出全部门户端，不做角色可访问性过滤 */
+  const portalSwitchItems = useMemo<MenuProps['items']>(() => {
+    return PORTALS.map((portal) => ({
+      key: `portal:${portal.key}`,
+      icon: portal.icon,
+      label: t(`portal.${portal.key}_name`),
+    }))
+  }, [t])
+
   /**
    * 右上角用户菜单：先展示「门户选择」一项，点击该项后再展开本次角色可访问的门户列表，
    * 避免点击头像就直接跳出一串门户（子菜单展开方式设为 click，见下方 Dropdown）。
@@ -134,6 +148,26 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           </span>
           <span className="header-brand-name">{t('common.appName')}</span>
         </div>
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: portalSwitchItems,
+            selectable: true,
+            selectedKeys: currentPortalKey ? [`portal:${currentPortalKey}`] : [],
+            onClick: ({ key }: { key: string }) => {
+              const portalKey = key.replace('portal:', '')
+              if (getPortal(portalKey)) {
+                navigate(`/portal/${portalKey}`)
+              }
+            },
+          }}
+        >
+          <Button type="text" className="portal-switcher">
+            <span className="portal-switcher-icon">{currentPortal?.icon}</span>
+            <span className="portal-switcher-name">{currentPortalName}</span>
+            <DownOutlined className="portal-switcher-arrow" />
+          </Button>
+        </Dropdown>
         {left}
       </div>
 
