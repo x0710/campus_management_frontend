@@ -2,17 +2,31 @@
 import {
   AppstoreOutlined,
   DownOutlined,
+  KeyOutlined,
   LogoutOutlined,
   MoonOutlined,
   SafetyCertificateOutlined,
   SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Avatar, Button, Dropdown, type MenuProps, Tooltip } from 'antd'
+import {
+  App as AntdApp,
+  Alert,
+  Avatar,
+  Button,
+  Dropdown,
+  Form,
+  Input,
+  Modal,
+  Tooltip,
+  type MenuProps,
+} from 'antd'
+import axios from 'axios'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { invalidate } from '../api/cache'
-import { getMyRoles } from '../api/auth'
+import { changeMyPassword, getCurrentUser, getMyRoles } from '../api/auth'
+import { extractErrorReason } from '../api/common'
 import { getMyProfile } from '../api/users'
 import { getAccessiblePortalKeys, getPortal, PORTALS, type PortalKey } from '../config/portals'
 import { useT } from '../i18n'
@@ -24,9 +38,17 @@ interface PortalHeaderProps {
   left?: ReactNode
 }
 
+/** 「重置密码」弹窗表单字段：本人改密需提供旧密码校验（PATCH /api/credentials） */
+interface ResetPasswordForm {
+  old_password: string
+  new_password: string
+  confirm_password: string
+}
+
 /** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
 export default function PortalHeader({ left }: PortalHeaderProps) {
   const t = useT()
+  const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const location = useLocation()
   const username = useAuthStore((s) => s.username) // 账户名（登录态自带，作为姓名的兜底展示）
@@ -40,6 +62,10 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const [realName, setRealName] = useState<string | null>(null)
   // 当前用户可访问的门户 key：由角色查询结果映射而来
   const [portalKeys, setPortalKeys] = useState<PortalKey[]>([])
+  // 「重置密码」弹窗：本人改密（需旧密码校验）
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetForm] = Form.useForm<ResetPasswordForm>()
 
   useEffect(() => {
     let cancelled = false
@@ -113,6 +139,12 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             ? portalItems
             : [{ key: 'no-portal', label: t('portal.noRole'), disabled: true }],
       },
+      { type: 'divider' },
+      {
+        key: 'reset-password',
+        icon: <KeyOutlined />,
+        label: t('password.menuLabel'),
+      },
     ]
   }, [portalKeys, t])
 
@@ -123,6 +155,41 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       setPortalKeys(getAccessiblePortalKeys(roles.map((role) => role.code)))
     } catch {
       // 刷新失败时保留原菜单，不打断用户操作
+    }
+  }
+
+  /** 打开「重置密码」弹窗并清空上次输入 */
+  const openResetPassword = () => {
+    resetForm.resetFields()
+    setResetOpen(true)
+  }
+
+  /**
+   * 提交本人改密：校验旧密码后调用 PATCH /api/credentials。
+   * 旧密码错误时后端返回 403，经 extractErrorReason 展示为「403 …：旧密码错误」。
+   */
+  const submitResetPassword = async () => {
+    let values: ResetPasswordForm
+    try {
+      values = await resetForm.validateFields()
+    } catch {
+      // 表单校验未通过，错误已由 Form.Item 就地展示
+      return
+    }
+    setResetting(true)
+    try {
+      const me = await getCurrentUser()
+      await changeMyPassword(me.uid, values.old_password, values.new_password)
+      message.success(t('password.success'))
+      setResetOpen(false)
+      resetForm.resetFields()
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，此处不重复提示
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -206,6 +273,10 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             triggerSubMenuAction: 'click',
             selectedKeys: currentPortalKey ? [`portal:${currentPortalKey}`] : [],
             onClick: ({ key }: { key: string }) => {
+              if (key === 'reset-password') {
+                openResetPassword()
+                return
+              }
               const portalKey = key.replace('portal:', '')
               if (getPortal(portalKey)) {
                 navigate(`/portal/${portalKey}`)
@@ -239,6 +310,51 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           />
         </Tooltip>
       </div>
+
+      <Modal
+        open={resetOpen}
+        title={t('password.title')}
+        width={420}
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        confirmLoading={resetting}
+        onCancel={() => setResetOpen(false)}
+        onOk={() => void submitResetPassword()}
+        destroyOnHidden
+      >
+        <Form form={resetForm} layout="vertical" autoComplete="off">
+          <Alert
+            type="info"
+            showIcon
+            title={t('password.hint')}
+            style={{ marginBottom: 12 }}
+          />
+          <Form.Item name="old_password" label={t('password.oldLabel')} rules={[{ required: true, message: t('password.oldRequired') }]}>
+            <Input.Password maxLength={64} autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item name="new_password" label={t('password.newLabel')} rules={[{ required: true, message: t('password.newRequired') }]}>
+            <Input.Password maxLength={64} autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirm_password"
+            label={t('password.confirmLabel')}
+            dependencies={['new_password']}
+            rules={[
+              { required: true, message: t('password.confirmRequired') },
+              ({ getFieldValue }) => ({
+                validator(_rule, value: string) {
+                  if (!value || getFieldValue('new_password') === value) {
+                    return Promise.resolve()
+                  }
+                  return Promise.reject(new Error(t('password.mismatch')))
+                },
+              }),
+            ]}
+          >
+            <Input.Password maxLength={64} autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </header>
   )
 }

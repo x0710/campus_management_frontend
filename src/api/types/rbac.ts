@@ -78,3 +78,26 @@ export interface UserRoleRelation {
   user_id: number
   role_id: number
 }
+
+/** 数据权限范围（对应后端 DataScope，按 snake_case 序列化） */
+export type DataScope = 'all' | 'self_only' | 'org' | 'org_and_child' | 'custom'
+
+/** 角色单条数据范围配置（GET /api/rbac/roles/{role_id}/data-scopes 返回元素） */
+export interface RoleDataScopeInfo {
+  /** 资源标识，通常取权限编码的最前列，如权限 student.read 对应资源 student */
+  resource: string
+  /** 数据权限范围 */
+  scope: DataScope
+  /** 仅 scope='custom' 时有值：逗号分隔的组织 ID 白名单，如 "1,2,3"；其余情况为 null */
+  scope_value: string | null
+}
+
+/** 角色数据范围配置项（PUT /api/rbac/roles/{role_id}/data-scopes 请求体数组元素） */
+export interface RoleDataScopeRequest {
+  /** 资源标识（必填，不能为空） */
+  resource: string
+  /** 数据权限范围（必填） */
+  scope: DataScope
+  /** 仅 scope='custom' 时生效：逗号分隔的组织 ID 白名单；其余情况提交 null */
+  scope_value?: string | null
+}

@@ -61,12 +61,23 @@ export async function deleteUser(id: number): Promise<void> {
   invalidate('GET /users')
 }
 
-/** PUT /api/users/{id}/reset_password 重置密码 */
+/**
+ * PUT /api/users/{id}/reset_password 重置指定用户密码。
+ * 请求体为 JSON 字符串或 `null`（后端签名为 `Json<Option<String>>`，OpenAPI 中 required=true）：
+ * - 传新密码字符串 → 重置为指定密码
+ * - 传 `null` → 由后端生成随机密码
+ * @param id 目标用户 ID（必填）
+ * @param newPassword 指定的新密码（可选；不传则重置为后端随机密码）
+ * @returns 本次实际写入的明文密码（与传入的 newPassword 一致，或后端生成的随机密码）
+ */
 export async function resetUserPassword(
   id: number,
+  newPassword?: string,
 ): Promise<{ user_id: number; new_password: string }> {
   const res = await http.put<{ user_id: number; new_password: string }>(
     `/users/${id}/reset_password`,
+    newPassword === undefined ? 'null' : JSON.stringify(newPassword),
+    { headers: { 'Content-Type': 'application/json' } },
   )
   // 重置密码不改变用户资料字段，但可能影响 last_login_at 等字段，保险起见失效
   invalidate(`GET /users/${id}`)

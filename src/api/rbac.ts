@@ -8,6 +8,8 @@ import type {
   PermissionQuery,
   PermissionUpdateRequest,
   RoleCreateRequest,
+  RoleDataScopeInfo,
+  RoleDataScopeRequest,
   RoleInfo,
   RoleQuery,
   RoleUpdateRequest,
@@ -52,6 +54,7 @@ export async function deleteRole(id: number): Promise<void> {
   await http.delete(`/rbac/roles/${id}`)
   invalidate('GET /rbac/roles')
   invalidate(`GET /rbac/roles/${id}/permissions`)
+  invalidate(`GET /rbac/roles/${id}/data-scopes`)
 }
 
 // ==================== 权限 ====================
@@ -121,6 +124,27 @@ export async function removeRolePermission(
 ): Promise<void> {
   await http.delete(`/rbac/roles/${roleId}/permissions/${permissionId}`)
   invalidate(`GET /rbac/roles/${roleId}/permissions`)
+}
+
+// ==================== 角色-数据范围 ====================
+
+/** GET /api/rbac/roles/{role_id}/data-scopes 查询角色已配置的数据范围（admin，会话内缓存） */
+export async function getRoleDataScopes(roleId: number): Promise<RoleDataScopeInfo[]> {
+  return cachedGet<RoleDataScopeInfo[]>(`/rbac/roles/${roleId}/data-scopes`)
+}
+
+/**
+ * PUT /api/rbac/roles/{role_id}/data-scopes 覆盖式配置角色数据范围（先清空旧配置再批量写入）。
+ * @param roleId 角色 ID（必填）
+ * @param scopes 数据范围配置项数组（必填；传空数组表示清空该角色的全部数据范围）
+ * @returns Promise<void> 无返回值，请求成功即代表覆盖完成
+ */
+export async function assignRoleDataScopes(
+  roleId: number,
+  scopes: RoleDataScopeRequest[],
+): Promise<void> {
+  await http.put(`/rbac/roles/${roleId}/data-scopes`, { scopes })
+  invalidate(`GET /rbac/roles/${roleId}/data-scopes`)
 }
 
 // ==================== 用户-角色关联 ====================

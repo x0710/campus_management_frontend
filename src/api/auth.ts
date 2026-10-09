@@ -8,6 +8,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  UpdateCredentialRequest,
   UserInfo,
 } from './types/auth'
 
@@ -50,4 +51,24 @@ export async function getMyRoles(force?: boolean): Promise<UserRoleInfo[]> {
   const me = await getCurrentUser()
   const roles = await queryUserRoles([me.uid], force)
   return roles.filter((role) => role.uid === me.uid)
+}
+
+/**
+ * 修改当前登录用户自己的密码（PATCH /api/credentials）。
+ * 后端「修改自己」分支要求验证旧密码，故必须提供 oldPassword；旧密码错误返回 403。
+ * @param uid 当前登录用户 ID（必填，取自 getCurrentUser().uid）
+ * @param oldPassword 旧密码（必填，用于后端校验）
+ * @param newPassword 新密码（必填）
+ */
+export async function changeMyPassword(
+  uid: number,
+  oldPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const body: UpdateCredentialRequest = {
+    uid,
+    old_password: oldPassword,
+    new_password: newPassword,
+  }
+  await http.patch('/credentials', body)
 }

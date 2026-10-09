@@ -44,6 +44,7 @@ import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getCurrentUser } from '../../api/auth'
 import { extractError } from '../../api/common'
+import { useAccountNames } from '../../composables/useAccountNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import UserEditPanel from './UserEditPanel'
@@ -99,6 +100,8 @@ export default function UsersAdminView() {
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
   const pageUids = useMemo(() => rows.map((u) => u.uid), [rows])
   const userOrgs = useUserOrganizations(pageUids)
+  // 当前页用户的账户用户名（GET /credentials/{uid}，走会话缓存，与组织架构页共用）
+  const userAccountNames = useAccountNames(pageUids)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -106,6 +109,10 @@ export default function UsersAdminView() {
 
   const [editUid, setEditUid] = useState<number | null>(null)
   const [resetResult, setResetResult] = useState<string | null>(null)
+  // 重置密码弹窗：可指定新密码（留空则由后端生成随机密码）
+  const [resetUid, setResetUid] = useState<number | null>(null)
+  const [resetRunning, setResetRunning] = useState(false)
+  const [resetPwdForm] = Form.useForm<{ password?: string }>()
   const [actingUid, setActingUid] = useState<number | null>(null)
 
   // 批量新增用户（基于 POST /api/users，CSV 解析为数组后一次性提交）
@@ -370,15 +377,30 @@ export default function UsersAdminView() {
     setBatchPreview(null)
   }
 
-  const doResetPassword = async (uid: number) => {
-    setActingUid(uid)
+  /** 打开重置密码弹窗（可指定新密码，留空则由后端生成随机密码） */
+  const openResetPassword = useCallback(
+    (uid: number) => {
+      resetPwdForm.resetFields()
+      setResetUid(uid)
+    },
+    [resetPwdForm],
+  )
+
+  /** 提交重置密码：填了新密码则重置为指定值，否则由后端生成随机密码 */
+  const doResetPassword = async () => {
+    if (resetUid === null) return
+    const raw = resetPwdForm.getFieldValue('password')
+    const newPassword = typeof raw === 'string' ? raw.trim() : ''
+    setResetRunning(true)
     try {
-      const res = await resetUserPassword(uid)
+      const res = await resetUserPassword(resetUid, newPassword || undefined)
       setResetResult(res.new_password)
+      setResetUid(null)
+      resetPwdForm.resetFields()
     } catch (err) {
       showError(err)
     } finally {
-      setActingUid(null)
+      setResetRunning(false)
     }
   }
 
@@ -402,6 +424,16 @@ export default function UsersAdminView() {
         dataIndex: 'uid',
         key: 'uid',
         width: 90,
+      },
+      {
+        // 「用户名」列（登录账户名，GET /credentials/{uid}）：插在 UID 之后
+        title: t('adminUsers.fieldUsername'),
+        key: 'username',
+        width: 140,
+        render: (_, record) =>
+          userAccountNames.has(record.uid)
+            ? (userAccountNames.get(record.uid) ?? '—')
+            : t('common.loading'),
       },
       {
         title: t('adminUsers.fieldName'),
@@ -457,17 +489,14 @@ export default function UsersAdminView() {
             <Button type="link" size="small" onClick={() => setEditUid(record.uid)}>
               {t('adminUsers.edit')}
             </Button>
-            <Popconfirm
-              title={t('adminUsers.resetConfirm')}
-              okText={t('adminUsers.resetPassword')}
-              cancelText={t('approval.cancel')}
-              okButtonProps={{ loading: actingUid === record.uid }}
-              onConfirm={() => void doResetPassword(record.uid)}
+            <Button
+              type="link"
+              size="small"
+              icon={<KeyOutlined />}
+              onClick={() => openResetPassword(record.uid)}
             >
-              <Button type="link" size="small" icon={<KeyOutlined />}>
-                {t('adminUsers.resetPassword')}
-              </Button>
-            </Popconfirm>
+              {t('adminUsers.resetPassword')}
+            </Button>
             {myUid !== record.uid && (
               <Popconfirm
                 title={t('adminUsers.deleteConfirm')}
@@ -485,7 +514,7 @@ export default function UsersAdminView() {
         ),
       },
     ],
-    [t, roleMap, userOrgs, actingUid, myUid],
+    [t, roleMap, userOrgs, userAccountNames, actingUid, myUid, openResetPassword],
   )
 
   return (
@@ -692,6 +721,28 @@ export default function UsersAdminView() {
             }
           />
         )}
+      </Modal>
+
+      <Modal
+        open={resetUid !== null}
+        title={resetUid !== null ? `${t('adminUsers.resetPassword')} #${resetUid}` : ''}
+        width={420}
+        okText={t('adminUsers.resetPassword')}
+        cancelText={t('approval.cancel')}
+        confirmLoading={resetRunning}
+        onCancel={() => setResetUid(null)}
+        onOk={() => void doResetPassword()}
+        destroyOnHidden
+      >
+        <Form form={resetPwdForm} layout="vertical">
+          <Form.Item
+            name="password"
+            label={t('adminUsers.newPassword')}
+            extra={t('adminUsers.passwordHint')}
+          >
+            <Input.Password maxLength={64} placeholder={t('adminUsers.passwordHint')} />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

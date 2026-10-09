@@ -50,6 +50,7 @@ import type { PositionDetail } from '../../api/types/positions'
 import { queryRoles } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
 import { extractError } from '../../api/common'
+import { useAccountNames } from '../../composables/useAccountNames'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
@@ -242,6 +243,8 @@ export default function OrgAdminView() {
   // 当前成员页内的用户 ID → 姓名 / 任职组织（均走会话缓存，相同 ID 不重复请求）
   const memberIds = useMemo(() => members.map((m) => m.user_id), [members])
   const memberNames = useUserNames(memberIds)
+  // 成员账户用户名（GET /credentials/{uid}，走会话缓存）
+  const memberUsernames = useAccountNames(memberIds)
   const memberOrgs = useUserOrganizations(memberIds)
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
   const positionNames = usePositionNames()
@@ -350,8 +353,18 @@ export default function OrgAdminView() {
         width: 80,
       },
       {
+        // 「用户名」列（登录账户名，GET /credentials/{uid}）：插在 UID 之后
+        title: t('adminOrg.colUsername'),
+        key: 'username',
+        width: 140,
+        render: (_, record) =>
+          memberUsernames.has(record.user_id)
+            ? (memberUsernames.get(record.user_id) ?? '—')
+            : t('common.loading'),
+      },
+      {
         // 通过 GET /api/users/{id} 解析出的真实姓名
-        title: t('adminOrg.colUserName'),
+        title: t('profile.name'),
         key: 'user_name',
         width: 130,
         render: (_, record) =>
@@ -436,7 +449,7 @@ export default function OrgAdminView() {
         ),
       },
     ],
-    [t, actingKey, memberNames, memberOrgs, positionNames, selectedId],
+    [t, actingKey, memberNames, memberUsernames, memberOrgs, positionNames, selectedId],
   )
 
   return (

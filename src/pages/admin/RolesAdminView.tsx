@@ -40,6 +40,7 @@ import type {
 import { extractError } from '../../api/common'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
+import RoleDataScopeModal from '../../components/RoleDataScopeModal'
 
 /** 角色/权限关联表每页条数（代码要求 12：表格每页最多 100 行） */
 const PAGE_SIZE = 100
@@ -112,6 +113,9 @@ export default function RolesAdminView() {
   const [assignInitial, setAssignInitial] = useState<number[]>([])
   const [assignLoading, setAssignLoading] = useState(false)
   const [assignSaving, setAssignSaving] = useState(false)
+
+  // 角色-数据范围配置
+  const [dataScopeRole, setDataScopeRole] = useState<RoleInfo | null>(null)
 
   const showError = useCallback(
     (err: unknown) => {
@@ -366,11 +370,14 @@ export default function RolesAdminView() {
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: 260,
+        width: 340,
         render: (_, record) => (
           <div className="approval-actions">
             <Button type="link" size="small" onClick={() => openAssign(record)}>
               {t('adminRoles.assignPerms')}
+            </Button>
+            <Button type="link" size="small" onClick={() => setDataScopeRole(record)}>
+              {t('adminRoles.dataScope')}
             </Button>
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openRoleEdit(record)}>
               {t('adminRoles.edit')}
@@ -728,6 +735,14 @@ export default function RolesAdminView() {
           }}
         />
       </Modal>
+
+      {/* 角色-数据范围配置 */}
+      <RoleDataScopeModal
+        open={dataScopeRole !== null}
+        role={dataScopeRole}
+        onCancel={() => setDataScopeRole(null)}
+        onSaved={() => setRoleReload((r) => ({ seq: r.seq + 1, force: false }))}
+      />
     </div>
   )
 }
