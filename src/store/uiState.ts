@@ -6,12 +6,13 @@
 import { create } from 'zustand'
 
 interface UiState {
-  /** 组织架构页面当前选中的组织 ID，null 表示未选中 */
-  selectedOrgId: number | null
-  setSelectedOrgId: (id: number | null) => void
+  /** 各组织视图当前选中的组织 ID，按模块 key 记忆（如 admin_m3 / leader_m3 / teacher_m3），null 表示未选中 */
+  selectedOrgIds: Partial<Record<string, number | null>>
+  setSelectedOrgId: (moduleKey: string, id: number | null) => void
 }
 
 export const useUiStateStore = create<UiState>()((set) => ({
-  selectedOrgId: null,
-  setSelectedOrgId: (id) => set({ selectedOrgId: id }),
+  selectedOrgIds: {},
+  setSelectedOrgId: (moduleKey, id) =>
+    set((s) => ({ selectedOrgIds: { ...s.selectedOrgIds, [moduleKey]: id } })),
 }))

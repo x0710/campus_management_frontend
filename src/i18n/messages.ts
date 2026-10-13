@@ -881,6 +881,7 @@ const messages = {
       tabGrades: '成绩信息',
       tabLeave: '请假信息',
       tabViolation: '违规信息',
+      tabRewarding: '奖学金及补助',
       profileEmpty: '暂无详细信息',
       profileLoadFailed: '详细信息加载失败',
       fieldIdCard: '身份证号',
@@ -944,6 +945,8 @@ const messages = {
       occurredAtRequired: '请选择发生时间',
       violationUpdateSuccess: '违规记录已更新',
       violationRefreshHint: '刷新违规列表',
+      rewardingRefreshHint: '刷新奖学金及补助列表',
+      rewardingRowClickHint: '点击查看奖学金及补助详情',
     },
     orgExplorer: {
       emptyOrgs: '未查询到您所在的组织，请联系管理员确认组织归属',
@@ -1866,6 +1869,7 @@ const messages = {
       tabGrades: 'Grades',
       tabLeave: 'Leave',
       tabViolation: 'Violations',
+      tabRewarding: 'Scholarships & Subsidies',
       profileEmpty: 'No detailed profile available',
       profileLoadFailed: 'Failed to load the detailed profile',
       fieldIdCard: 'ID card number',
@@ -1929,6 +1933,8 @@ const messages = {
       occurredAtRequired: 'Please select the occurred time',
       violationUpdateSuccess: 'Violation record updated',
       violationRefreshHint: 'Refresh the violation list',
+      rewardingRefreshHint: 'Refresh the reward list',
+      rewardingRowClickHint: 'Click to view reward details',
     },
     orgExplorer: {
       emptyOrgs: 'No organization found for your account. Please contact an administrator.',

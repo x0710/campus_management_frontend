@@ -77,7 +77,7 @@ export default function OrgAdminView() {
   const [orgsError, setOrgsError] = useState<string | null>(null)
 
   // 选中组织 ID 存入 Zustand 会话状态，切换路由回来后仍保留
-  const selectedId = useUiStateStore((s) => s.selectedOrgId)
+  const selectedId = useUiStateStore((s) => s.selectedOrgIds['admin_m3'] ?? null)
   const setSelectedId = useUiStateStore((s) => s.setSelectedOrgId)
 
   // 组织搜索关键词（仅前端过滤树节点）
@@ -250,7 +250,7 @@ export default function OrgAdminView() {
   const positionNames = usePositionNames()
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
-    setSelectedId(keys.length ? Number(keys[0]) : null)
+    setSelectedId('admin_m3', keys.length ? Number(keys[0]) : null)
   }
 
   const openCreate = (parent?: OrganizationInfo) => {
@@ -302,7 +302,7 @@ export default function OrgAdminView() {
     try {
       await deleteOrganization(org.id)
       message.success(t('adminOrg.deleteSuccess'))
-      if (selectedId === org.id) setSelectedId(null)
+      if (selectedId === org.id) setSelectedId('admin_m3', null)
       await loadOrgs()
     } catch (err) {
       showError(err)

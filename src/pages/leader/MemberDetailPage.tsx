@@ -73,6 +73,8 @@ import { queryProfileDetails } from '../../api/profileDetails'
 import type { ProfileDetail } from '../../api/types/profileDetails'
 import { getUser } from '../../api/users'
 import type { UserDetail } from '../../api/types/users'
+import { queryRewardings } from '../../api/rewardings'
+import type { RewardingDto } from '../../api/types/rewardings'
 import {
   getViolation,
   queryViolations,
@@ -102,6 +104,7 @@ import {
 import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
+import { formatCentsAsYuan } from '../../utils/money'
 
 /** 成绩编辑表单值 */
 interface ScoreFormValues {
@@ -247,6 +250,11 @@ export default function MemberDetailPage() {
                 key: 'violation',
                 label: t('memberDetail.tabViolation'),
                 children: <ViolationTab uid={userId} t={t} readOnly={readOnly} />,
+              },
+              {
+                key: 'rewarding',
+                label: t('memberDetail.tabRewarding'),
+                children: <RewardingTab uid={userId} t={t} locale={locale} />,
               },
             ]}
           />
@@ -1088,6 +1096,158 @@ function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
                 key: 'created_at',
                 label: t('leaveDetail.createdAt'),
                 children: formatDateTime(detail.detail.created_at, locale),
+              },
+            ]}
+          />
+        )}
+      </Modal>
+    </>
+  )
+}
+
+/** 奖学金及补助 Tab：分页展示该成员的奖学金/补助记录，点击行查看详情（只读） */
+function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale: 'zh' | 'en' }) {
+  const [rows, setRows] = useState<RewardingDto[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [reload, setReload] = useState({ seq: 0, force: false })
+  const [detail, setDetail] = useState<RewardingDto | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await queryRewardings(
+        { page, page_size: MEMBER_DETAIL_PAGE_SIZE, uid },
+        reload.force,
+      )
+      setRows(res.data)
+      setTotal(res.total)
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        setError(extractErrorWithStatus(err))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [uid, page, reload.seq, reload.force])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const columns = useMemo<ColumnsType<RewardingDto>>(
+    () => [
+      {
+        title: t('rewarding.colProject'),
+        dataIndex: 'project',
+        key: 'project',
+        ellipsis: true,
+        render: (v: string) => <span title={v}>{v || '—'}</span>,
+      },
+      {
+        title: t('rewarding.colAmount'),
+        dataIndex: 'amount_cents',
+        key: 'amount_cents',
+        width: 160,
+        align: 'right',
+        render: (cents: number) => formatCentsAsYuan(cents, locale),
+      },
+      {
+        title: t('rewarding.colCreatedAt'),
+        dataIndex: 'created_at',
+        key: 'created_at',
+        width: 190,
+        render: (v: string) => formatDateTime(v, locale),
+      },
+    ],
+    [t, locale],
+  )
+
+  return (
+    <>
+      <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+        <Tooltip title={t('memberDetail.rewardingRefreshHint')}>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+          >
+            {t('common.refresh')}
+          </Button>
+        </Tooltip>
+      </div>
+
+      {error ? (
+        <Alert
+          type="error"
+          showIcon
+          title={error}
+          action={
+            <Button
+              size="small"
+              onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+            >
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      ) : (
+        <Table<RewardingDto>
+          rowKey="id"
+          size="small"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          locale={{ emptyText: t('common.noData') }}
+          scroll={{ x: 720 }}
+          onRow={(record) => ({
+            onClick: () => setDetail(record),
+            title: t('memberDetail.rewardingRowClickHint'),
+            style: { cursor: 'pointer' },
+          })}
+          pagination={{
+            current: page,
+            pageSize: MEMBER_DETAIL_PAGE_SIZE,
+            total,
+            showSizeChanger: false,
+            showQuickJumper: true,
+            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            onChange: (p: number) => setPage(p),
+          }}
+        />
+      )}
+
+      <Modal
+        open={detail !== null}
+        title={t('rewarding.detailTitle')}
+        footer={<Button onClick={() => setDetail(null)}>{t('common.close')}</Button>}
+        onCancel={() => setDetail(null)}
+        destroyOnHidden
+      >
+        {detail && (
+          <Descriptions
+            bordered
+            size="small"
+            column={1}
+            items={[
+              { key: 'id', label: t('common.id'), children: detail.id },
+              { key: 'uid', label: t('rewarding.colUid'), children: detail.uid },
+              {
+                key: 'project',
+                label: t('rewarding.colProject'),
+                children: detail.project || '—',
+              },
+              {
+                key: 'amount',
+                label: t('rewarding.colAmount'),
+                children: formatCentsAsYuan(detail.amount_cents, locale),
+              },
+              {
+                key: 'created_at',
+                label: t('rewarding.colCreatedAt'),
+                children: formatDateTime(detail.created_at, locale),
               },
             ]}
           />

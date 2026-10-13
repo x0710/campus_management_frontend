@@ -25,6 +25,7 @@ import { usePositionNames } from '../composables/usePositionNames'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
+import { useUiStateStore } from '../store/uiState'
 
 /** 组织树节点所需的最小组织信息（领导端传 OrganizationInfo，老师端传本人任职组织） */
 export interface OrgNode {
@@ -72,7 +73,8 @@ export default function OrgMembersExplorer({
   const { portalKey } = useParams<{ portalKey: string }>()
 
   const [orgSearch, setOrgSearch] = useState('')
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const selectedId = useUiStateStore((s) => s.selectedOrgIds[fromModuleKey] ?? null)
+  const setSelectedId = useUiStateStore((s) => s.setSelectedOrgId)
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState<string | null>(null)
@@ -103,9 +105,9 @@ export default function OrgMembersExplorer({
   // 自动选中首个组织（老师端通常只有一个组织，避免多一次点击）
   useEffect(() => {
     if (autoSelectFirst && selectedId === null && orgs.length > 0) {
-      setSelectedId(orgs[0].id)
+      setSelectedId(fromModuleKey, orgs[0].id)
     }
-  }, [autoSelectFirst, orgs, selectedId])
+  }, [autoSelectFirst, orgs, selectedId, fromModuleKey, setSelectedId])
 
   // 切换组织后回到第 1 页并加载成员
   useEffect(() => {
@@ -278,7 +280,7 @@ export default function OrgMembersExplorer({
                     treeData={treeData}
                     selectedKeys={selectedId !== null ? [selectedId] : []}
                     onSelect={(keys: React.Key[]) =>
-                      setSelectedId(keys.length ? Number(keys[0]) : null)
+                      setSelectedId(fromModuleKey, keys.length ? Number(keys[0]) : null)
                     }
                     showLine
                     blockNode
