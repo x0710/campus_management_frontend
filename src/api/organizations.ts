@@ -102,8 +102,27 @@ export async function listSubsidiaries(orgId: number): Promise<OrganizationInfo[
   return cachedGet<OrganizationInfo[]>(`/organizations/${orgId}/subsidiaries`)
 }
 
-/** GET /api/organization-members?uids={uid} 查询用户的全部组织任职（会话内缓存） */
+/**
+ * GET /api/organization-members?uids=... 批量查询多个用户的全部组织任职（会话内缓存）。
+ *
+ * @param uids 用户 ID 数组（必填；为空时直接返回空数组，不发请求）
+ * @param force 是否绕过会话缓存（可选，默认 false；手动刷新时传 true）
+ * @returns 任职记录数组（可能为空；同一用户有多个任职会返回多条）
+ */
+export async function listUserOrganizationsBatch(
+  uids: number[],
+  force?: boolean,
+): Promise<UserOrganization[]> {
+  if (uids.length === 0) return []
+  return cachedGet<UserOrganization[]>(
+    '/organization-members',
+    { uids: uids.join(',') },
+    { force },
+  )
+}
+
+/** GET /api/organization-members?uids={uid} 查询单个用户的全部组织任职（会话内缓存） */
 export async function listUserOrganizations(uid: number): Promise<UserOrganization[]> {
-  return cachedGet<UserOrganization[]>('/organization-members', { uids: uid })
+  return listUserOrganizationsBatch([uid])
 }
 

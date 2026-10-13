@@ -1,7 +1,8 @@
 /**
  * 用户 ID → 任职组织列表批量解析 Hook：
- * 传入任意数量的用户 ID，去重后并行调用 listUserOrganizations（走会话内缓存 cachedGet），
- * 返回 Map<uid, UserOrganization[]>。请求失败的 ID 映射为空数组，不阻塞其他解析。
+ * 传入任意数量的用户 ID，去重后一次性批量调用 listUserOrganizationsBatch
+ * （GET /api/organization-members?uids=1,2,3，走会话内缓存 cachedGet），
+ * 返回 Map<uid, UserOrganization[]>。批量请求失败的 ID 映射为空数组，不阻塞页面其他内容。
  * 适用于组织架构成员表展示用户所属组织等场景。
  *
  * Map 中不存在 key 表示尚未解析，存在 key（含空数组）表示解析完成。
@@ -9,7 +10,7 @@
  * 已解析 ID 再次进入时由 API 层缓存直接返回，不会产生额外网络请求。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { listUserOrganizations } from '../api/organizations'
+import { listUserOrganizationsBatch } from '../api/organizations'
 import type { UserOrganization } from '../api/types/organizations'
 
 export function useUserOrganizations(
@@ -26,19 +27,22 @@ export function useUserOrganizations(
     if (uniqueIds.length === 0) return
 
     let cancelled = false
-    const fetched = new Map<number, UserOrganization[]>()
 
     void (async () => {
-      // 并行请求，每个独立容错；重复 ID 由 API 层缓存命中，不发额外请求
-      await Promise.all(
-        uniqueIds.map(async (id) => {
-          try {
-            fetched.set(id, await listUserOrganizations(id))
-          } catch {
-            fetched.set(id, [])
-          }
-        }),
-      )
+      // 先按请求的 ID 全部初始化为空数组，再按返回结果分组；
+      // 一次批量请求即可覆盖全部 ID，避免逐用户请求（接口支持 uids 批量）
+      const fetched = new Map<number, UserOrganization[]>()
+      for (const id of uniqueIds) fetched.set(id, [])
+      try {
+        const list = await listUserOrganizationsBatch(uniqueIds)
+        for (const item of list) {
+          const arr = fetched.get(item.user_id)
+          if (arr) arr.push(item)
+          else fetched.set(item.user_id, [item])
+        }
+      } catch {
+        // 批量请求失败：全部 ID 保持空数组，不影响页面其他内容
+      }
       if (!cancelled) {
         // 与旧状态合并，保留其它 ID 的已解析结果
         setOrgMap((prev) => {

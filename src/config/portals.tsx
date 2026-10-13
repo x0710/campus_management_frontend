@@ -12,6 +12,7 @@ import {
   CalendarOutlined,
   CheckCircleOutlined,
   CrownOutlined,
+  DollarOutlined,
   FileDoneOutlined,
   FileSearchOutlined,
   FormOutlined,
@@ -120,6 +121,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'leader_m6', status: 'ready', icon: <ReadOutlined /> },
       { key: 'leader_m7', status: 'ready', icon: <NotificationOutlined /> },
       { key: 'leader_m8', status: 'ready', icon: <FileDoneOutlined /> },
+      { key: 'leader_m9', status: 'ready', icon: <DollarOutlined /> },
     ],
   },
   {
