@@ -2,7 +2,7 @@
  * 老师端：班级管理（展示本人所在组织的全部人员，点击成员可查看学生详细信息）。
  *
  * 数据来源：当前登录用户 uid（GET /api/credentials/me，会话缓存）
- *   → 本人全部组织任职（GET /api/organizations/users/{uid}，会话缓存）
+ *   → 本人全部组织任职（GET /api/organization-members?uids={uid}，会话缓存）
  *   → 所选组织成员（GET /api/organizations/{id}/members，复用 OrgMembersExplorer 内分页查询）。
  * 本页不提供任何组织/成员范围输入，只用登录态解析出的组织，因此老师只能看到本人所在组织的人员；
  * 后端对成员查询另有数据权限校验，越权会返回 403（错误提示含状态码与中文原因）。

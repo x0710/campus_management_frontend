@@ -456,7 +456,7 @@ export default function UsersAdminView() {
         },
       },
       {
-        // 用户的组织任职：组织名 + 职位，数据来自 GET /organizations/users/{uid}
+        // 用户的组织任职：组织名 + 职位，数据来自 GET /organization-members?uids=
         title: t('adminUsers.colOrgPos'),
         key: 'org_pos',
         width: 260,

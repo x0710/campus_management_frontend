@@ -332,9 +332,9 @@ export default function OrgAdminView() {
 
   const removeMember = async (member: OrganizationMember) => {
     if (selectedId === null) return
-    setActingKey(`member-${member.user_id}-${member.position}`)
+    setActingKey(`member-${member.id}`)
     try {
-      await removeOrgMember(selectedId, member)
+      await removeOrgMember(selectedId, member.id)
       message.success(t('adminOrg.memberRemoveSuccess'))
       await loadMembers(selectedId, memberPage)
     } catch (err) {
@@ -373,7 +373,7 @@ export default function OrgAdminView() {
             : t('common.loading'),
       },
       {
-        // 用户的全部任职组织（当前组织高亮），数据来自 GET /organizations/users/{uid}
+        // 用户的全部任职组织（当前组织高亮），数据来自 GET /organization-members?uids=
         title: t('adminOrg.colUserOrg'),
         key: 'user_orgs',
         width: 220,
@@ -437,7 +437,7 @@ export default function OrgAdminView() {
               cancelText={t('approval.cancel')}
               okButtonProps={{
                 danger: true,
-                loading: actingKey === `member-${record.user_id}-${record.position}`,
+                loading: actingKey === `member-${record.id}`,
               }}
               onConfirm={() => void removeMember(record)}
             >
@@ -596,9 +596,7 @@ export default function OrgAdminView() {
               </div>
 
               <Table<OrganizationMember>
-                rowKey={(_r: OrganizationMember, i: number | undefined) =>
-                  `${_r.user_id}-${_r.position}-${i ?? 0}`
-                }
+                rowKey={(r: OrganizationMember) => String(r.id)}
                 loading={membersLoading}
                 columns={memberColumns}
                 dataSource={members}

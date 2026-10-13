@@ -36,9 +36,9 @@ export async function listAllPositions(force?: boolean): Promise<PositionDetail[
   return all
 }
 
-/** GET /api/positions/management/{code} 查询职位详情（会话内缓存） */
+/** GET /api/positions/{code} 查询职位详情（会话内缓存） */
 export async function getPosition(code: string): Promise<PositionDetail> {
-  return cachedGet<PositionDetail>(`/positions/management/${code}`)
+  return cachedGet<PositionDetail>(`/positions/${code}`)
 }
 
 /** POST /api/positions 创建职位，返回新职位 code（后端响应体为纯字符串） */
@@ -48,14 +48,14 @@ export async function createPosition(body: PositionCreateRequest): Promise<strin
   return res.data
 }
 
-/** PATCH /api/positions/management/{code} 更新职位（code 不可改；description 省略表示保留原值） */
+/** PATCH /api/positions/{code} 更新职位（code 不可改；description 省略表示保留原值） */
 export async function updatePosition(code: string, body: PositionUpdateRequest): Promise<void> {
-  await http.patch(`/positions/management/${code}`, body)
+  await http.patch(`/positions/${code}`, body)
   invalidate('GET /positions')
 }
 
-/** DELETE /api/positions/management/{code} 删除职位 */
+/** DELETE /api/positions/{code} 删除职位 */
 export async function deletePosition(code: string): Promise<void> {
-  await http.delete(`/positions/management/${code}`)
+  await http.delete(`/positions/${code}`)
   invalidate('GET /positions')
 }

@@ -5,6 +5,7 @@ import type { PaginatedResponse } from './types/common'
 import type {
   OrganizationInfo,
   OrganizationMember,
+  OrganizationMemberInput,
   OrganizationMemberQuery,
   OrganizationQuery,
   UserOrganization,
@@ -78,18 +79,22 @@ export async function queryOrgMembers(
   )
 }
 
-/** POST /api/organizations/{id}/members 添加成员 */
-export async function addOrgMember(orgId: number, member: OrganizationMember): Promise<void> {
-  await http.post(`/organizations/${orgId}/members`, member)
+/** POST /api/organizations/{id}/members 添加成员，返回新成员记录 */
+export async function addOrgMember(
+  orgId: number,
+  member: OrganizationMemberInput,
+): Promise<OrganizationMember> {
+  const res = await http.post<OrganizationMember>(`/organizations/${orgId}/members`, member)
   invalidate(`GET /organizations/${orgId}/members`)
-  invalidate(`GET /organizations/users/`)
+  invalidate('GET /organization-members')
+  return res.data
 }
 
-/** DELETE /api/organizations/{id}/members 移除成员（参数在 body） */
-export async function removeOrgMember(orgId: number, member: OrganizationMember): Promise<void> {
-  await http.delete(`/organizations/${orgId}/members`, { data: member })
+/** DELETE /api/organizations/{id}/members/{member_id} 按成员记录 id 移除成员 */
+export async function removeOrgMember(orgId: number, memberId: number): Promise<void> {
+  await http.delete(`/organizations/${orgId}/members/${memberId}`)
   invalidate(`GET /organizations/${orgId}/members`)
-  invalidate(`GET /organizations/users/`)
+  invalidate('GET /organization-members')
 }
 
 /** GET /api/organizations/{id}/subsidiaries 直接下级组织（会话内缓存） */
@@ -97,8 +102,8 @@ export async function listSubsidiaries(orgId: number): Promise<OrganizationInfo[
   return cachedGet<OrganizationInfo[]>(`/organizations/${orgId}/subsidiaries`)
 }
 
-/** GET /api/organizations/users/{uid} 查询用户的全部组织任职（会话内缓存） */
+/** GET /api/organization-members?uids={uid} 查询用户的全部组织任职（会话内缓存） */
 export async function listUserOrganizations(uid: number): Promise<UserOrganization[]> {
-  return cachedGet<UserOrganization[]>(`/organizations/users/${uid}`)
+  return cachedGet<UserOrganization[]>('/organization-members', { uids: uid })
 }
 

@@ -1,8 +1,8 @@
 /**
  * 管理端：职位管理
- * - 职位 CRUD（GET/POST /positions，PATCH/DELETE /positions/management/{code}）
+ * - 职位 CRUD（GET/POST /positions，PATCH/DELETE /positions/{code}）
  * - 支持按编码/名称关键字搜索、手动刷新（绕过会话缓存）
- * - 点击表格行查看职位详情（GET /positions/management/{code}）
+ * - 点击表格行查看职位详情（GET /positions/{code}）
  * code 为主键，创建时指定、创建后不可修改。
  */
 import {

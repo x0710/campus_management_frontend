@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/auth'
 
 /**
  * 全局 axios 实例：
- * - baseURL 走相对路径 /api，开发环境由 Vite 代理转发到 campus-server（默认 8000 端口）
+ * - baseURL 走相对路径 /api，开发环境由 Vite 代理转发到后端服务器（见 vite.config.ts）
  * - 请求拦截器自动附带 JWT（Bearer Token）
  * - 响应拦截器统一处理登录失效（401）：清除本地登录态并回到登录页
  */

@@ -329,9 +329,7 @@ export default function OrgMembersExplorer({
             />
           ) : (
             <Table<OrganizationMember>
-              rowKey={(r: OrganizationMember, i: number | undefined) =>
-                `${r.user_id}-${r.position}-${i ?? 0}`
-              }
+              rowKey={(r: OrganizationMember) => String(r.id)}
               loading={membersLoading}
               columns={memberColumns}
               dataSource={members}

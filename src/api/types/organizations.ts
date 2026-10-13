@@ -14,19 +14,26 @@ export interface OrganizationInfo {
   updated_at: string
 }
 
-/** 组织成员（POST/DELETE body；position 为字符串编码） */
-export interface OrganizationMember {
+/** 组织成员新增请求体（POST /organizations/{id}/members body；position 为字符串编码） */
+export interface OrganizationMemberInput {
   user_id: number
   position: string
   workplace: string | null
 }
 
-/** 用户-组织任职详情（GET /organizations/users/{uid}） */
-export interface UserOrganization extends OrganizationMember {
+/** 组织成员记录（GET /organizations/{id}/members 返回项，含成员记录 id 与创建时间） */
+export interface OrganizationMember {
   id: number
+  user_id: number
+  position: string
+  workplace: string | null
+  created_at: string
+}
+
+/** 用户-组织任职详情（GET /organization-members?uids= 返回项） */
+export interface UserOrganization extends OrganizationMember {
   organization_id: number
   organization_name: string
-  created_at: string
 }
 
 /** 组织分页查询参数 */

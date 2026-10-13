@@ -2,7 +2,7 @@
  * 解析指定用户所在组织内的全体成员（教师端「学生成绩」的数据范围来源）。
  *
  * 流程：
- *   uid → GET /organizations/users/{uid}        拿到该用户的所有任职组织
+ *   uid → GET /organization-members?uids={uid}   拿到该用户的所有任职组织
  *       → GET /organizations/{id}/members       逐组织分页拉取**全部**成员（不按职位筛选）
  *       → 得到成员列表（同一成员跨多个组织时保留多条任职记录）
  *

@@ -194,11 +194,7 @@ export default function UserEditPanel({ uid, roles, organizations, positions, on
   const removeRelation = async (rel: UserOrganization) => {
     setOrgBusy(`rel-${rel.id}`)
     try {
-      await removeOrgMember(rel.organization_id, {
-        user_id: uid,
-        position: rel.position,
-        workplace: rel.workplace,
-      })
+      await removeOrgMember(rel.organization_id, rel.id)
       message.success(t('adminOrg.memberRemoveSuccess'))
       setOrgRelations((list) => list.filter((x) => x.id !== rel.id))
     } catch (err) {
