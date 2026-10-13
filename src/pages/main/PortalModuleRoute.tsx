@@ -7,32 +7,32 @@
  */
 import { ApiOutlined, AppstoreAddOutlined, LockOutlined } from '@ant-design/icons'
 import { Navigate, useParams } from 'react-router'
-import type { ComponentType } from 'react'
+import { lazy, type ComponentType } from 'react'
 import { Tag } from 'antd'
 import { getPortal, type PortalKey, type PortalModule } from '../../config/portals'
 import { useT } from '../../i18n'
-import AnnouncementsView from './AnnouncementsView'
-import LeaveApplyView from '../student/LeaveApplyView'
-import StudentProfileView from '../student/StudentProfileView'
-import SchoolCalendarView from '../student/SchoolCalendarView'
-import ScheduleView from '../student/ScheduleView'
-import GradesView from '../student/GradesView'
-import CounselingBookingView from '../student/CounselingBookingView'
-import SecondClassCreditsView from '../student/SecondClassCreditsView'
-import ViolationQueryView from '../student/ViolationQueryView'
-import LeaveApprovalView from '../teacher/LeaveApprovalView'
-import StudentScoresView from '../teacher/StudentScoresView'
-import ClassManageView from '../teacher/ClassManageView'
-import PublishAnnouncementView from '../leader/PublishAnnouncementView'
-import CalendarManageView from '../leader/CalendarManageView'
-import CourseManageView from '../leader/CourseManageView'
-import ApprovalTemplateManageView from '../leader/ApprovalTemplateManageView'
-import LeaderOrgView from '../leader/LeaderOrgView'
-import RewardingManageView from '../leader/RewardingManageView'
-import UsersAdminView from '../admin/UsersAdminView'
-import OrgAdminView from '../admin/OrgAdminView'
-import RolesAdminView from '../admin/RolesAdminView'
-import PositionsAdminView from '../admin/PositionsAdminView'
+const AnnouncementsView = lazy(() => import('./AnnouncementsView'))
+const LeaveApplyView = lazy(() => import('../student/LeaveApplyView'))
+const StudentProfileView = lazy(() => import('../student/StudentProfileView'))
+const SchoolCalendarView = lazy(() => import('../student/SchoolCalendarView'))
+const ScheduleView = lazy(() => import('../student/ScheduleView'))
+const GradesView = lazy(() => import('../student/GradesView'))
+const CounselingBookingView = lazy(() => import('../student/CounselingBookingView'))
+const SecondClassCreditsView = lazy(() => import('../student/SecondClassCreditsView'))
+const ViolationQueryView = lazy(() => import('../student/ViolationQueryView'))
+const LeaveApprovalView = lazy(() => import('../teacher/LeaveApprovalView'))
+const StudentScoresView = lazy(() => import('../teacher/StudentScoresView'))
+const ClassManageView = lazy(() => import('../teacher/ClassManageView'))
+const PublishAnnouncementView = lazy(() => import('../leader/PublishAnnouncementView'))
+const CalendarManageView = lazy(() => import('../leader/CalendarManageView'))
+const CourseManageView = lazy(() => import('../leader/CourseManageView'))
+const ApprovalTemplateManageView = lazy(() => import('../leader/ApprovalTemplateManageView'))
+const LeaderOrgView = lazy(() => import('../leader/LeaderOrgView'))
+const RewardingManageView = lazy(() => import('../leader/RewardingManageView'))
+const UsersAdminView = lazy(() => import('../admin/UsersAdminView'))
+const OrgAdminView = lazy(() => import('../admin/OrgAdminView'))
+const RolesAdminView = lazy(() => import('../admin/RolesAdminView'))
+const PositionsAdminView = lazy(() => import('../admin/PositionsAdminView'))
 
 /**
  * 领导端「公告管理」：复用学生端公告列表并开启管理模式

@@ -18,9 +18,10 @@ import {
 } from '@ant-design/icons'
 import { Button, Layout, Menu, Tag, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
-import { useEffect, useMemo } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import PortalHeader from '../../components/PortalHeader'
+import PageLoading from '../../components/PageLoading'
 import { getPortal, type PortalModule } from '../../config/portals'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
@@ -207,7 +208,9 @@ export default function PortalWorkspace() {
         </Layout.Sider>
 
         <main className="workspace-content">
-          <Outlet />
+          <Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

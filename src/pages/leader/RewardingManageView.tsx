@@ -55,6 +55,88 @@ interface ModalState {
   rewardingId?: number
 }
 
+/** 筛选栏：输入值保存在本组件内，点击「搜索」才回调父组件，避免每次键入触发整张列表重渲染 */
+function RewardingFilterBar({
+  onApply,
+}: {
+  onApply: (
+    uid: number | null,
+    amountMin: number | null,
+    amountMax: number | null,
+    dateRange: [Dayjs, Dayjs] | null,
+  ) => void
+}) {
+  const t = useT()
+  const [uid, setUid] = useState<number | null>(null)
+  const [amountMin, setAmountMin] = useState<number | null>(null)
+  const [amountMax, setAmountMax] = useState<number | null>(null)
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
+
+  return (
+    <div
+      className="approval-toolbar"
+      style={{ flexWrap: 'wrap', rowGap: 10, marginBottom: 16 }}
+    >
+      <Tooltip title={t('rewarding.filterUidHint')}>
+        <InputNumber
+          style={{ width: 150 }}
+          precision={0}
+          min={REWARDING_UID_MIN}
+          value={uid}
+          placeholder={t('rewarding.filterUidPlaceholder')}
+          onChange={(v: number | null) => setUid(v)}
+        />
+      </Tooltip>
+      <Tooltip title={t('rewarding.filterAmountMinHint')}>
+        <InputNumber
+          style={{ width: 140 }}
+          prefix="¥"
+          step={REWARDING_AMOUNT_STEP_YUAN}
+          precision={2}
+          min={REWARDING_AMOUNT_MIN_YUAN}
+          max={REWARDING_AMOUNT_MAX_YUAN}
+          value={amountMin}
+          placeholder={t('rewarding.filterAmountMin')}
+          onChange={(v: number | null) => setAmountMin(v)}
+        />
+      </Tooltip>
+      <Tooltip title={t('rewarding.filterAmountMaxHint')}>
+        <InputNumber
+          style={{ width: 140 }}
+          prefix="¥"
+          step={REWARDING_AMOUNT_STEP_YUAN}
+          precision={2}
+          min={REWARDING_AMOUNT_MIN_YUAN}
+          max={REWARDING_AMOUNT_MAX_YUAN}
+          value={amountMax}
+          placeholder={t('rewarding.filterAmountMax')}
+          onChange={(v: number | null) => setAmountMax(v)}
+        />
+      </Tooltip>
+      <Tooltip title={t('rewarding.filterDateHint')}>
+        <RangePicker
+          style={{ width: 260 }}
+          value={dateRange}
+          onChange={(dates) =>
+            setDateRange(
+              dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null,
+            )
+          }
+        />
+      </Tooltip>
+      <Tooltip title={t('rewarding.searchHint')}>
+        <Button
+          type="primary"
+          icon={<SearchOutlined />}
+          onClick={() => onApply(uid, amountMin, amountMax, dateRange)}
+        >
+          {t('rewarding.search')}
+        </Button>
+      </Tooltip>
+    </div>
+  )
+}
+
 export default function RewardingManageView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -68,10 +150,6 @@ export default function RewardingManageView() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
-  const [uidFilter, setUidFilter] = useState<number | null>(null)
-  const [amountMin, setAmountMin] = useState<number | null>(null)
-  const [amountMax, setAmountMax] = useState<number | null>(null)
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   // 已应用的筛选条件（点击「搜索」后才提交，避免输入过程中频繁触发请求）
   const [applied, setApplied] = useState<{
     uid: number | null
@@ -140,16 +218,19 @@ export default function RewardingManageView() {
     void load()
   }, [load])
 
-  /** 点击「搜索」：把当前筛选输入提交为已应用条件并回到第一页 */
-  const applyFilters = useCallback(() => {
-    setApplied({
-      uid: uidFilter,
-      amountMin,
-      amountMax,
-      dateRange,
-    })
-    setPage(1)
-  }, [uidFilter, amountMin, amountMax, dateRange])
+  /** 点击「搜索」：接收筛选栏提交的条件并回到第一页 */
+  const applyFilters = useCallback(
+    (
+      uid: number | null,
+      amountMin: number | null,
+      amountMax: number | null,
+      dateRange: [Dayjs, Dayjs] | null,
+    ) => {
+      setApplied({ uid, amountMin, amountMax, dateRange })
+      setPage(1)
+    },
+    [],
+  )
 
   /** 删除记录：成功后失效列表缓存并强制刷新列表（代码要求 13） */
   const doDelete = useCallback(
@@ -295,63 +376,7 @@ export default function RewardingManageView() {
           </div>
         </header>
         <div className="panel-card-body">
-          <div
-            className="approval-toolbar"
-            style={{ flexWrap: 'wrap', rowGap: 10, marginBottom: 16 }}
-          >
-            <Tooltip title={t('rewarding.filterUidHint')}>
-              <InputNumber
-                style={{ width: 150 }}
-                precision={0}
-                min={REWARDING_UID_MIN}
-                value={uidFilter}
-                placeholder={t('rewarding.filterUidPlaceholder')}
-                onChange={(v: number | null) => setUidFilter(v)}
-              />
-            </Tooltip>
-            <Tooltip title={t('rewarding.filterAmountMinHint')}>
-              <InputNumber
-                style={{ width: 140 }}
-                prefix="¥"
-                step={REWARDING_AMOUNT_STEP_YUAN}
-                precision={2}
-                min={REWARDING_AMOUNT_MIN_YUAN}
-                max={REWARDING_AMOUNT_MAX_YUAN}
-                value={amountMin}
-                placeholder={t('rewarding.filterAmountMin')}
-                onChange={(v: number | null) => setAmountMin(v)}
-              />
-            </Tooltip>
-            <Tooltip title={t('rewarding.filterAmountMaxHint')}>
-              <InputNumber
-                style={{ width: 140 }}
-                prefix="¥"
-                step={REWARDING_AMOUNT_STEP_YUAN}
-                precision={2}
-                min={REWARDING_AMOUNT_MIN_YUAN}
-                max={REWARDING_AMOUNT_MAX_YUAN}
-                value={amountMax}
-                placeholder={t('rewarding.filterAmountMax')}
-                onChange={(v: number | null) => setAmountMax(v)}
-              />
-            </Tooltip>
-            <Tooltip title={t('rewarding.filterDateHint')}>
-              <RangePicker
-                style={{ width: 260 }}
-                value={dateRange}
-                onChange={(dates) =>
-                  setDateRange(
-                    dates && dates[0] && dates[1] ? [dates[0], dates[1]] : null,
-                  )
-                }
-              />
-            </Tooltip>
-            <Tooltip title={t('rewarding.searchHint')}>
-              <Button type="primary" icon={<SearchOutlined />} onClick={applyFilters}>
-                {t('rewarding.search')}
-              </Button>
-            </Tooltip>
-          </div>
+          <RewardingFilterBar onApply={applyFilters} />
 
           {error ? (
             <Alert

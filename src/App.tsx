@@ -5,15 +5,17 @@
  * /portal/:portalKey 是各门户的工作台（顶栏 + 侧栏 + 内容区）。
  */
 
+import { lazy } from 'react'
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import LoginPage from './pages/LoginPage'
-import AnnouncementDetailPage from './pages/main/AnnouncementDetailPage'
-import AnnouncementEditorPage from './pages/leader/AnnouncementEditorPage'
-import MemberDetailPage from './pages/leader/MemberDetailPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalRedirect from './pages/main/PortalRedirect'
 import PortalWorkspace from './pages/main/PortalWorkspace'
 import { useAuthStore } from './store/auth'
+
+const AnnouncementDetailPage = lazy(() => import('./pages/main/AnnouncementDetailPage'))
+const AnnouncementEditorPage = lazy(() => import('./pages/leader/AnnouncementEditorPage'))
+const MemberDetailPage = lazy(() => import('./pages/leader/MemberDetailPage'))
 
 
 /**
