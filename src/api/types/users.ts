@@ -34,6 +34,8 @@ export interface UserDetail {
 export interface UserQuery extends PageQuery {
   keyword?: string
   status?: UserStatus
+  /** 按用户 ID 批量筛选，逗号分隔，如 '1,2,3'（对应后端 ids 查询参数） */
+  ids?: string
 }
 
 /** POST /api/users 请求元素（body 为数组，支持批量创建） */

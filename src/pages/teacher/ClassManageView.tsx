@@ -67,7 +67,6 @@ export default function ClassManageView() {
         onReloadOrgs={() => void loadOrgs()}
         fromModuleKey="teacher_m3"
         autoSelectFirst
-        showUsername
       />
     </>
   )

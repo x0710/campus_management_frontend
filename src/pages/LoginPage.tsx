@@ -17,7 +17,7 @@ import {
   SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Checkbox, Dropdown, Form, Input } from 'antd'
+import { Alert, App as AntdApp, Button, Checkbox, Dropdown, Form, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import axios from 'axios'
 import type { ReactNode } from 'react'
@@ -27,6 +27,7 @@ import { login } from '../api/auth'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
+import { formatDateTime, formatElapsed } from '../utils/datetime'
 
 interface LoginFormValues {
   username: string
@@ -45,6 +46,7 @@ const FEATURE_ICONS: ReactNode[] = [
 
 export default function LoginPage() {
   const t = useT()
+  const { notification } = AntdApp.useApp()
   const [form] = Form.useForm<LoginFormValues>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -87,6 +89,23 @@ export default function LoginPage() {
         localStorage.setItem(REMEMBER_KEY, res.user)
       } else {
         localStorage.removeItem(REMEMBER_KEY)
+      }
+      // 登录成功：顶部弹窗欢迎；有上次登录时间则附带「上次登录 + 已过去」，首次登录走欢迎语
+      if (res.last_login_at) {
+        const elapsed = formatElapsed(res.last_login_at, locale)
+        notification.open({
+          placement: 'top',
+          duration: 4,
+          message: t('login.welcomeBack'),
+          description: `${t('login.lastLoginAt')}：${formatDateTime(res.last_login_at, locale)}${elapsed ? `\n${t('login.elapsed')}：${elapsed}` : ''}`,
+        })
+      } else {
+        notification.open({
+          placement: 'top',
+          duration: 4,
+          message: t('login.welcomeBack'),
+          description: t('login.firstLogin'),
+        })
       }
       // 登录成功：进入 /，由 PortalRedirect 请求角色并跳转到对应门户
       navigate('/', { replace: true })

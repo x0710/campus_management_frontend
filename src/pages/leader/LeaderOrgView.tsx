@@ -54,7 +54,6 @@ export default function LeaderOrgView() {
       orgsError={orgsError}
       onReloadOrgs={(force?: boolean) => void loadOrgs(force)}
       fromModuleKey="leader_m3"
-      showUsername
     />
   )
 }

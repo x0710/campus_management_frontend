@@ -44,7 +44,6 @@ import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getCurrentUser } from '../../api/auth'
 import { extractError } from '../../api/common'
-import { useAccountNames } from '../../composables/useAccountNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import UserEditPanel from './UserEditPanel'
@@ -100,8 +99,6 @@ export default function UsersAdminView() {
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
   const pageUids = useMemo(() => rows.map((u) => u.uid), [rows])
   const userOrgs = useUserOrganizations(pageUids)
-  // 当前页用户的账户用户名（GET /credentials/{uid}，走会话缓存，与组织架构页共用）
-  const userAccountNames = useAccountNames(pageUids)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -426,16 +423,6 @@ export default function UsersAdminView() {
         width: 90,
       },
       {
-        // 「用户名」列（登录账户名，GET /credentials/{uid}）：插在 UID 之后
-        title: t('adminUsers.fieldUsername'),
-        key: 'username',
-        width: 140,
-        render: (_, record) =>
-          userAccountNames.has(record.uid)
-            ? (userAccountNames.get(record.uid) ?? '—')
-            : t('common.loading'),
-      },
-      {
         title: t('adminUsers.fieldName'),
         dataIndex: 'name',
         key: 'name',
@@ -514,7 +501,7 @@ export default function UsersAdminView() {
         ),
       },
     ],
-    [t, roleMap, userOrgs, userAccountNames, actingUid, myUid, openResetPassword],
+    [t, roleMap, userOrgs, actingUid, myUid, openResetPassword],
   )
 
   return (

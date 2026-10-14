@@ -1989,3 +1989,498 @@ h3 {
 :root[data-theme='dark'] *::-webkit-scrollbar-corner {
   background-color: transparent;
 }
+
+/* 党委团支部门户：首页（先锋指数概览，虚拟数据） */
+.party-view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 顶部：姓名 + 所属支部 */
+.party-profile {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 20px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.party-member-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.party-branch-name {
+  font-size: 14px;
+  color: var(--ink-secondary);
+}
+
+/* 先锋指数卡片（淡黄底 + 红色数字 + 黑色文字） */
+.party-index-card {
+  padding: 24px;
+  border-radius: 12px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  color: #1f2433;
+  overflow: hidden;
+}
+
+.party-index-title {
+  font-size: 14px;
+  color: #1f2433;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+
+.party-index-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.party-index-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.party-index-value {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: #cf1322;
+}
+
+.party-index-unit {
+  font-size: 16px;
+  color: #1f2433;
+}
+
+.party-index-grade {
+  font-size: 14px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1px solid #cf1322;
+  color: #cf1322;
+}
+
+.party-index-gap {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #1f2433;
+  opacity: 0.8;
+}
+
+/* 基础分 / 加分项 / 减分 三个小框 */
+.party-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.party-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.party-stat-label {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.party-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* 近期记录 */
+.party-records-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.party-records-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.party-record-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.party-record-date {
+  width: 56px;
+  flex: none;
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.party-record-act {
+  flex: 1;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.party-record-delta {
+  font-size: 15px;
+  font-weight: 600;
+  color: #389e0d;
+}
+
+:root[data-theme='dark'] .party-record-delta {
+  color: #73d13d;
+}
+
+/* 通用：表头多选筛选触发器 */
+.table-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.table-filter-icon {
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+/* 成绩列：加分（正数）绿色、减分（负数）红色 */
+.party-score-plus {
+  font-weight: 600;
+  color: #389e0d;
+}
+
+.party-score-minus {
+  font-weight: 600;
+  color: #cf1322;
+}
+
+:root[data-theme='dark'] .party-score-plus {
+  color: #73d13d;
+}
+
+:root[data-theme='dark'] .party-score-minus {
+  color: #ff7875;
+}
+
+/* 整改提升：整改任务卡片（淡黄底） */
+.improve-task-card {
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+}
+
+.improve-task-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2433;
+  margin-bottom: 12px;
+}
+
+.improve-task-icon {
+  color: #fa8c16;
+}
+
+.improve-task-line {
+  font-size: 14px;
+  line-height: 2;
+  color: #1f2433;
+}
+
+.improve-task-label {
+  opacity: 0.6;
+}
+
+.improve-task-btn {
+  margin-top: 12px;
+}
+
+/* 整改提升：年度计划提交按钮 */
+.improve-plan-btn {
+  height: 44px;
+  font-size: 15px;
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* 整改提升：历史整改记录 */
+.improve-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.improve-history-item {
+  padding: 14px 20px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+.improve-history-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.improve-history-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+/* 暗色模式：淡黄卡片需同步调整底色与文字色 */
+:root[data-theme='dark'] .improve-task-card {
+  background: #2b2611;
+  border-color: #4a3f14;
+}
+
+:root[data-theme='dark'] .improve-task-title,
+:root[data-theme='dark'] .improve-task-line {
+  color: var(--ink);
+}
+
+/* 我的：页签内容容器 */
+.party-tab-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 我的：占位内容（年度评价报告 / 操作指南 / 关于井大大先锋） */
+.party-placeholder {
+  padding: 32px 0;
+}
+
+/* 我的：消息通知 */
+.party-notif-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.party-notif-item {
+  padding: 14px 20px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+.party-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.party-notif-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.party-notif-icon {
+  color: var(--brand);
+}
+
+.party-notif-time {
+  flex: none;
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.party-notif-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-secondary);
+}
+
+/* 党员支部端：本支部概况 */
+.branch-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.branch-overview-item {
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+.branch-overview-label {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  margin-bottom: 8px;
+}
+
+.branch-overview-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--brand);
+}
+
+.branch-overview-unit {
+  font-size: 14px;
+  font-weight: 400;
+  margin-left: 6px;
+  color: var(--ink-secondary);
+}
+
+/* 党员支部端：等级分布柱状图 */
+.branch-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.branch-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.branch-chart-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.branch-chart-track {
+  width: 100%;
+  max-width: 72px;
+  height: 160px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.branch-chart-bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.3s ease;
+}
+
+.branch-bar-pioneer {
+  background: #cf1322;
+}
+
+.branch-bar-demonstration {
+  background: #fa8c16;
+}
+
+.branch-bar-progress {
+  background: #1677ff;
+}
+
+.branch-bar-warning {
+  background: #8c8c8c;
+}
+
+.branch-chart-label {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+/* 党员支部端：待办事项 */
+.branch-todo-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.branch-todo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+.branch-todo-label {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.branch-todo-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fa8c16;
+}
+
+.branch-todo-unit {
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 4px;
+  color: var(--ink-secondary);
+}
+
+/* 党员支部端：党员概览表格 */
+.branch-member-score {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.branch-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.branch-member-actions .anticon {
+  margin-left: 4px;
+  font-size: 10px;
+}

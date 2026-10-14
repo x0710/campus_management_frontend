@@ -15,12 +15,15 @@ import {
   DollarOutlined,
   FileDoneOutlined,
   FileSearchOutlined,
+  FlagOutlined,
   FormOutlined,
   HeartOutlined,
+  HomeOutlined,
   LineChartOutlined,
   NotificationOutlined,
   ProfileOutlined,
   ReadOutlined,
+  RiseOutlined,
   SafetyCertificateOutlined,
   ScheduleOutlined,
   SettingOutlined,
@@ -32,8 +35,11 @@ import {
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
-/** 四个工作端标识（与后端角色 student/teacher/admin 对齐，leader 为产品层门户） */
-export type PortalKey = 'student' | 'teacher' | 'leader' | 'admin'
+/**
+ * 工作端标识（与后端角色 student/teacher/admin 对齐，leader 为产品层门户）。
+ * party 为党员端门户、branch 为党员支部端门户：后端暂无对应角色与接口，前端全部使用虚拟数据。
+ */
+export type PortalKey = 'party' | 'branch' | 'student' | 'teacher' | 'leader' | 'admin'
 
 /**
  * 模块就绪状态：
@@ -65,6 +71,30 @@ export interface PortalDef {
 }
 
 export const PORTALS: PortalDef[] = [
+  {
+    // 党员端门户：后端暂无接口，首页（先锋指数）、成绩申报、整改提升、我的均使用虚拟数据预览
+    key: 'party',
+    icon: <FlagOutlined />,
+    gradient: 'linear-gradient(135deg, #a8071a 0%, #f5222d 100%)',
+    accent: '#a8071a',
+    modules: [
+      { key: 'party_m1', status: 'preview', icon: <HomeOutlined /> },
+      { key: 'party_m2', status: 'preview', icon: <FormOutlined /> },
+      { key: 'party_m3', status: 'preview', icon: <RiseOutlined /> },
+      { key: 'party_m4', status: 'preview', icon: <UserOutlined /> },
+    ],
+  },
+  {
+    // 党员支部端门户：后端暂无接口，工作台与党员概览均使用虚拟数据预览
+    key: 'branch',
+    icon: <ApartmentOutlined />,
+    gradient: 'linear-gradient(135deg, #873800 0%, #fa8c16 100%)',
+    accent: '#873800',
+    modules: [
+      { key: 'branch_m1', status: 'preview', icon: <LineChartOutlined /> },
+      { key: 'branch_m2', status: 'preview', icon: <TeamOutlined /> },
+    ],
+  },
   {
     key: 'student',
     icon: <ReadOutlined />,
@@ -192,14 +222,22 @@ export function getPortalKeysByRoleCodes(roleCodes: string[]): PortalKey[] {
 /** 无角色信息时默认进入的门户端：登录后查询不到可匹配角色时，默认进入学生端 */
 export const DEFAULT_PORTAL_KEY: PortalKey = 'student'
 
+/** 党员端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+export const PARTY_PORTAL_KEY: PortalKey = 'party'
+
+/** 党员支部端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+export const BRANCH_PORTAL_KEY: PortalKey = 'branch'
+
 /**
  * 根据角色代码获取当前用户可访问的门户，无匹配角色时回退为学生端。
  * 与「登录后无角色信息默认进入学生端」保持一致，供登录跳转与顶栏门户菜单共用，
  * 避免出现「已进入学生端、但门户菜单却提示无可用工作端」的不一致。
+ * 党员端（party）与党员支部端（branch）门户无后端角色，暂无条件置于列表首位，供全部登录用户预览。
  * @param roleCodes 当前用户的角色 code 列表（必填）
  * @returns 非空的 PortalKey 数组（必返回）；无匹配角色时返回 [DEFAULT_PORTAL_KEY]
  */
 export function getAccessiblePortalKeys(roleCodes: string[]): PortalKey[] {
   const keys = getPortalKeysByRoleCodes(roleCodes)
-  return keys.length > 0 ? keys : [DEFAULT_PORTAL_KEY]
+  const base = keys.length > 0 ? keys : [DEFAULT_PORTAL_KEY]
+  return [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ...base]
 }

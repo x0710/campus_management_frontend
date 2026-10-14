@@ -20,7 +20,6 @@ import { useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
 import type { OrganizationMember } from '../api/types/organizations'
-import { useAccountNames } from '../composables/useAccountNames'
 import { usePositionNames } from '../composables/usePositionNames'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
@@ -54,8 +53,6 @@ interface OrgMembersExplorerProps {
   memberPageSize?: number
   /** 组织加载完成后是否自动选中第一个组织（可选，默认 false） */
   autoSelectFirst?: boolean
-  /** 是否展示「用户名」列（可选，默认 false；领导端组织概览、老师端班级管理均开启，列数据来自 GET /credentials/{uid}） */
-  showUsername?: boolean
 }
 
 export default function OrgMembersExplorer({
@@ -66,7 +63,6 @@ export default function OrgMembersExplorer({
   fromModuleKey,
   memberPageSize = LEADER_ORG_MEMBER_PAGE_SIZE,
   autoSelectFirst = false,
-  showUsername = false,
 }: OrgMembersExplorerProps) {
   const t = useT()
   const navigate = useNavigate()
@@ -162,11 +158,8 @@ export default function OrgMembersExplorer({
   )
 
   const memberIds = useMemo(() => members.map((m) => m.user_id), [members])
-  // 姓名（真实姓名，GET /users/{id}）与用户名（账户名，GET /credentials/{uid}）分别解析
+  // 姓名（真实姓名，GET /users/{id}）解析
   const memberNames = useUserNames(memberIds)
-  // 仅在开启「用户名」列时请求，未开启时传空数组避免多余请求（代码要求 5）
-  const usernameIds = useMemo(() => (showUsername ? memberIds : []), [showUsername, memberIds])
-  const memberUsernames = useAccountNames(usernameIds)
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
   const positionNames = usePositionNames()
 
@@ -221,20 +214,8 @@ export default function OrgMembersExplorer({
         ),
       },
     ]
-    // 「用户名」列（账户名，GET /credentials/{uid}）：插在「用户 ID」之后，由 showUsername 控制（领导端组织概览、老师端班级管理开启）
-    if (showUsername) {
-      cols.splice(1, 0, {
-        title: t('adminOrg.colUsername'),
-        key: 'username',
-        width: 140,
-        render: (_, record) =>
-          memberUsernames.has(record.user_id)
-            ? (memberUsernames.get(record.user_id) ?? '—')
-            : t('common.loading'),
-      })
-    }
     return cols
-  }, [t, memberNames, positionNames, memberUsernames, showUsername, openMember])
+  }, [t, memberNames, positionNames, openMember])
 
   return (
     <div className="admin-org-view">

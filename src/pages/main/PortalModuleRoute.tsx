@@ -33,6 +33,12 @@ const UsersAdminView = lazy(() => import('../admin/UsersAdminView'))
 const OrgAdminView = lazy(() => import('../admin/OrgAdminView'))
 const RolesAdminView = lazy(() => import('../admin/RolesAdminView'))
 const PositionsAdminView = lazy(() => import('../admin/PositionsAdminView'))
+const PartyHomeView = lazy(() => import('../party/PartyHomeView'))
+const PartyDeclarationView = lazy(() => import('../party/PartyDeclarationView'))
+const PartyImprovementView = lazy(() => import('../party/PartyImprovementView'))
+const PartyProfileView = lazy(() => import('../party/PartyProfileView'))
+const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
+const BranchMembersView = lazy(() => import('../branch/BranchMembersView'))
 
 /**
  * 领导端「公告管理」：复用学生端公告列表并开启管理模式
@@ -47,6 +53,12 @@ const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
  * ready 模块接真实接口，preview 模块为模拟数据预览页，接口就绪后替换数据源即可。
  */
 const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
+  'party:party_m1': PartyHomeView,
+  'party:party_m2': PartyDeclarationView,
+  'party:party_m3': PartyImprovementView,
+  'party:party_m4': PartyProfileView,
+  'branch:branch_m1': BranchWorkbenchView,
+  'branch:branch_m2': BranchMembersView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

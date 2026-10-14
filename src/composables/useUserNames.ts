@@ -1,6 +1,6 @@
 /**
  * 用户 ID → 姓名批量解析 Hook：
- * 传入任意数量的用户 ID，去重后并行调用 getUser（走会话内缓存 cachedGet），
+ * 传入任意数量的用户 ID，去重后通过 queryUsers 的 uid 批量参数一次查询（走会话内缓存 cachedGet），
  * 返回 Map<id, name | null>。请求失败或不存在的 ID 映射为 null，不阻塞其他解析。
  * 适用于公告列表发布人列、公告详情发布人、组织成员表等需要批量展示姓名的场景。
  *
@@ -13,7 +13,7 @@
  * 已解析 ID 再次进入时由 API 层缓存直接返回，不会产生额外网络请求。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { getUser } from '../api/users'
+import { queryUsers } from '../api/users'
 
 export function useUserNames(ids: number[]): Map<number, string | null> {
   const [names, setNames] = useState<Map<number, string | null>>(new Map())
@@ -30,22 +30,26 @@ export function useUserNames(ids: number[]): Map<number, string | null> {
     const fetched = new Map<number, string | null>()
 
     void (async () => {
-      // 并行请求，每个独立容错；重复 ID 由 API 层缓存命中，不发额外请求
-      await Promise.all(
-        uniqueIds.map(async (id) => {
-          try {
-            const detail = await getUser(id)
-            fetched.set(id, detail.name)
-          } catch {
-            fetched.set(id, null)
-          }
-        }),
-      )
+      try{
+        // 后端已支持 uid 批量查询：一次请求取回所有用户姓名
+        const res = await queryUsers({
+          ids: uniqueIds.join(','),
+          page: 1,
+          page_size: Math.min(uniqueIds.length, 100),
+        })
+        for (const user of res.data) {
+          fetched.set(user.uid, user.name || null)
+        }
+      }catch{
+        // 批量请求失败时保持 Map 缺失，由渲染层兜底
+        for (const id of uniqueIds) fetched.set(id, null)
+      }
+
       if (!cancelled) {
         // 与旧状态合并，保留其它 ID 的已解析结果
         setNames((prev) => {
           const next = new Map(prev)
-          for (const [k, v] of fetched) next.set(k, v)
+          for (const id of uniqueIds) next.set(id, fetched.get(id) ?? null)
           return next
         })
       }
