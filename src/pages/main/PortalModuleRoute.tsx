@@ -39,9 +39,15 @@ const PartyImprovementView = lazy(() => import('../party/PartyImprovementView'))
 const PartyProfileView = lazy(() => import('../party/PartyProfileView'))
 const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
 const BranchMembersView = lazy(() => import('../branch/BranchMembersView'))
+const BranchReviewView = lazy(() => import('../branch/BranchReviewView'))
+const BranchManageView = lazy(() => import('../branch/BranchManageView'))
+const AcademyWorkbenchView = lazy(() => import('../academy/AcademyWorkbenchView'))
+const AcademyMetricsView = lazy(() => import('../academy/AcademyMetricsView'))
+const AcademyBranchManageView = lazy(() => import('../academy/AcademyBranchManageView'))
+const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
+const SchoolOrgView = lazy(() => import('../school/SchoolOrgView'))
 
 /**
- * 领导端「公告管理」：复用学生端公告列表并开启管理模式
  * （可查看全部公告、删除任意公告，编辑仅限本人发布的公告）。
  * 提取为模块级常量，保证组件引用稳定，避免每次渲染都重新挂载列表。
  */
@@ -59,6 +65,23 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'party:party_m4': PartyProfileView,
   'branch:branch_m1': BranchWorkbenchView,
   'branch:branch_m2': BranchMembersView,
+  'branch:branch_m3': BranchReviewView,
+  // 党委支部端「我的」：与党员端「我的」复用同一页面
+  'branch:branch_m4': PartyProfileView,
+  // 党委支部端「支部管理」：复用公共组件 OrgMembersExplorer（本支部成员查看，无组织树）
+  'branch:branch_m5': BranchManageView,
+  'academy:academy_m1': AcademyWorkbenchView,
+  'academy:academy_m2': AcademyMetricsView,
+  // 党委学院端「审核管理」：与党委支部端复用同一页面
+  'academy:academy_m3': BranchReviewView,
+  // 党委学院端「我的」：与党员端「我的」复用同一页面
+  'academy:academy_m4': PartyProfileView,
+  // 党委学院端「学院支部管理」：复用公共组件 OrgMembersExplorer（本学院组织树 + 支部成员查看）
+  'academy:academy_m5': AcademyBranchManageView,
+  'school:school_m1': SchoolOverviewView,
+  'school:school_m2': SchoolOrgView,
+  // 党委学校端「系统权限管理」：与管理端「角色权限」复用同一页面（接真实 RBAC 接口）
+  'school:school_m3': RolesAdminView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

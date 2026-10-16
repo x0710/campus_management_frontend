@@ -5,7 +5,9 @@
  *
  * 由领导端「组织概览」抽出，老师端「班级管理」复用同一套界面：
  * - 领导端传入全部组织（listAllOrganizations）；
- * - 老师端传入本人所在组织（listUserOrganizations），接口与数据范围都不变。
+ * - 老师端传入本人所在组织（listUserOrganizations），接口与数据范围都不变；
+ * - 党委学院端「学院支部管理」传入本学院子树并保留组织树；
+ * - 党委支部端「支部管理」传 showOrgTree=false（支部为最底层组织，无需树），仅展示成员表。
  *
  * 组织数据由父组件加载后传入（不同门户数据范围不同），本组件只负责组织树渲染、
  * 成员分页查询与跳转；成员查询走会话缓存，刷新传 force=true 绕过缓存（代码要求 5）。
@@ -53,6 +55,12 @@ interface OrgMembersExplorerProps {
   memberPageSize?: number
   /** 组织加载完成后是否自动选中第一个组织（可选，默认 false） */
   autoSelectFirst?: boolean
+  /**
+   * 是否展示左侧组织树（可选，默认 true）。
+   * 置为 false 时隐藏组织树与组织切换，仅展示唯一组织（orgs[0]）的成员表，
+   * 适用于「支部」等最底层组织（无下级组织，无需树形切换）。
+   */
+  showOrgTree?: boolean
 }
 
 export default function OrgMembersExplorer({
@@ -63,6 +71,7 @@ export default function OrgMembersExplorer({
   fromModuleKey,
   memberPageSize = LEADER_ORG_MEMBER_PAGE_SIZE,
   autoSelectFirst = false,
+  showOrgTree = true,
 }: OrgMembersExplorerProps) {
   const t = useT()
   const navigate = useNavigate()
@@ -98,23 +107,28 @@ export default function OrgMembersExplorer({
     [memberPageSize, t],
   )
 
-  // 自动选中首个组织（老师端通常只有一个组织，避免多一次点击）
+  // 实际查询成员的组织：
+  // 展示组织树时取用户在树中选中的组织；不展示组织树时固定为唯一组织（orgs[0]）
+  const activeOrgId = showOrgTree ? selectedId : (orgs[0]?.id ?? null)
+
+  // 自动选中首个组织（老师端/学院端通常只有一个/少数组织，避免多一次点击）
   useEffect(() => {
+    if (!showOrgTree) return
     if (autoSelectFirst && selectedId === null && orgs.length > 0) {
       setSelectedId(fromModuleKey, orgs[0].id)
     }
-  }, [autoSelectFirst, orgs, selectedId, fromModuleKey, setSelectedId])
+  }, [showOrgTree, autoSelectFirst, orgs, selectedId, fromModuleKey, setSelectedId])
 
   // 切换组织后回到第 1 页并加载成员
   useEffect(() => {
-    if (selectedId === null) {
+    if (activeOrgId === null) {
       setMembers([])
       setMemberTotal(0)
       return
     }
     setMemberPage(1)
-    void loadMembers(selectedId, 1)
-  }, [selectedId, loadMembers])
+    void loadMembers(activeOrgId, 1)
+  }, [activeOrgId, loadMembers])
 
   // parent_id -> children 建树；搜索关键词仅前端过滤名称/编码，并保留匹配节点的祖先链
   const treeData = useMemo<TreeProps['treeData']>(() => {
@@ -153,8 +167,8 @@ export default function OrgMembersExplorer({
   }, [orgs, orgSearch])
 
   const selectedOrg = useMemo(
-    () => orgs.find((o) => o.id === selectedId) ?? null,
-    [orgs, selectedId],
+    () => orgs.find((o) => o.id === activeOrgId) ?? null,
+    [orgs, activeOrgId],
   )
 
   const memberIds = useMemo(() => members.map((m) => m.user_id), [members])
@@ -219,6 +233,7 @@ export default function OrgMembersExplorer({
 
   return (
     <div className="admin-org-view">
+      {showOrgTree && (
       <section className="panel-card org-tree-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('memberDetail.orgTreeTitle')}</h3>
@@ -273,6 +288,7 @@ export default function OrgMembersExplorer({
           )}
         </div>
       </section>
+      )}
 
       <section className="panel-card org-members-card">
         <header className="panel-card-header">

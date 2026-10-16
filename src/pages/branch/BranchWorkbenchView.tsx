@@ -2,8 +2,8 @@ import { Alert } from 'antd'
 import { useT } from '../../i18n'
 
 /**
- * 党员支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
- * 注意：当前为【模拟数据预览页】，后端尚未提供党员支部端相关接口；
+ * 党委支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
+ * 注意：当前为【模拟数据预览页】，后端尚未提供党委支部端相关接口；
  * 接口就绪后把 MOCK_OVERVIEW / MOCK_DISTRIBUTION / MOCK_TODOS 替换为 src/api/ 请求即可。
  */
 
@@ -32,7 +32,7 @@ const MOCK_TODOS: { id: string; labelKey: string; count: number; unitKey: string
 
 export default function BranchWorkbenchView() {
   const t = useT()
-  // 柱状图以最高人数为满高基准
+  // 横向柱状图以最高人数为满长基准
   const maxCount = Math.max(...MOCK_DISTRIBUTION.map((item) => item.count))
 
   return (
@@ -64,23 +64,23 @@ export default function BranchWorkbenchView() {
         </div>
       </section>
 
-      {/* 等级分布（柱状图） */}
+      {/* 等级分布（横向柱状图） */}
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('branch.distributionTitle')}</h3>
         </header>
         <div className="panel-card-body">
-          <div className="branch-chart">
+          <div className="branch-chart-list">
             {MOCK_DISTRIBUTION.map((item) => (
-              <div key={item.tone} className="branch-chart-col">
-                <span className="branch-chart-value">{item.count}</span>
+              <div key={item.tone} className="branch-chart-row">
+                <span className="branch-chart-label">{t(item.key)}</span>
                 <div className="branch-chart-track">
                   <div
                     className={`branch-chart-bar branch-bar-${item.tone}`}
-                    style={{ height: `${Math.round((item.count / maxCount) * 100)}%` }}
+                    style={{ width: `${Math.round((item.count / maxCount) * 100)}%` }}
                   />
+                  <span className="branch-chart-value">{item.count}</span>
                 </div>
-                <span className="branch-chart-label">{t(item.key)}</span>
               </div>
             ))}
           </div>

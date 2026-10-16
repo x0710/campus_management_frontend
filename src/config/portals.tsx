@@ -37,9 +37,18 @@ import type { ReactNode } from 'react'
 
 /**
  * 工作端标识（与后端角色 student/teacher/admin 对齐，leader 为产品层门户）。
- * party 为党员端门户、branch 为党员支部端门户：后端暂无对应角色与接口，前端全部使用虚拟数据。
+ * party 为党员端门户、branch 为党委支部端门户、academy 为党委学院端门户、school 为党委学校端门户：
+ * 后端暂无对应角色与接口，前端全部使用虚拟数据。
  */
-export type PortalKey = 'party' | 'branch' | 'student' | 'teacher' | 'leader' | 'admin'
+export type PortalKey =
+  | 'party'
+  | 'branch'
+  | 'academy'
+  | 'school'
+  | 'student'
+  | 'teacher'
+  | 'leader'
+  | 'admin'
 
 /**
  * 模块就绪状态：
@@ -85,7 +94,8 @@ export const PORTALS: PortalDef[] = [
     ],
   },
   {
-    // 党员支部端门户：后端暂无接口，工作台与党员概览均使用虚拟数据预览
+    // 党委支部端门户：工作台、党员概览、审核管理、我的使用虚拟数据预览；
+    // 支部管理复用公共组件 OrgMembersExplorer，接真实的组织/成员接口
     key: 'branch',
     icon: <ApartmentOutlined />,
     gradient: 'linear-gradient(135deg, #873800 0%, #fa8c16 100%)',
@@ -93,6 +103,37 @@ export const PORTALS: PortalDef[] = [
     modules: [
       { key: 'branch_m1', status: 'preview', icon: <LineChartOutlined /> },
       { key: 'branch_m2', status: 'preview', icon: <TeamOutlined /> },
+      { key: 'branch_m3', status: 'preview', icon: <AuditOutlined /> },
+      { key: 'branch_m4', status: 'preview', icon: <UserOutlined /> },
+      { key: 'branch_m5', status: 'ready', icon: <ApartmentOutlined /> },
+    ],
+  },
+  {
+    // 党委学院端门户：工作台、指标、审核管理、我的使用虚拟数据预览；
+    // 学院支部管理复用公共组件 OrgMembersExplorer，接真实的组织/成员接口
+    key: 'academy',
+    icon: <BookOutlined />,
+    gradient: 'linear-gradient(135deg, #531dab 0%, #9254de 100%)',
+    accent: '#531dab',
+    modules: [
+      { key: 'academy_m1', status: 'preview', icon: <HomeOutlined /> },
+      { key: 'academy_m2', status: 'preview', icon: <ProfileOutlined /> },
+      { key: 'academy_m3', status: 'preview', icon: <AuditOutlined /> },
+      { key: 'academy_m4', status: 'preview', icon: <UserOutlined /> },
+      { key: 'academy_m5', status: 'ready', icon: <ApartmentOutlined /> },
+    ],
+  },
+  {
+    // 党委学校端门户：后端暂无接口，总览、组织管理均使用虚拟数据预览；
+    // 系统权限管理复用管理端「角色权限」页面，接真实的 RBAC 接口
+    key: 'school',
+    icon: <SafetyCertificateOutlined />,
+    gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
+    accent: '#08979c',
+    modules: [
+      { key: 'school_m1', status: 'preview', icon: <LineChartOutlined /> },
+      { key: 'school_m2', status: 'preview', icon: <ApartmentOutlined /> },
+      { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
     ],
   },
   {
@@ -225,19 +266,26 @@ export const DEFAULT_PORTAL_KEY: PortalKey = 'student'
 /** 党员端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
 export const PARTY_PORTAL_KEY: PortalKey = 'party'
 
-/** 党员支部端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+/** 党委支部端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
 export const BRANCH_PORTAL_KEY: PortalKey = 'branch'
+
+/** 党委学院端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+export const ACADEMY_PORTAL_KEY: PortalKey = 'academy'
+
+/** 党委学校端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+export const SCHOOL_PORTAL_KEY: PortalKey = 'school'
 
 /**
  * 根据角色代码获取当前用户可访问的门户，无匹配角色时回退为学生端。
  * 与「登录后无角色信息默认进入学生端」保持一致，供登录跳转与顶栏门户菜单共用，
  * 避免出现「已进入学生端、但门户菜单却提示无可用工作端」的不一致。
- * 党员端（party）与党员支部端（branch）门户无后端角色，暂无条件置于列表首位，供全部登录用户预览。
+ * 党员端（party）、党委支部端（branch）、党委学院端（academy）、党委学校端（school）
+ * 门户无后端角色，暂无条件置于列表首位，供全部登录用户预览。
  * @param roleCodes 当前用户的角色 code 列表（必填）
  * @returns 非空的 PortalKey 数组（必返回）；无匹配角色时返回 [DEFAULT_PORTAL_KEY]
  */
 export function getAccessiblePortalKeys(roleCodes: string[]): PortalKey[] {
   const keys = getPortalKeysByRoleCodes(roleCodes)
   const base = keys.length > 0 ? keys : [DEFAULT_PORTAL_KEY]
-  return [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ...base]
+  return [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ACADEMY_PORTAL_KEY, SCHOOL_PORTAL_KEY, ...base]
 }

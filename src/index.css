@@ -2077,6 +2077,40 @@ h3 {
   opacity: 0.8;
 }
 
+/*
+  夜间模式：先锋指数卡片换成「深红底 + 金色数字」配色。
+  亮色下的淡黄底（#fffbe6）在暗色环境中过亮刺眼，故整体反转为深红渐变、
+  数字与等级徽章改用柔和的暖金色（#ffc53d），保证对比度同时降低眩光。
+*/
+:root[data-theme='dark'] .party-index-card {
+  background: linear-gradient(135deg, #3a1418 0%, #241016 100%);
+  border-color: #5c2b30;
+  color: #f3e7e0;
+}
+
+:root[data-theme='dark'] .party-index-title {
+  color: #f3e7e0;
+  opacity: 0.7;
+}
+
+:root[data-theme='dark'] .party-index-value {
+  color: #ffc53d;
+}
+
+:root[data-theme='dark'] .party-index-unit {
+  color: #f3e7e0;
+}
+
+:root[data-theme='dark'] .party-index-grade {
+  border-color: #ffc53d;
+  color: #ffc53d;
+}
+
+:root[data-theme='dark'] .party-index-gap {
+  color: #f3e7e0;
+  opacity: 0.75;
+}
+
 /* 基础分 / 加分项 / 减分 三个小框 */
 .party-stats {
   display: grid;
@@ -2337,7 +2371,7 @@ h3 {
   color: var(--ink-secondary);
 }
 
-/* 党员支部端：本支部概况 */
+/* 党委支部端：本支部概况 */
 .branch-overview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -2371,41 +2405,39 @@ h3 {
   color: var(--ink-secondary);
 }
 
-/* 党员支部端：等级分布柱状图 */
-.branch-chart {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  gap: 16px;
-  padding: 8px 0;
-}
-
-.branch-chart-col {
-  flex: 1;
+/* 党委支部端：等级分布（横向柱状图） */
+.branch-chart-list {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  gap: 14px;
+  padding: 4px 0;
 }
 
-.branch-chart-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
+.branch-chart-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.branch-chart-label {
+  flex: none;
+  width: 60px;
+  font-size: 13px;
+  color: var(--ink-secondary);
 }
 
 .branch-chart-track {
-  width: 100%;
-  max-width: 72px;
-  height: 160px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
 }
 
 .branch-chart-bar {
-  width: 100%;
-  border-radius: 6px 6px 0 0;
-  transition: height 0.3s ease;
+  flex: 0 1 auto;
+  height: 16px;
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 .branch-bar-pioneer {
@@ -2424,12 +2456,15 @@ h3 {
   background: #8c8c8c;
 }
 
-.branch-chart-label {
-  font-size: 13px;
-  color: var(--ink-secondary);
+.branch-chart-value {
+  flex: none;
+  margin-left: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
-/* 党员支部端：待办事项 */
+/* 党委支部端：待办事项 */
 .branch-todo-list {
   margin: 0;
   padding: 0;
@@ -2468,7 +2503,7 @@ h3 {
   color: var(--ink-secondary);
 }
 
-/* 党员支部端：党员概览表格 */
+/* 党委支部端：党员概览表格 */
 .branch-member-score {
   font-weight: 600;
   color: var(--ink);
@@ -2483,4 +2518,396 @@ h3 {
 .branch-member-actions .anticon {
   margin-left: 4px;
   font-size: 10px;
+}
+
+/* 党委支部端：审核管理 */
+.review-section-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.review-card {
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+.review-card-main {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.review-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.review-card-item {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.review-card-points {
+  font-size: 15px;
+  font-weight: 700;
+  color: #389e0d;
+}
+
+.review-card-points--deduct {
+  color: #cf1322;
+}
+
+.review-card-evidence {
+  padding: 0;
+  height: auto;
+  font-size: 13px;
+}
+
+.review-card-evidence .anticon {
+  margin-left: 2px;
+  font-size: 10px;
+}
+
+.review-card-actions {
+  display: flex;
+  gap: 24px;
+}
+
+.review-btn.ant-btn {
+  min-width: 110px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.review-btn-reject.ant-btn,
+.review-btn-reject.ant-btn:hover {
+  background: #e03131 !important;
+  border-color: #e03131 !important;
+  color: #fff !important;
+}
+
+.review-btn-reject.ant-btn:hover {
+  background: #c92a2a !important;
+}
+
+.review-btn-approve.ant-btn,
+.review-btn-approve.ant-btn:hover {
+  background: #2f9e44 !important;
+  border-color: #2f9e44 !important;
+  color: #fff !important;
+}
+
+.review-btn-approve.ant-btn:hover {
+  background: #2b8a3e !important;
+}
+
+/* 党委学院端：工作台 */
+.academy-section-title {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.academy-overview {
+  display: flex;
+  gap: 56px;
+  padding: 18px 24px;
+  margin-bottom: 26px;
+  border-radius: 10px;
+  background: #fdecec;
+}
+
+.academy-overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.academy-overview-label {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.academy-overview-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: #cf1322;
+}
+
+.academy-overview-unit {
+  margin-left: 2px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.academy-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.academy-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.academy-rank-name {
+  flex: none;
+  width: 120px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.academy-rank-track {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.academy-rank-bar {
+  flex: 0 1 auto;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.academy-rank-bar--high {
+  background: #1677ff;
+}
+
+.academy-rank-bar--low {
+  background: #fa8c16;
+}
+
+.academy-rank-score {
+  flex: none;
+  margin-left: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.academy-pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #fdf3d8;
+  cursor: pointer;
+  text-align: left;
+}
+
+.academy-pending-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #cf1322;
+}
+
+.academy-pending-icon {
+  font-size: 10px;
+  color: #cf1322;
+}
+
+:root[data-theme='dark'] .academy-overview {
+  background: rgba(207, 19, 34, 0.16);
+}
+
+:root[data-theme='dark'] .academy-rank-row {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme='dark'] .academy-pending {
+  background: rgba(250, 140, 22, 0.18);
+}
+
+/* 党委学院端：指标管理 */
+.academy-metrics-add.ant-btn {
+  height: 40px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.academy-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.academy-metrics-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+.academy-metrics-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.academy-metrics-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.academy-metrics-scope {
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.academy-metrics-points {
+  flex: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: #389e0d;
+}
+
+.academy-metrics-report.ant-btn,
+.academy-metrics-report.ant-btn:hover {
+  height: 40px;
+  font-weight: 500;
+  color: #cf1322 !important;
+  border-color: #cf1322 !important;
+  background: transparent !important;
+}
+
+/* 党委学校端：总览 */
+.school-section-title {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.school-overview {
+  display: flex;
+  gap: 56px;
+  padding: 18px 24px;
+  margin-bottom: 26px;
+  border-radius: 10px;
+  background: #fdf3d8;
+}
+
+.school-overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.school-overview-label {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.school-overview-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: #cf1322;
+}
+
+.school-overview-unit {
+  margin-left: 2px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.school-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.school-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.school-rank-name {
+  flex: none;
+  width: 140px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.school-rank-track {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.school-rank-bar {
+  flex: 0 1 auto;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.school-rank-bar--top {
+  background: #cf1322;
+}
+
+.school-rank-bar--normal {
+  background: #1677ff;
+}
+
+.school-rank-score {
+  flex: none;
+  margin-left: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .school-overview {
+  background: rgba(250, 140, 22, 0.18);
+}
+
+:root[data-theme='dark'] .school-rank-row {
+  background: rgba(255, 255, 255, 0.06);
 }

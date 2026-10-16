@@ -14,7 +14,12 @@ export const MEMBER_DETAIL_PAGE_SIZE = 100
 
 /**
  * 成员详情页的「只读来源」模块 key：
- * 从这些模块（如老师端班级管理 teacher_m3）进入成员详情时隐藏成绩/违规编辑入口，
- * 老师端在该入口只做学生信息查询，避免展示无权限的编辑按钮。
+ * 从这些模块（老师端班级管理 teacher_m3、党委支部端支部管理 branch_m5、
+ * 党委学院端学院支部管理 academy_m5）进入成员详情时隐藏成绩/违规编辑入口，
+ * 这些入口只做成员信息查询，避免展示无权限的编辑按钮。
  */
-export const MEMBER_DETAIL_READONLY_FROM_MODULES: string[] = ['teacher_m3']
+export const MEMBER_DETAIL_READONLY_FROM_MODULES: string[] = [
+  'teacher_m3',
+  'branch_m5',
+  'academy_m5',
+]

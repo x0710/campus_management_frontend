@@ -6,7 +6,7 @@ import MultiSelectHeaderFilter from '../../components/MultiSelectHeaderFilter'
 import { useT } from '../../i18n'
 
 /**
- * 党员支部端：党员概览（本支部全部党员）。
+ * 党委支部端：党员概览（本支部全部党员）。
  * 表头：编号 | 姓名 | 组织 | 成绩（可正序/倒序） | 等级（可单选/多选筛选） | 操作（详细：档案/成绩，编辑）。
  * 注意：当前为【模拟数据预览页】，后端暂无接口；接口就绪后替换 MOCK_MEMBERS 即可。
  */
