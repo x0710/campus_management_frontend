@@ -38,20 +38,34 @@ const PartyDeclarationView = lazy(() => import('../party/PartyDeclarationView'))
 const PartyImprovementView = lazy(() => import('../party/PartyImprovementView'))
 const PartyProfileView = lazy(() => import('../party/PartyProfileView'))
 const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
-const BranchMembersView = lazy(() => import('../branch/BranchMembersView'))
-const BranchReviewView = lazy(() => import('../branch/BranchReviewView'))
 const BranchManageView = lazy(() => import('../branch/BranchManageView'))
 const AcademyWorkbenchView = lazy(() => import('../academy/AcademyWorkbenchView'))
 const AcademyMetricsView = lazy(() => import('../academy/AcademyMetricsView'))
-const AcademyBranchManageView = lazy(() => import('../academy/AcademyBranchManageView'))
 const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
-const SchoolOrgView = lazy(() => import('../school/SchoolOrgView'))
 
 /**
  * （可查看全部公告、删除任意公告，编辑仅限本人发布的公告）。
  * 提取为模块级常量，保证组件引用稳定，避免每次渲染都重新挂载列表。
  */
 const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
+
+/**
+ * 党委学校端「组织管理」：复用管理端组织架构页面（组织树 + 组织 CRUD + 成员任职管理），
+ * 接真实组织/成员接口；用独立 uiKey 隔离选中态，避免与管理端串用。
+ */
+const SchoolOrgAdminView = () => <OrgAdminView uiKey="school_m2" />
+
+/**
+ * 党委支部端「支部管理」：按组织树深度判定当前用户所属支部后展示其成员
+ * （支部还有下级支部时展示「支部 + 全部下级」组织树）。
+ */
+const BranchManageModule = () => <BranchManageView fromModuleKey="branch_m5" />
+
+/**
+ * 党委学院端「学院支部管理」：与支部端使用同一套支部判定与组织树显隐逻辑，
+ * 仅侧栏高亮/详情页返回来源不同。
+ */
+const AcademyBranchManageModule = () => <BranchManageView fromModuleKey="academy_m5" />
 
 /**
  * 模块视图注册表。
@@ -64,24 +78,27 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'party:party_m3': PartyImprovementView,
   'party:party_m4': PartyProfileView,
   'branch:branch_m1': BranchWorkbenchView,
-  'branch:branch_m2': BranchMembersView,
-  'branch:branch_m3': BranchReviewView,
+  // 党委支部端「审核管理」：复用教师端请假审批页面（查看审批列表 + 同意/驳回，详情走 /api/leaves/{id}）
+  'branch:branch_m3': LeaveApprovalView,
   // 党委支部端「我的」：与党员端「我的」复用同一页面
   'branch:branch_m4': PartyProfileView,
-  // 党委支部端「支部管理」：复用公共组件 OrgMembersExplorer（本支部成员查看，无组织树）
-  'branch:branch_m5': BranchManageView,
+  // 党委支部端「支部管理」：判定所属支部后展示其成员（有下级支部则展示组织树）
+  'branch:branch_m5': BranchManageModule,
   'academy:academy_m1': AcademyWorkbenchView,
   'academy:academy_m2': AcademyMetricsView,
-  // 党委学院端「审核管理」：与党委支部端复用同一页面
-  'academy:academy_m3': BranchReviewView,
+  // 党委学院端「审核管理」：复用教师端请假审批页面（查看审批列表 + 同意/驳回，详情走 /api/leaves/{id}）
+  'academy:academy_m3': LeaveApprovalView,
   // 党委学院端「我的」：与党员端「我的」复用同一页面
   'academy:academy_m4': PartyProfileView,
-  // 党委学院端「学院支部管理」：复用公共组件 OrgMembersExplorer（本学院组织树 + 支部成员查看）
-  'academy:academy_m5': AcademyBranchManageView,
+  // 党委学院端「学院支部管理」：与支部端同一支部判定逻辑（所属支部 + 下级组织成员）
+  'academy:academy_m5': AcademyBranchManageModule,
   'school:school_m1': SchoolOverviewView,
-  'school:school_m2': SchoolOrgView,
+  // 党委学校端「组织管理」：复用管理端「组织架构」页面（接真实组织/成员接口）
+  'school:school_m2': SchoolOrgAdminView,
   // 党委学校端「系统权限管理」：与管理端「角色权限」复用同一页面（接真实 RBAC 接口）
   'school:school_m3': RolesAdminView,
+  // 党委学校端「审批管理」：复用教师端请假审批页面（查看审批列表 + 同意/驳回，详情走 /api/leaves/{id}）
+  'school:school_m4': LeaveApprovalView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

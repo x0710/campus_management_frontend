@@ -8,6 +8,7 @@ import type {
   OrganizationMemberInput,
   OrganizationMemberQuery,
   OrganizationQuery,
+  OrganizationTreeNode,
   UserOrganization,
 } from './types/organizations'
 
@@ -100,6 +101,15 @@ export async function removeOrgMember(orgId: number, memberId: number): Promise<
 /** GET /api/organizations/{id}/subsidiaries 直接下级组织（会话内缓存） */
 export async function listSubsidiaries(orgId: number): Promise<OrganizationInfo[]> {
   return cachedGet<OrganizationInfo[]>(`/organizations/${orgId}/subsidiaries`)
+}
+
+/**
+ * GET /api/organizations/{id}/tree 组织树链路（会话内缓存）。
+ * 返回「根组织 → 该组织」的完整链路，链上最后一项的 level 为 0、越靠根越大，
+ * 因此链路深度（上级组织数量）= 链条数 - 1 = 根节点的 level，用于判定该组织是否为支部。
+ */
+export async function getOrganizationTree(orgId: number): Promise<OrganizationTreeNode[]> {
+  return cachedGet<OrganizationTreeNode[]>(`/organizations/${orgId}/tree`)
 }
 
 /**

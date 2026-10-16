@@ -1,15 +1,21 @@
 /**
- * 成员详情页（领导端「组织概览」与老师端「班级管理」共用，渲染在 PortalWorkspace 布局壳内）。
+ * 成员详情页（领导端「组织概览」、老师端「班级管理」、党委各端支部管理、
+ * 管理端「组织架构」与党委学校端「组织管理」共用，渲染在 PortalWorkspace 布局壳内）。
  *
- * 入口与来源：?from=<moduleKey>（leader_m3 / teacher_m3），决定「返回」目标与侧栏高亮；
+ * 入口与来源：?from=<moduleKey>（leader_m3 / teacher_m3 / branch_m5 / academy_m5 /
+ * admin_m3 / school_m2），决定「返回」目标与侧栏高亮；
  * 来自只读来源（见 MEMBER_DETAIL_READONLY_FROM_MODULES，如老师端）时隐藏成绩/违规编辑入口，
- * 仅提供查询，避免展示无权限的编辑按钮。
+ * 仅提供查询；来自具备用户管理权限的来源（见 MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES，
+ * 管理端 admin_m3 / 党委学校端 school_m2）时在「基本信息」页额外提供「编辑成员信息」入口，
+ * 复用 admin/UserEditPanel 修改资料、角色与组织任职。
  *
- * 四个 Tab：
- *   1. 基本信息：GET /api/users/{id}
- *   2. 成绩信息（可编辑）：GET /api/examinations?uid=成员 → 点击行编辑 → PATCH /api/examinations/{id}
- *   3. 请假信息：GET /api/approvals?applicant_id=成员 取审批实例 → GET /api/leaves/{id} 取详情
- *   4. 违规信息（查看详细 + 编辑）：GET /api/violations?user_id=成员 → GET/PATCH /api/violations/{id}
+ * 六个 Tab：
+ *   1. 基本信息：GET /api/users/{id}（可编辑来源另提供资料/角色/组织任职编辑）
+ *   2. 详细信息：GET /api/profile-details?user_id=成员
+ *   3. 成绩信息（可编辑）：GET /api/examinations?uid=成员 → 点击行编辑 → PATCH /api/examinations/{id}
+ *   4. 请假信息：GET /api/approvals?applicant_id=成员 取审批实例 → GET /api/leaves/{id} 取详情
+ *   5. 违规信息（查看详细 + 编辑）：GET /api/violations?user_id=成员 → GET/PATCH /api/violations/{id}
+ *   6. 奖学金及补助：GET /api/rewardings?uid=成员（只读）
  *
  * 约定（代码要求）：
  * - 表格每页最多 100 行，支持页码跳转与总数展示（要求 12）；
@@ -55,11 +61,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { queryApprovals } from '../../api/approvals'
 import type { ApprovalStepStatus } from '../../api/types/approvals'
 import { extractErrorWithStatus } from '../../api/common'
-import { listUserOrganizations } from '../../api/organizations'
-import type { UserOrganization } from '../../api/types/organizations'
-import { getPosition } from '../../api/positions'
+import { listAllOrganizations, listUserOrganizations } from '../../api/organizations'
+import type {
+  OrganizationInfo,
+  UserOrganization,
+} from '../../api/types/organizations'
+import { getPosition, queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
-import { getRole, queryUserRoleRelations } from '../../api/rbac'
+import { getRole, queryRoles, queryUserRoleRelations } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
 import {
   getScore,
@@ -90,7 +99,11 @@ import {
   EXAM_TYPE_ORDER,
   scoreColor,
 } from '../../config/examination'
-import { MEMBER_DETAIL_PAGE_SIZE, MEMBER_DETAIL_READONLY_FROM_MODULES } from '../../config/leaderOrg'
+import {
+  MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES,
+  MEMBER_DETAIL_PAGE_SIZE,
+  MEMBER_DETAIL_READONLY_FROM_MODULES,
+} from '../../config/leaderOrg'
 import { LEAVE_STATUS_COLOR, LEAVE_TYPE_COLOR } from '../../config/leave'
 import {
   VIOLATION_CATEGORY_MAX_LENGTH,
@@ -105,6 +118,7 @@ import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import { formatCentsAsYuan } from '../../utils/money'
+import UserEditPanel from '../admin/UserEditPanel'
 
 /** 成绩编辑表单值 */
 interface ScoreFormValues {
@@ -137,22 +151,34 @@ interface OrgItem extends UserOrganization {
 
 const { Text } = Typography
 
-/** 领导端成员详情页：4 个 Tab 汇总成员基本信息、成绩、请假与违规信息 */
+/** 共享成员详情页：6 个 Tab 汇总成员基本信息、详细信息、成绩、请假、违规与奖助信息 */
 export default function MemberDetailPage() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
+  const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const { portalKey, uid } = useParams<{ portalKey: string; uid: string }>()
   const [searchParams] = useSearchParams()
-  // 来源模块（侧栏高亮 + 返回目标）：领导端组织概览 leader_m3 / 老师端班级管理 teacher_m3
+  // 来源模块（侧栏高亮 + 返回目标）：领导端组织概览 leader_m3 / 老师端班级管理 teacher_m3 /
+  // 党委支部端 branch_m5 / 学院端 academy_m5 / 管理端 admin_m3 / 党委学校端 school_m2
   const fromModuleKey = searchParams.get('from') ?? 'leader_m3'
   // 只读来源（如老师端班级管理）隐藏成绩/违规编辑入口，避免无权限操作（错误处理只作兜底）
   const readOnly = MEMBER_DETAIL_READONLY_FROM_MODULES.includes(fromModuleKey)
+  // 可编辑成员资料的来源（管理端 / 党委学校端）在「基本信息」页展示编辑入口
+  const canEditBasic = MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES.includes(fromModuleKey)
   const userId = Number(uid)
 
   const [user, setUser] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // 编辑成员信息弹窗（复用 admin/UserEditPanel）：按需加载角色/职位/组织选项
+  const [editOpen, setEditOpen] = useState(false)
+  const [editRefs, setEditRefs] = useState<{
+    roles: RoleInfo[]
+    organizations: OrganizationInfo[]
+    positions: PositionDetail[]
+  } | null>(null)
 
   const loadUser = useCallback(async () => {
     if (!Number.isFinite(userId) || userId <= 0) {
@@ -176,6 +202,29 @@ export default function MemberDetailPage() {
   useEffect(() => {
     void loadUser()
   }, [loadUser])
+
+  // 打开编辑弹窗：首次打开时并行拉取角色/职位/组织选项（均走会话缓存），失败仅提示不阻塞
+  const openEdit = useCallback(async () => {
+    setEditOpen(true)
+    if (editRefs) return
+    try {
+      const [roleRes, posRes, orgList] = await Promise.all([
+        queryRoles({ page: 1, page_size: 100 }),
+        queryPositions({ page: 1, page_size: 100 }),
+        listAllOrganizations(),
+      ])
+      setEditRefs({
+        roles: roleRes.data,
+        positions: posRes.data,
+        organizations: orgList,
+      })
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorWithStatus(err))
+        setEditOpen(false)
+      }
+    }
+  }, [editRefs, message])
 
   const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey}`)
 
@@ -228,6 +277,8 @@ export default function MemberDetailPage() {
                     genderLabel={genderLabel}
                     locale={locale}
                     t={t}
+                    canEdit={canEditBasic}
+                    onEdit={() => void openEdit()}
                   />
                 ),
               },
@@ -260,6 +311,29 @@ export default function MemberDetailPage() {
           />
         )}
       </div>
+
+      {/* 编辑成员信息（仅管理端 / 党委学校端等具备用户管理权限的来源）：复用 admin/UserEditPanel */}
+      <Modal
+        open={editOpen}
+        title={t('memberDetail.editBasicTitle', { name: user?.name ?? `#${userId}` })}
+        width={760}
+        footer={null}
+        onCancel={() => setEditOpen(false)}
+        destroyOnHidden
+      >
+        {editRefs ? (
+          <UserEditPanel
+            uid={userId}
+            roles={editRefs.roles}
+            organizations={editRefs.organizations}
+            positions={editRefs.positions}
+            // 资料保存后刷新页面上的基本信息（弹窗保持打开，便于继续改角色/任职）
+            onChanged={() => void loadUser()}
+          />
+        ) : (
+          <Skeleton active paragraph={{ rows: 6 }} />
+        )}
+      </Modal>
     </section>
   )
 }
@@ -271,12 +345,18 @@ function BasicInfoPanel({
   genderLabel,
   locale,
   t,
+  canEdit,
+  onEdit,
 }: {
   user: UserDetail | null
   loading: boolean
   genderLabel: string
   locale: 'zh' | 'en'
   t: TranslateFn
+  /** 是否展示「编辑成员信息」入口（管理端 / 党委学校端等来源为 true） */
+  canEdit: boolean
+  /** 打开编辑弹窗（复用 admin/UserEditPanel） */
+  onEdit: () => void
 }) {
   const [roles, setRoles] = useState<RoleInfo[]>([])
   const [orgs, setOrgs] = useState<OrgItem[]>([])
@@ -332,6 +412,16 @@ function BasicInfoPanel({
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      {/* 具备用户管理权限的来源（管理端 / 党委学校端）提供成员信息编辑入口 */}
+      {canEdit && (
+        <div className="approval-toolbar">
+          <Tooltip title={t('memberDetail.editBasicHint')}>
+            <Button type="primary" icon={<EditOutlined />} onClick={onEdit}>
+              {t('memberDetail.editBasic')}
+            </Button>
+          </Tooltip>
+        </div>
+      )}
       <Descriptions
         bordered
         size="small"

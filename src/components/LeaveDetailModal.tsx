@@ -17,17 +17,28 @@ interface Props {
   leaveId: number | null
   onClose: () => void
   /**
-   * 弹窗底部左侧的操作插槽（如学生端的「撤回 / 删除」）。
-   * 不传即为纯只读详情，教师端审批视图沿用该默认行为。
+   * 弹窗底部居中的操作插槽（如审批的「同意 / 驳回」、学生端的「撤回 / 删除」）。
+   * 不传则不渲染底部栏（关闭统一用右上角的 ×，不再重复放「关闭」按钮）。
    */
   footerExtra?: ReactNode
+  /**
+   * 隐藏请假专属字段（目的地 / 家长确认）。
+   * 党员端「成绩申报」临时借用请假接口，申报场景无这两个概念，置 true 后不展示。
+   */
+  hideLeaveOnlyFields?: boolean
 }
 
 /**
  * 可复用的请假详情弹窗：教师审批列表点击行后展示请假完整信息。
  * 数据通过 getLeave 走会话级缓存；单个详情加载失败时弹窗内显示带状态码的错误并支持重试。
  */
-export default function LeaveDetailModal({ open, leaveId, onClose, footerExtra }: Props) {
+export default function LeaveDetailModal({
+  open,
+  leaveId,
+  onClose,
+  footerExtra,
+  hideLeaveOnlyFields = false,
+}: Props) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
 
@@ -75,12 +86,7 @@ export default function LeaveDetailModal({ open, leaveId, onClose, footerExtra }
     <Modal
       open={open}
       title={t('leaveDetail.title')}
-      footer={
-        <div className="leave-detail-footer">
-          <div className="leave-detail-footer-extra">{footerExtra}</div>
-          <Button onClick={onClose}>{t('common.close')}</Button>
-        </div>
-      }
+      footer={footerExtra ? <div className="leave-detail-footer">{footerExtra}</div> : null}
       onCancel={onClose}
       destroyOnHidden
       width={640}
@@ -116,21 +122,25 @@ export default function LeaveDetailModal({ open, leaveId, onClose, footerExtra }
           <Descriptions.Item label={t('leaveDetail.endTime')}>
             {formatDateTime(detail.end_time, locale)}
           </Descriptions.Item>
-          <Descriptions.Item label={t('leaveDetail.destination')} span={2}>
-            {detail.destination}
-          </Descriptions.Item>
+          {hideLeaveOnlyFields ? null : (
+            <Descriptions.Item label={t('leaveDetail.destination')} span={2}>
+              {detail.destination}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label={t('leaveDetail.reason')} span={2}>
             <Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
               {detail.reason}
             </Paragraph>
           </Descriptions.Item>
-          <Descriptions.Item label={t('leaveDetail.parentConfirm')}>
-            {detail.parent_confirm ? (
-              <Text type="success">{t('leaveDetail.confirmed')}</Text>
-            ) : (
-              <Text type="secondary">{t('leaveDetail.notConfirmed')}</Text>
-            )}
-          </Descriptions.Item>
+          {hideLeaveOnlyFields ? null : (
+            <Descriptions.Item label={t('leaveDetail.parentConfirm')}>
+              {detail.parent_confirm ? (
+                <Text type="success">{t('leaveDetail.confirmed')}</Text>
+              ) : (
+                <Text type="secondary">{t('leaveDetail.notConfirmed')}</Text>
+              )}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label={t('leaveDetail.attachment')}>
             {detail.attachment_url && detail.attachment_url.trim() ? (
               <TypographyLink href={detail.attachment_url} target="_blank" rel="noreferrer">

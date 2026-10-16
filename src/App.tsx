@@ -62,7 +62,8 @@ export default function App() {
           <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
           {/* /portal/:portalKey/announcements/:id：公告详情，沿用同一界面壳与侧栏 */}
           <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
-          {/* 领导端成员详情：从组织概览点击成员进入，沿用同一界面壳与侧栏 */}
+          {/* 成员详情：领导端组织概览/老师端班级管理/党委各端支部管理/管理端组织架构/
+              学校端组织管理点击成员进入，沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route path="organization-members/:uid" element={<MemberDetailPage />} />
         </Route>
 

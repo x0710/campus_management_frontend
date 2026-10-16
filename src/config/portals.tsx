@@ -94,23 +94,24 @@ export const PORTALS: PortalDef[] = [
     ],
   },
   {
-    // 党委支部端门户：工作台、党员概览、审核管理、我的使用虚拟数据预览；
-    // 支部管理复用公共组件 OrgMembersExplorer，接真实的组织/成员接口
+    // 党委支部端门户：工作台、我的使用虚拟数据预览；
+    // 审核管理复用教师端请假审批页面（GET /api/approvals + PUT /api/approvals），
+    // 支部管理按组织树深度判定所属支部并展示其成员（有下级支部则展示组织树），均接真实接口
     key: 'branch',
     icon: <ApartmentOutlined />,
     gradient: 'linear-gradient(135deg, #873800 0%, #fa8c16 100%)',
     accent: '#873800',
     modules: [
       { key: 'branch_m1', status: 'preview', icon: <LineChartOutlined /> },
-      { key: 'branch_m2', status: 'preview', icon: <TeamOutlined /> },
-      { key: 'branch_m3', status: 'preview', icon: <AuditOutlined /> },
+      { key: 'branch_m3', status: 'ready', icon: <AuditOutlined /> },
       { key: 'branch_m4', status: 'preview', icon: <UserOutlined /> },
       { key: 'branch_m5', status: 'ready', icon: <ApartmentOutlined /> },
     ],
   },
   {
-    // 党委学院端门户：工作台、指标、审核管理、我的使用虚拟数据预览；
-    // 学院支部管理复用公共组件 OrgMembersExplorer，接真实的组织/成员接口
+    // 党委学院端门户：工作台、指标、我的使用虚拟数据预览；
+    // 审核管理复用教师端请假审批页面（GET /api/approvals + PUT /api/approvals），
+    // 学院支部管理与支部端同一套支部判定逻辑，均接真实接口
     key: 'academy',
     icon: <BookOutlined />,
     gradient: 'linear-gradient(135deg, #531dab 0%, #9254de 100%)',
@@ -118,22 +119,24 @@ export const PORTALS: PortalDef[] = [
     modules: [
       { key: 'academy_m1', status: 'preview', icon: <HomeOutlined /> },
       { key: 'academy_m2', status: 'preview', icon: <ProfileOutlined /> },
-      { key: 'academy_m3', status: 'preview', icon: <AuditOutlined /> },
+      { key: 'academy_m3', status: 'ready', icon: <AuditOutlined /> },
       { key: 'academy_m4', status: 'preview', icon: <UserOutlined /> },
       { key: 'academy_m5', status: 'ready', icon: <ApartmentOutlined /> },
     ],
   },
   {
-    // 党委学校端门户：后端暂无接口，总览、组织管理均使用虚拟数据预览；
-    // 系统权限管理复用管理端「角色权限」页面，接真实的 RBAC 接口
+    // 党委学校端门户：总览使用虚拟数据预览；
+    // 组织管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
+    // 审批管理复用教师端请假审批页面，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
     gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
     accent: '#08979c',
     modules: [
       { key: 'school_m1', status: 'preview', icon: <LineChartOutlined /> },
-      { key: 'school_m2', status: 'preview', icon: <ApartmentOutlined /> },
+      { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
+      { key: 'school_m4', status: 'ready', icon: <AuditOutlined /> },
     ],
   },
   {

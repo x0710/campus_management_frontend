@@ -1,4 +1,12 @@
-/** 教师端：请假审批待办（GET /api/approvals + PUT /api/approvals） */
+/**
+ * 请假审批待办（GET /api/approvals + PUT /api/approvals）。
+ * 教师端「请假审批」与党委支部端 / 学院端 / 学校端的「审批管理」共用本组件。
+ *
+ * 审批入口有两处：
+ *   1. 列表「操作」列：同意 / 驳回（填写意见后提交）；
+ *   2. 点击行打开请假详情弹窗后，弹窗底部同样提供同意 / 驳回（仅等待中/待审批的步骤可用）。
+ * 提交意见后通过 invalidate('GET /leaves') 失效缓存并刷新列表。
+ */
 import { ReloadOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -37,6 +45,11 @@ const STATUS_COLOR: Record<ApprovalStepStatus, string> = {
   skipped: 'orange',
 }
 
+/** 审批步骤是否可操作（等待中/待审批才允许同意或驳回） */
+function isActionable(status: ApprovalStepStatus): boolean {
+  return status === 'waiting' || status === 'pending'
+}
+
 /** 教师端：请假审批待办（GET /api/approvals + PUT /api/approvals） */
 export default function LeaveApprovalView() {
   const t = useT()
@@ -55,8 +68,9 @@ export default function LeaveApprovalView() {
     decision: ApprovalDecision
   } | null>(null)
   const [commentForm] = Form.useForm<{ comment: string }>()
-  // 请假详情弹窗：点击审批行时用该行的审批实例 ID（即请假记录 approval_id）打开
-  const [detailId, setDetailId] = useState<number | null>(null)
+  // 请假详情弹窗：点击审批行时用该行的审批实例 ID（即请假记录 approval_id）打开，
+  // 同时保留该行（审批步骤）信息，可在详情弹窗内直接「同意 / 驳回」
+  const [detailRow, setDetailRow] = useState<ApprovalInstanceStep | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -178,8 +192,7 @@ export default function LeaveApprovalView() {
         key: 'action',
         width: 132,
         render: (_, record) => {
-          const actionable = record.status === 'waiting' || record.status === 'pending'
-          if (!actionable) return <span className="cell-sub">—</span>
+          if (!isActionable(record.status)) return <span className="cell-sub">—</span>
           return (
             <div className="approval-actions">
               <Button
@@ -257,7 +270,7 @@ export default function LeaveApprovalView() {
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
               onRow={(record) => ({
-                onClick: () => setDetailId(record.instance_id),
+                onClick: () => setDetailRow(record),
                 title: t('approval.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
@@ -307,9 +320,36 @@ export default function LeaveApprovalView() {
       </Modal>
 
       <LeaveDetailModal
-        open={detailId !== null}
-        leaveId={detailId}
-        onClose={() => setDetailId(null)}
+        open={detailRow !== null}
+        leaveId={detailRow?.instance_id ?? null}
+        onClose={() => setDetailRow(null)}
+        // 可在详情弹窗内直接审批：同意/驳回后关闭详情弹窗，弹出填写意见的确认弹窗
+        footerExtra={
+          detailRow && isActionable(detailRow.status) ? (
+            <>
+              <Button
+                type="primary"
+                onClick={() => {
+                  const step = detailRow
+                  setDetailRow(null)
+                  setAction({ step, decision: 'agree' })
+                }}
+              >
+                {t('approval.agree')}
+              </Button>
+              <Button
+                danger
+                onClick={() => {
+                  const step = detailRow
+                  setDetailRow(null)
+                  setAction({ step, decision: 'reject' })
+                }}
+              >
+                {t('approval.reject')}
+              </Button>
+            </>
+          ) : undefined
+        }
       />
     </div>
   )

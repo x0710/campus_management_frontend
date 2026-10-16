@@ -1,6 +1,6 @@
 /**
  * 组织成员浏览器（可复用组件，代码要求 1）：
- * 左侧「组织树（可搜索）」+ 右侧「成员表（每页 20 行，支持翻页/跳页/总数）」，
+ * 左侧「组织树（可搜索）」+ 右侧「成员表（支持翻页/跳页/总数）」，
  * 点击成员行或「详情」按钮跳转到成员详情页（成绩/请假/违规信息，代码要求 14）。
  *
  * 由领导端「组织概览」抽出，老师端「班级管理」复用同一套界面：
@@ -9,10 +9,19 @@
  * - 党委学院端「学院支部管理」传入本学院子树并保留组织树；
  * - 党委支部端「支部管理」传 showOrgTree=false（支部为最底层组织，无需树），仅展示成员表。
  *
+ * 成员 ID 搜索（各门户通用，逻辑见 composables/useMemberSearch）：输入用户 ID 后经
+ * GET /api/organization-members?uids= 定位其所属组织 → 展开组织树到该组织并选中
+ * （无组织树时固定选中唯一组织）→ 高亮该成员所在行；目标不在第 1 页时自动跳到其所在页。
+ *
  * 组织数据由父组件加载后传入（不同门户数据范围不同），本组件只负责组织树渲染、
  * 成员分页查询与跳转；成员查询走会话缓存，刷新传 force=true 绕过缓存（代码要求 5）。
  */
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import {
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
 import { Alert, Button, Input, Spin, Table, Tag, Tooltip, Tree } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
@@ -22,6 +31,7 @@ import { useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
 import type { OrganizationMember } from '../api/types/organizations'
+import { useMemberSearch } from '../composables/useMemberSearch'
 import { usePositionNames } from '../composables/usePositionNames'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
@@ -80,6 +90,9 @@ export default function OrgMembersExplorer({
   const [orgSearch, setOrgSearch] = useState('')
   const selectedId = useUiStateStore((s) => s.selectedOrgIds[fromModuleKey] ?? null)
   const setSelectedId = useUiStateStore((s) => s.setSelectedOrgId)
+  // 左侧组织树的收起状态（按模块 key 记忆，跨路由返回仍保持）
+  const treeCollapsed = useUiStateStore((s) => s.collapsedOrgTrees[fromModuleKey] ?? false)
+  const setTreeCollapsed = useUiStateStore((s) => s.setOrgTreeCollapsed)
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState<string | null>(null)
@@ -119,16 +132,39 @@ export default function OrgMembersExplorer({
     }
   }, [showOrgTree, autoSelectFirst, orgs, selectedId, fromModuleKey, setSelectedId])
 
-  // 切换组织后回到第 1 页并加载成员
+  // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
+  const search = useMemberSearch({
+    orgs,
+    memberPageSize,
+    activeOrgId,
+    onSelectOrg: (orgId: number) => setSelectedId(fromModuleKey, orgId),
+    onClearFilter: () => setOrgSearch(''),
+    onLoadPage: (orgId: number, page: number) => {
+      setMemberPage(page)
+      void loadMembers(orgId, page)
+    },
+    memberRows: members,
+  })
+
+  // 组织树展开节点：未手动调整/未搜索命中时默认全展开（与原 defaultExpandAll 观感一致）
+  const expandedKeys = useMemo<React.Key[]>(
+    () => search.focusKeys ?? orgs.map((o) => o.id),
+    [search.focusKeys, orgs],
+  )
+  // 解构出稳定引用（useCallback），避免把每次渲染都新建的 search 对象放进 effect 依赖
+  const { consumePendingPage } = search
+
+  // 切换组织后加载成员：默认回到第 1 页；若为搜索命中则按目标页加载
   useEffect(() => {
     if (activeOrgId === null) {
       setMembers([])
       setMemberTotal(0)
       return
     }
-    setMemberPage(1)
-    void loadMembers(activeOrgId, 1)
-  }, [activeOrgId, loadMembers])
+    const targetPage = consumePendingPage()
+    setMemberPage(targetPage)
+    void loadMembers(activeOrgId, targetPage)
+  }, [activeOrgId, loadMembers, consumePendingPage])
 
   // parent_id -> children 建树；搜索关键词仅前端过滤名称/编码，并保留匹配节点的祖先链
   const treeData = useMemo<TreeProps['treeData']>(() => {
@@ -232,7 +268,7 @@ export default function OrgMembersExplorer({
   }, [t, memberNames, positionNames, openMember])
 
   return (
-    <div className="admin-org-view">
+    <div className={`admin-org-view${showOrgTree && treeCollapsed ? ' is-tree-collapsed' : ''}`}>
       {showOrgTree && (
       <section className="panel-card org-tree-card">
         <header className="panel-card-header">
@@ -274,13 +310,14 @@ export default function OrgMembersExplorer({
                 ) : (
                   <Tree
                     treeData={treeData}
+                    expandedKeys={expandedKeys}
+                    onExpand={(keys: React.Key[]) => search.setFocusKeys(keys)}
                     selectedKeys={selectedId !== null ? [selectedId] : []}
                     onSelect={(keys: React.Key[]) =>
                       setSelectedId(fromModuleKey, keys.length ? Number(keys[0]) : null)
                     }
                     showLine
                     blockNode
-                    defaultExpandAll
                   />
                 )}
               </Spin>
@@ -292,22 +329,54 @@ export default function OrgMembersExplorer({
 
       <section className="panel-card org-members-card">
         <header className="panel-card-header">
-          <h3 className="panel-card-title">
-            {selectedOrg
-              ? selectedOrg.code && selectedOrg.code !== selectedOrg.name
-                ? `${selectedOrg.name}（${selectedOrg.code}）`
-                : selectedOrg.name
-              : t('memberDetail.memberListTitle')}
-          </h3>
-          {selectedOrg && (
-            <Tooltip title={t('memberDetail.refreshMembersHint')}>
-              <Button
-                size="small"
-                icon={<ReloadOutlined />}
-                onClick={() => void loadMembers(selectedOrg.id, memberPage, true)}
-              />
-            </Tooltip>
-          )}
+          <div className="org-members-title">
+            {/* 左侧组织树收起/展开（无组织树时不展示） */}
+            {showOrgTree && (
+              <Tooltip
+                title={
+                  treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
+                }
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  aria-label={
+                    treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
+                  }
+                  icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setTreeCollapsed(fromModuleKey, !treeCollapsed)}
+                />
+              </Tooltip>
+            )}
+            <h3 className="panel-card-title">
+              {selectedOrg
+                ? selectedOrg.code && selectedOrg.code !== selectedOrg.name
+                  ? `${selectedOrg.name}（${selectedOrg.code}）`
+                  : selectedOrg.name
+                : t('memberDetail.memberListTitle')}
+            </h3>
+          </div>
+          <div className="org-members-actions">
+            <Input.Search
+              allowClear
+              style={{ width: 300 }}
+              enterButton={t('common.search')}
+              prefix={<SearchOutlined />}
+              placeholder={t('orgExplorer.searchMemberPlaceholder')}
+              value={search.query}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => search.setQuery(e.target.value)}
+              onSearch={search.run}
+              loading={search.searching}
+            />
+            {selectedOrg && (
+              <Tooltip title={t('memberDetail.refreshMembersHint')}>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => void loadMembers(selectedOrg.id, memberPage, true)}
+                />
+              </Tooltip>
+            )}
+          </div>
         </header>
         <div className="panel-card-body">
           {!selectedOrg ? (
@@ -332,6 +401,10 @@ export default function OrgMembersExplorer({
               loading={membersLoading}
               columns={memberColumns}
               dataSource={members}
+              // 搜索命中的成员所在行高亮（夜间配色见 index.css 的 .org-member-row-hit）
+              rowClassName={(record: OrganizationMember) =>
+                record.user_id === search.hitUid ? 'org-member-row-hit' : ''
+              }
               locale={{ emptyText: t('common.noData') }}
               scroll={{ x: 860 }}
               onRow={(record: OrganizationMember) => ({

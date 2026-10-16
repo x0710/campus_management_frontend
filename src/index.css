@@ -13,6 +13,9 @@
   /* 富文本写作区：与卡片底色刻意区分，形成"输入槽"观感 */
   --editor-bg: #f6f8fc;
   --editor-line: #d9dfef;
+  /* 组织成员「按 ID 搜索命中」行的高亮底色与文字色（夜间单独配色，避免刺眼） */
+  --member-hit-bg: #fff3cd;
+  --member-hit-ink: #874d00;
 }
 
 :root[data-theme='dark'] {
@@ -24,6 +27,9 @@
   --header-bg: #171a23;
   --editor-bg: #12141d;
   --editor-line: #3a3f52;
+  /* 搜索命中行：夜间改为深琥珀底 + 浅金光文字，避免亮黄底在暗环境下刺眼 */
+  --member-hit-bg: #3a2f10;
+  --member-hit-ink: #f2d478;
   /* 原生滚动条滑块（不受 antd 主题影响，暗色下需单独配色） */
   --scrollbar-thumb: #3a3f52;
   --scrollbar-thumb-hover: #4a5064;
@@ -924,18 +930,13 @@ h3 {
   padding-left: 18px;
 }
 
-/* 请假详情弹窗底部：左侧操作、右侧关闭 */
+/* 请假详情弹窗底部：操作按钮（审批的同意/驳回、学生端的撤回/删除）居中，
+   关闭统一用右上角的 × */
 .leave-detail-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-}
-
-.leave-detail-footer-extra {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* 教师端审批视图 */
@@ -981,6 +982,52 @@ h3 {
   min-width: 0;
 }
 
+/* 组织树收起后：隐藏左侧组织树卡片，成员表自动占满整行 */
+.admin-org-view.is-tree-collapsed .org-tree-card {
+  display: none;
+}
+
+/* 成员表表头左侧：组织树收起/展开按钮 + 标题 */
+.org-members-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 成员表头部操作区：按 ID 搜索框 + 刷新按钮 */
+.org-members-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 管理端/学校端组织成员表上方的操作行：按 ID 搜索 + 添加成员入口 */
+.org-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/*
+ * 「按 ID 搜索」命中的成员行：暖色高亮（夜间自动切换为深底浅字，避免刺眼）。
+ * 复合选择器 + !important 避免被 antd 表格的悬停/斑马纹底色覆盖。
+ */
+.org-members-card .org-member-row-hit > td,
+.org-members-card .org-member-row-hit:hover > td {
+  background: var(--member-hit-bg) !important;
+  color: var(--member-hit-ink) !important;
+  font-weight: 600;
+}
+
+/* 命中行左侧色条，翻页/横向滚动时也能一眼定位 */
+.org-members-card .org-member-row-hit > td:first-child {
+  box-shadow: inset 3px 0 0 var(--member-hit-ink);
+}
+
+/* 「添加任职组织」行内表单（用于 UserEditPanel 的用户详情弹窗） */
 .org-add-member {
   display: flex;
   align-items: center;
@@ -2518,109 +2565,6 @@ h3 {
 .branch-member-actions .anticon {
   margin-left: 4px;
   font-size: 10px;
-}
-
-/* 党委支部端：审核管理 */
-.review-section-title {
-  margin: 0 0 16px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.review-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 560px;
-}
-
-.review-card {
-  padding: 16px 20px;
-  border-radius: 10px;
-  background: var(--card-bg);
-  border: 1px solid var(--line);
-}
-
-.review-card-main {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.review-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.review-card-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.review-card-item {
-  font-size: 13px;
-  color: var(--ink-secondary);
-}
-
-.review-card-points {
-  font-size: 15px;
-  font-weight: 700;
-  color: #389e0d;
-}
-
-.review-card-points--deduct {
-  color: #cf1322;
-}
-
-.review-card-evidence {
-  padding: 0;
-  height: auto;
-  font-size: 13px;
-}
-
-.review-card-evidence .anticon {
-  margin-left: 2px;
-  font-size: 10px;
-}
-
-.review-card-actions {
-  display: flex;
-  gap: 24px;
-}
-
-.review-btn.ant-btn {
-  min-width: 110px;
-  height: 36px;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-}
-
-.review-btn-reject.ant-btn,
-.review-btn-reject.ant-btn:hover {
-  background: #e03131 !important;
-  border-color: #e03131 !important;
-  color: #fff !important;
-}
-
-.review-btn-reject.ant-btn:hover {
-  background: #c92a2a !important;
-}
-
-.review-btn-approve.ant-btn,
-.review-btn-approve.ant-btn:hover {
-  background: #2f9e44 !important;
-  border-color: #2f9e44 !important;
-  color: #fff !important;
-}
-
-.review-btn-approve.ant-btn:hover {
-  background: #2b8a3e !important;
 }
 
 /* 党委学院端：工作台 */

@@ -1,9 +1,12 @@
 import {
   DeleteOutlined,
   EditOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -32,6 +35,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import {
   addOrgMember,
   createOrganization,
@@ -47,15 +51,13 @@ import type {
 } from '../../api/types/organizations'
 import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
-import { queryRoles } from '../../api/rbac'
-import type { RoleInfo } from '../../api/types/rbac'
 import { extractError } from '../../api/common'
+import { useMemberSearch } from '../../composables/useMemberSearch'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
-import UserEditPanel from './UserEditPanel'
 
 /** 组织成员表每页条数（代码要求 12：表格每页最多 100 行） */
 const MEMBER_PAGE_SIZE = 100
@@ -66,18 +68,31 @@ interface OrgFormValues {
   parent_id: number | null
 }
 
-/** 管理端：组织架构（组织树 + 组织 CRUD + 成员任职管理） */
-export default function OrgAdminView() {
+interface OrgAdminViewProps {
+  /**
+   * 组织选中态的会话缓存 key。
+   * 管理端与党委学校端复用同一页面时各用一个 key，避免两端的选择状态互相串用。
+   */
+  uiKey?: string
+}
+
+/** 管理端：组织架构（组织树 + 组织 CRUD + 成员任职管理，成员详情跳转共用领导端成员详情页） */
+export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
+  const navigate = useNavigate()
+  const { portalKey } = useParams<{ portalKey: string }>()
 
   const [orgs, setOrgs] = useState<OrganizationInfo[]>([])
   const [orgsLoading, setOrgsLoading] = useState(true)
   const [orgsError, setOrgsError] = useState<string | null>(null)
 
   // 选中组织 ID 存入 Zustand 会话状态，切换路由回来后仍保留
-  const selectedId = useUiStateStore((s) => s.selectedOrgIds['admin_m3'] ?? null)
+  const selectedId = useUiStateStore((s) => s.selectedOrgIds[uiKey] ?? null)
   const setSelectedId = useUiStateStore((s) => s.setSelectedOrgId)
+  // 左侧组织树的收起状态（按模块 key 记忆，跨路由返回仍保持）
+  const treeCollapsed = useUiStateStore((s) => s.collapsedOrgTrees[uiKey] ?? false)
+  const setTreeCollapsed = useUiStateStore((s) => s.setOrgTreeCollapsed)
 
   // 组织搜索关键词（仅前端过滤树节点）
   const [orgSearch, setOrgSearch] = useState('')
@@ -89,7 +104,6 @@ export default function OrgAdminView() {
   const [actingKey, setActingKey] = useState<string | null>(null)
 
   const [positions, setPositions] = useState<PositionDetail[]>([])
-  const [roles, setRoles] = useState<RoleInfo[]>([])
 
   const [orgModal, setOrgModal] = useState<
     { mode: 'create' | 'edit'; org?: OrganizationInfo } | null
@@ -97,15 +111,14 @@ export default function OrgAdminView() {
   const [orgSaving, setOrgSaving] = useState(false)
   const [orgForm] = Form.useForm<OrgFormValues>()
 
-  // 点击成员行打开的用户详情弹窗
-  const [editUid, setEditUid] = useState<number | null>(null)
-
   const [newMember, setNewMember] = useState<{
     user_id: number | null
     position: string
     workplace: string
   }>({ user_id: null, position: '', workplace: '' })
   const [addingMember, setAddingMember] = useState(false)
+  /** 新增成员弹窗开关（成员操作收进弹窗，避免与表头上方的搜索框混在一起） */
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   const showError = useCallback(
     (err: unknown) => {
@@ -140,17 +153,14 @@ export default function OrgAdminView() {
     void loadOrgs()
   }, [loadOrgs])
 
+  // 职位列表供「添加成员」弹窗的职位自动补全使用（加载失败不阻塞，仍可手填）
   useEffect(() => {
     void (async () => {
       try {
-        const [posRes, roleRes] = await Promise.all([
-          queryPositions({ page: 1, page_size: 100 }),
-          queryRoles({ page: 1, page_size: 100 }),
-        ])
-        setPositions(posRes.data)
-        setRoles(roleRes.data)
+        const res = await queryPositions({ page: 1, page_size: 100 })
+        setPositions(res.data)
       } catch {
-        // 职位/角色列表加载失败不阻塞，表单仍可手填
+        // 忽略：无 position.read 权限时保留空选项
       }
     })()
   }, [])
@@ -175,15 +185,38 @@ export default function OrgAdminView() {
     [showError],
   )
 
+  // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
+  const search = useMemberSearch({
+    orgs,
+    memberPageSize: MEMBER_PAGE_SIZE,
+    activeOrgId: selectedId,
+    onSelectOrg: (orgId: number) => setSelectedId(uiKey, orgId),
+    onClearFilter: () => setOrgSearch(''),
+    onLoadPage: (orgId: number, page: number) => {
+      setMemberPage(page)
+      void loadMembers(orgId, page)
+    },
+    memberRows: members,
+  })
+  const { consumePendingPage } = search
+
+  // 组织树展开节点：未手动调整/未搜索命中时默认全展开（与原 defaultExpandAll 观感一致）
+  const expandedKeys = useMemo<React.Key[]>(
+    () => search.focusKeys ?? orgs.map((o) => o.id),
+    [search.focusKeys, orgs],
+  )
+
+  // 切换组织后加载成员：默认回到第 1 页；若为搜索命中则按目标页加载
   useEffect(() => {
     if (selectedId !== null) {
-      setMemberPage(1)
-      void loadMembers(selectedId, 1)
+      const targetPage = consumePendingPage()
+      setMemberPage(targetPage)
+      void loadMembers(selectedId, targetPage)
     } else {
       setMembers([])
       setMemberTotal(0)
     }
-  }, [selectedId, loadMembers])
+  }, [selectedId, loadMembers, consumePendingPage])
 
   // parent_id -> children 组树（搜索关键词仅前端过滤名称/编码）
   const treeData = useMemo<TreeProps['treeData']>(() => {
@@ -247,8 +280,17 @@ export default function OrgAdminView() {
   const positionNames = usePositionNames()
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
-    setSelectedId('admin_m3', keys.length ? Number(keys[0]) : null)
+    setSelectedId(uiKey, keys.length ? Number(keys[0]) : null)
   }
+
+  // 点击成员行 / 「查看详细」跳转到成员详情页（与领导端「组织概览」共用同一页面，
+  // from=uiKey 让侧栏仍高亮当前组织模块，返回时回到本页）
+  const openMemberDetail = useCallback(
+    (uid: number) => {
+      navigate(`/portal/${portalKey}/organization-members/${uid}?from=${uiKey}`)
+    },
+    [navigate, portalKey, uiKey],
+  )
 
   const openCreate = (parent?: OrganizationInfo) => {
     setOrgModal({ mode: 'create' })
@@ -299,7 +341,7 @@ export default function OrgAdminView() {
     try {
       await deleteOrganization(org.id)
       message.success(t('adminOrg.deleteSuccess'))
-      if (selectedId === org.id) setSelectedId('admin_m3', null)
+      if (selectedId === org.id) setSelectedId(uiKey, null)
       await loadOrgs()
     } catch (err) {
       showError(err)
@@ -319,6 +361,7 @@ export default function OrgAdminView() {
       })
       message.success(t('adminOrg.memberAddSuccess'))
       setNewMember({ user_id: null, position: '', workplace: '' })
+      setAddModalOpen(false)
       await loadMembers(selectedId, memberPage)
     } catch (err) {
       showError(err)
@@ -413,7 +456,7 @@ export default function OrgAdminView() {
               <Button
                 type="link"
                 size="small"
-                onClick={() => setEditUid(record.user_id)}
+                onClick={() => openMemberDetail(record.user_id)}
               >
                 {t('adminOrg.viewUser')}
               </Button>
@@ -436,11 +479,11 @@ export default function OrgAdminView() {
         ),
       },
     ],
-    [t, actingKey, memberNames, memberOrgs, positionNames, selectedId],
+    [t, actingKey, memberNames, memberOrgs, positionNames, selectedId, openMemberDetail],
   )
 
   return (
-    <div className="admin-org-view">
+    <div className={`admin-org-view${treeCollapsed ? ' is-tree-collapsed' : ''}`}>
       <section className="panel-card org-tree-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminOrg.treeTitle')}</h3>
@@ -480,11 +523,12 @@ export default function OrgAdminView() {
               <Spin spinning={orgsLoading}>
                 <Tree
                   treeData={treeData}
+                  expandedKeys={expandedKeys}
+                  onExpand={(keys: React.Key[]) => search.setFocusKeys(keys)}
                   selectedKeys={selectedId !== null ? [selectedId] : []}
                   onSelect={onSelectTree}
                   showLine
                   blockNode
-                  defaultExpandAll
                 />
               </Spin>
             </>
@@ -494,13 +538,40 @@ export default function OrgAdminView() {
 
       <section className="panel-card org-members-card">
         <header className="panel-card-header">
-          <h3 className="panel-card-title">
-            {selectedOrg
-              ? `${selectedOrg.name}（${selectedOrg.code}）`
-              : t('adminOrg.detailTitle')}
-          </h3>
+          <div className="org-members-title">
+            {/* 左侧组织树收起/展开 */}
+            <Tooltip
+              title={
+                treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
+              }
+            >
+              <Button
+                type="text"
+                size="small"
+                aria-label={
+                  treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
+                }
+                icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={() => setTreeCollapsed(uiKey, !treeCollapsed)}
+              />
+            </Tooltip>
+            <h3 className="panel-card-title">
+              {selectedOrg
+                ? `${selectedOrg.name}（${selectedOrg.code}）`
+                : t('adminOrg.detailTitle')}
+            </h3>
+          </div>
           {selectedOrg && (
             <div className="approval-toolbar">
+              {/* 添加成员与搜索框分处表头/表体，避免被误认成搜索按钮 */}
+              <Button
+                type="primary"
+                size="small"
+                icon={<UserAddOutlined />}
+                onClick={() => setAddModalOpen(true)}
+              >
+                {t('adminOrg.addMember')}
+              </Button>
               <Tooltip title={t('common.refresh')}>
                 <Button
                   size="small"
@@ -536,57 +607,33 @@ export default function OrgAdminView() {
           )}
         </header>
         <div className="panel-card-body">
+          {/* 成员 ID 搜索（添加成员入口已移至表头，避免与搜索按钮混淆） */}
+          <div className="org-member-actions">
+            <Input.Search
+              allowClear
+              style={{ width: 320 }}
+              enterButton={t('common.search')}
+              prefix={<SearchOutlined />}
+              placeholder={t('orgExplorer.searchMemberPlaceholder')}
+              value={search.query}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => search.setQuery(e.target.value)}
+              onSearch={search.run}
+              loading={search.searching}
+            />
+          </div>
           {!selectedOrg ? (
             <Alert type="info" showIcon title={t('adminOrg.selectHint')} />
           ) : (
             <>
-              <div className="org-add-member">
-                <InputNumber
-                  className="org-add-member-uid"
-                  placeholder={t('adminOrg.userIdPlaceholder')}
-                  min={1}
-                  precision={0}
-                  value={newMember.user_id}
-                  onChange={(v: number | null) =>
-                    setNewMember((s) => ({ ...s, user_id: v === null ? null : Number(v) }))
-                  }
-                />
-                <AutoComplete
-                  className="org-add-member-pos"
-                  options={positionOptions}
-                  placeholder={t('adminOrg.positionPlaceholder')}
-                  value={newMember.position}
-                  onChange={(v: string) => setNewMember((s) => ({ ...s, position: v }))}
-                  filterOption={(input: string, option?: { label?: unknown }) =>
-                    String(option?.label ?? '')
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
-                  allowClear
-                />
-                <Input
-                  className="org-add-member-place"
-                  placeholder={t('adminOrg.workplacePlaceholder')}
-                  value={newMember.workplace}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setNewMember((s) => ({ ...s, workplace: e.target.value }))
-                  }
-                />
-                <Button
-                  type="primary"
-                  loading={addingMember}
-                  disabled={newMember.user_id === null || !newMember.position.trim()}
-                  onClick={() => void addMember()}
-                >
-                  {t('adminOrg.addMember')}
-                </Button>
-              </div>
-
               <Table<OrganizationMember>
                 rowKey={(r: OrganizationMember) => String(r.id)}
                 loading={membersLoading}
                 columns={memberColumns}
                 dataSource={members}
+                // 搜索命中的成员所在行高亮（夜间配色见 index.css 的 .org-member-row-hit）
+                rowClassName={(record: OrganizationMember) =>
+                  record.user_id === search.hitUid ? 'org-member-row-hit' : ''
+                }
                 locale={{ emptyText: t('common.noData') }}
                 scroll={{ x: 960 }}
                 onRow={(record: OrganizationMember) => ({
@@ -594,8 +641,9 @@ export default function OrgAdminView() {
                     // 点击按钮/链接时不触发行点击
                     const target = e.target as HTMLElement
                     if (target.closest('button') || target.closest('.ant-popover')) return
-                    setEditUid(record.user_id)
+                    openMemberDetail(record.user_id)
                   },
+                  title: t('memberDetail.rowClickHint'),
                   style: { cursor: 'pointer' },
                 })}
                 pagination={{
@@ -659,28 +707,59 @@ export default function OrgAdminView() {
         </Form>
       </Modal>
 
-      {/* 点击成员行打开用户详情弹窗，复用 UserEditPanel */}
+      {/* 添加成员弹窗：UID + 职位 + 工作地点，成功提交后关闭并刷新成员列表 */}
       <Modal
-        open={editUid !== null}
-        title={editUid !== null ? `${t('adminOrg.viewUser')} #${editUid}` : ''}
-        width={760}
-        footer={null}
-        onCancel={() => setEditUid(null)}
+        open={addModalOpen}
+        title={`${t('adminOrg.addMember')}${selectedOrg ? ` · ${selectedOrg.name}` : ''}`}
+        okText={t('adminOrg.addMember')}
+        cancelText={t('approval.cancel')}
+        confirmLoading={addingMember}
+        okButtonProps={{
+          disabled: newMember.user_id === null || !newMember.position.trim(),
+        }}
+        onCancel={() => setAddModalOpen(false)}
+        onOk={() => void addMember()}
+        forceRender
         destroyOnHidden
       >
-        {editUid !== null && (
-          <UserEditPanel
-            uid={editUid}
-            roles={roles}
-            organizations={orgs}
-            positions={positions}
-            onChanged={() => {
-              if (selectedId !== null) {
-                void loadMembers(selectedId, memberPage, true)
+        <Form layout="vertical" style={{ marginTop: 12 }}>
+          <Form.Item label={t('adminOrg.colUserId')}>
+            <InputNumber
+              style={{ width: '100%' }}
+              placeholder={t('adminOrg.userIdPlaceholder')}
+              min={1}
+              precision={0}
+              value={newMember.user_id}
+              onChange={(v: number | null) =>
+                setNewMember((s) => ({ ...s, user_id: v === null ? null : Number(v) }))
               }
-            }}
-          />
-        )}
+            />
+          </Form.Item>
+          <Form.Item label={t('adminOrg.colPosition')}>
+            <AutoComplete
+              style={{ width: '100%' }}
+              options={positionOptions}
+              placeholder={t('adminOrg.positionPlaceholder')}
+              value={newMember.position}
+              onChange={(v: string) => setNewMember((s) => ({ ...s, position: v }))}
+              filterOption={(input: string, option?: { label?: unknown }) =>
+                String(option?.label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+              allowClear
+            />
+          </Form.Item>
+          <Form.Item label={t('adminOrg.colWorkplace')}>
+            <Input
+              placeholder={t('adminOrg.workplacePlaceholder')}
+              value={newMember.workplace}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setNewMember((s) => ({ ...s, workplace: e.target.value }))
+              }
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   )

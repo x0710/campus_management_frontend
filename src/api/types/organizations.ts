@@ -36,6 +36,15 @@ export interface UserOrganization extends OrganizationMember {
   organization_name: string
 }
 
+/** 组织树链路节点（GET /organizations/{id}/tree 返回项；链路顺序为「根 → 查询组织」） */
+export interface OrganizationTreeNode {
+  id: number
+  name: string
+  code: string
+  /** 距查询组织自身的层级：链上最后一项恒为 0，越靠根越大（根节点的 level 即链路深度） */
+  level: number
+}
+
 /** 组织分页查询参数 */
 export interface OrganizationQuery {
   page?: number
