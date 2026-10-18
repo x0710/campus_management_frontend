@@ -42,16 +42,31 @@ interface ProfileFormValues {
   gender?: Gender
 }
 
+/** 编辑区块：资料（姓名/性别等）、系统角色、组织任职 */
+export type EditSection = 'profile' | 'roles' | 'organizations'
+
 interface Props {
   uid: number
   roles: { id: number; code: string; name: string }[]
   organizations: OrganizationInfo[]
   positions: PositionDetail[]
   onChanged: () => void
+  /**
+   * 只展示指定区块（成员详情页把「资料 / 系统角色 / 组织任职」拆成三个独立编辑入口，
+   * 避免一个弹窗同时编辑多个部分）；不传则三个区块全部展示（管理端用户管理弹窗沿用）。
+   */
+  section?: EditSection
 }
 
 /** 编辑用户：资料修改（PATCH /users/{id}）、角色分配（POST /rbac/users/{uid}）、组织任职管理 */
-export default function UserEditPanel({ uid, roles, organizations, positions, onChanged }: Props) {
+export default function UserEditPanel({
+  uid,
+  roles,
+  organizations,
+  positions,
+  onChanged,
+  section,
+}: Props) {
   const t = useT()
   const { message } = AntdApp.useApp()
   const [form] = Form.useForm<ProfileFormValues>()
@@ -116,10 +131,15 @@ export default function UserEditPanel({ uid, roles, organizations, positions, on
     }
   }, [uid])
 
+  // 只展示的区块（不传 section 时三块都展示）
+  const showProfile = section === undefined || section === 'profile'
+  const showRoles = section === undefined || section === 'roles'
+  const showOrgs = section === undefined || section === 'organizations'
+
   useEffect(() => {
     void load()
-    void loadRoleRelations()
-  }, [load, loadRoleRelations])
+    if (showRoles) void loadRoleRelations()
+  }, [load, loadRoleRelations, showRoles])
 
   const orgOptions = useMemo(
     () => organizations.map((o) => ({ value: o.id, title: `${o.name}（${o.code}）` })),
@@ -184,6 +204,8 @@ export default function UserEditPanel({ uid, roles, organizations, positions, on
       setNewWorkplace('')
       const orgs = await listUserOrganizations(uid)
       setOrgRelations(orgs)
+      // 通知宿主刷新（成员详情页需更新「组织任职」区块的展示）
+      onChanged()
     } catch (err) {
       showError(err)
     } finally {
@@ -197,6 +219,8 @@ export default function UserEditPanel({ uid, roles, organizations, positions, on
       await removeOrgMember(rel.organization_id, rel.id)
       message.success(t('adminOrg.memberRemoveSuccess'))
       setOrgRelations((list) => list.filter((x) => x.id !== rel.id))
+      // 通知宿主刷新（成员详情页需更新「组织任职」区块的展示）
+      onChanged()
     } catch (err) {
       showError(err)
     } finally {
@@ -253,110 +277,118 @@ export default function UserEditPanel({ uid, roles, organizations, positions, on
 
   return (
     <div className="user-edit-panel">
-      <Form form={form} layout="vertical">
-        <div className="leave-form-grid">
-          <Form.Item name="name" label={t('adminUsers.fieldName')}>
-            <Input maxLength={64} />
-          </Form.Item>
-          <Form.Item name="gender" label={t('adminUsers.fieldGender')}>
-            <Select
-              allowClear
-              options={[
-                { value: 'male', label: t('adminUsers.genderMale') },
-                { value: 'female', label: t('adminUsers.genderFemale') },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="email" label={t('adminUsers.fieldEmail')}>
-            <Input maxLength={128} />
-          </Form.Item>
-          <Form.Item name="phone" label={t('adminUsers.fieldPhone')}>
-            <Input maxLength={32} />
-          </Form.Item>
-          <Form.Item name="birthday" label={t('adminUsers.fieldBirthday')}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </div>
-        <div className="user-edit-actions">
-          <Button type="primary" loading={savingProfile} onClick={() => void saveProfile()}>
-            {t('adminUsers.saveProfile')}
+      {showProfile && (
+        <Form form={form} layout="vertical">
+          <div className="leave-form-grid">
+            <Form.Item name="name" label={t('adminUsers.fieldName')}>
+              <Input maxLength={64} />
+            </Form.Item>
+            <Form.Item name="gender" label={t('adminUsers.fieldGender')}>
+              <Select
+                allowClear
+                options={[
+                  { value: 'male', label: t('adminUsers.genderMale') },
+                  { value: 'female', label: t('adminUsers.genderFemale') },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="email" label={t('adminUsers.fieldEmail')}>
+              <Input maxLength={128} />
+            </Form.Item>
+            <Form.Item name="phone" label={t('adminUsers.fieldPhone')}>
+              <Input maxLength={32} />
+            </Form.Item>
+            <Form.Item name="birthday" label={t('adminUsers.fieldBirthday')}>
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
+          <div className="user-edit-actions">
+            <Button type="primary" loading={savingProfile} onClick={() => void saveProfile()}>
+              {t('adminUsers.saveProfile')}
+            </Button>
+          </div>
+        </Form>
+      )}
+
+      {showProfile && showRoles && <Divider />}
+
+      {showRoles && (
+        <div className="user-edit-roles">
+          <span className="user-edit-label">{t('adminUsers.fieldRoles')}</span>
+          <Select
+            mode="multiple"
+            className="user-edit-roles-select"
+            value={roleIds}
+            options={roles.map((r) => ({ value: r.id, label: `${r.name}（${r.code}）` }))}
+            onChange={(v: number[]) => setRoleIds(v)}
+            optionFilterProp="label"
+          />
+          <Button
+            type="primary"
+            ghost
+            loading={savingRoles}
+            disabled={shallowEq(roleIds, initialRoleIds)}
+            onClick={() => void saveRoles()}
+          >
+            {t('adminUsers.saveRoles')}
           </Button>
         </div>
-      </Form>
+      )}
 
-      <Divider />
+      {(showProfile || showRoles) && showOrgs && <Divider />}
 
-      <div className="user-edit-roles">
-        <span className="user-edit-label">{t('adminUsers.fieldRoles')}</span>
-        <Select
-          mode="multiple"
-          className="user-edit-roles-select"
-          value={roleIds}
-          options={roles.map((r) => ({ value: r.id, label: `${r.name}（${r.code}）` }))}
-          onChange={(v: number[]) => setRoleIds(v)}
-          optionFilterProp="label"
-        />
-        <Button
-          type="primary"
-          ghost
-          loading={savingRoles}
-          disabled={shallowEq(roleIds, initialRoleIds)}
-          onClick={() => void saveRoles()}
-        >
-          {t('adminUsers.saveRoles')}
-        </Button>
-      </div>
-
-      <Divider />
-
-      <div className="user-edit-label">{t('adminUsers.orgRelations')}</div>
-      <div className="org-add-member" style={{ margin: '8px 0' }}>
-        <TreeSelect
-          className="org-add-member-uid"
-          treeData={orgOptions}
-          value={newOrgId}
-          onChange={(v: number | null) => setNewOrgId(v)}
-          allowClear
-          showSearch
-          treeNodeFilterProp="title"
-          placeholder={t('adminUsers.selectOrg')}
-        />
-        <AutoComplete
-          className="org-add-member-pos"
-          options={positionOptions}
-          value={newPosition}
-          onChange={(v: string) => setNewPosition(v)}
-          placeholder={t('adminOrg.positionPlaceholder')}
-          filterOption={(input: string, option?: { label?: unknown }) =>
-            String(option?.label ?? '')
-              .toLowerCase()
-              .includes(input.toLowerCase())
-          }
-          allowClear
-        />
-        <Input
-          className="org-add-member-place"
-          value={newWorkplace}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setNewWorkplace(e.target.value)}
-          placeholder={t('adminOrg.workplacePlaceholder')}
-        />
-        <Button
-          type="primary"
-          loading={orgBusy === 'add'}
-          disabled={newOrgId === null || !newPosition.trim()}
-          onClick={() => void addRelation()}
-        >
-          {t('adminUsers.addRelation')}
-        </Button>
-      </div>
-      <Table<UserOrganization>
-        rowKey="id"
-        size="small"
-        columns={relationColumns}
-        dataSource={orgRelations}
-        locale={{ emptyText: t('common.noData') }}
-        pagination={false}
-      />
+      {showOrgs && (
+        <>
+          <div className="user-edit-label">{t('adminUsers.orgRelations')}</div>
+          <div className="org-add-member" style={{ margin: '8px 0' }}>
+            <TreeSelect
+              className="org-add-member-uid"
+              treeData={orgOptions}
+              value={newOrgId}
+              onChange={(v: number | null) => setNewOrgId(v)}
+              allowClear
+              showSearch
+              treeNodeFilterProp="title"
+              placeholder={t('adminUsers.selectOrg')}
+            />
+            <AutoComplete
+              className="org-add-member-pos"
+              options={positionOptions}
+              value={newPosition}
+              onChange={(v: string) => setNewPosition(v)}
+              placeholder={t('adminOrg.positionPlaceholder')}
+              filterOption={(input: string, option?: { label?: unknown }) =>
+                String(option?.label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+              allowClear
+            />
+            <Input
+              className="org-add-member-place"
+              value={newWorkplace}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setNewWorkplace(e.target.value)}
+              placeholder={t('adminOrg.workplacePlaceholder')}
+            />
+            <Button
+              type="primary"
+              loading={orgBusy === 'add'}
+              disabled={newOrgId === null || !newPosition.trim()}
+              onClick={() => void addRelation()}
+            >
+              {t('adminUsers.addRelation')}
+            </Button>
+          </div>
+          <Table<UserOrganization>
+            rowKey="id"
+            size="small"
+            columns={relationColumns}
+            dataSource={orgRelations}
+            locale={{ emptyText: t('common.noData') }}
+            pagination={false}
+          />
+        </>
+      )}
     </div>
   )
 }

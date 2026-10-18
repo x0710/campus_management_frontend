@@ -118,7 +118,7 @@ export default function PartyProfileView() {
         </div>
       ),
     },
-    { key: 'report', label: t('partyProfile.tabReport'), children: <Placeholder /> },
+ 
     { key: 'notifications', label: t('partyProfile.tabNotifications'), children: <NotificationsList /> },
     { key: 'guide', label: t('partyProfile.tabGuide'), children: <Placeholder /> },
     { key: 'about', label: t('partyProfile.tabAbout'), children: <Placeholder /> },

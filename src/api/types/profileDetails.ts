@@ -40,6 +40,45 @@ export interface ProfileDetail {
   updated_at: string | null
 }
 
+/**
+ * 创建档案请求（POST /api/profile-details）。
+ * 必填：user_id、id_card、ethnic、birth_date、class_id；其余字段可省略或传 null。
+ */
+export interface ProfileDetailCreateRequest {
+  user_id: number
+  /** 身份证号（必填） */
+  id_card: string
+  /** 民族（必填） */
+  ethnic: string
+  /** 出生日期（YYYY-MM-DD，必填） */
+  birth_date: string
+  /** 班级 ID（必填） */
+  class_id: number
+  /** 籍贯 */
+  native_place?: string | null
+  /** 户口所在地 */
+  household_location?: string | null
+  /** 户口性质 */
+  household_type?: string | null
+  phone?: string | null
+  email?: string | null
+  /** 父亲姓名 */
+  father_name?: string | null
+  /** 父亲电话 */
+  father_phone?: string | null
+  /** 父亲工作单位 */
+  father_company?: string | null
+  /** 母亲姓名 */
+  mother_name?: string | null
+  /** 母亲电话 */
+  mother_phone?: string | null
+  /** 母亲工作单位 */
+  mother_company?: string | null
+}
+
+/** 更新档案请求（PATCH /api/profile-details/{id}，除 user_id 外字段全部可选且可置 null） */
+export type ProfileDetailUpdateRequest = Partial<Omit<ProfileDetailCreateRequest, 'user_id'>>
+
 /** GET /api/profile-details 查询参数 */
 export interface ProfileDetailQuery extends PageQuery {
   /** 身份证号 / 籍贯模糊搜索 */

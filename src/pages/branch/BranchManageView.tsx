@@ -2,7 +2,8 @@
  * 党委支部端 / 党委学院端：支部管理（所属支部及其下级组织的成员信息）。
  * 两端共用本组件，仅侧栏高亮与详情页返回来源（fromModuleKey）不同。
  *
- * 所属支部判定（需求：支部位于组织树第 3 / 4 层）：
+ * 所属支部判定（需求：支部位于组织树第 3 / 4 层，规则已抽到 composables/useBranchOrg.ts，
+ * 与支部工作台 BranchWorkbenchView 共用）：
  *   1. GET /api/credentials/me                   当前登录用户 uid
  *   2. GET /api/organization-members?uids={uid}  该用户全部任职组织
  *   3. 对每个任职组织 GET /api/organizations/{id}/tree →「根 → 该组织」链路（含 level）
@@ -22,34 +23,13 @@
  */
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import {
-  getOrganizationTree,
-  listAllOrganizations,
-  listSubsidiaries,
-  listUserOrganizations,
-} from '../../api/organizations'
+import { listAllOrganizations, listSubsidiaries } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
 import OrgMembersExplorer from '../../components/OrgMembersExplorer'
 import type { OrgNode } from '../../components/OrgMembersExplorer'
-import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
+import { resolveBranchOrg } from '../../composables/useBranchOrg'
 import { useT } from '../../i18n'
-
-/**
- * 按组织树链路深度判定支部（需求：上级组织数量为 3 或 4）。
- *
- * @param orgIds 该用户的全部任职组织 ID（必填；按任职顺序逐个判定）
- * @returns 第一个被判定为支部的组织 ID；均不满足时返回 null
- */
-async function findBranchOrg(orgIds: number[]): Promise<number | null> {
-  for (const id of orgIds) {
-    const chain = await getOrganizationTree(id)
-    // 链条数 - 1 即上级组织数量（等于链路首项的 level）
-    if (BRANCH_ANCESTOR_DEPTHS.includes(chain.length - 1)) return id
-  }
-  return null
-}
 
 /**
  * 收集以 rootId 为顶点的组织子树（顶点 + 全部下级）。
@@ -104,20 +84,15 @@ export default function BranchManageView({ fromModuleKey }: BranchManageViewProp
       setOrgsLoading(true)
       setOrgsError(null)
       try {
-        // 1) 当前登录用户的全部任职组织
-        const me = await getCurrentUser()
-        const mine = await listUserOrganizations(me.uid)
-        if (mine.length === 0) {
+        // 1) 当前登录用户的全部任职组织，并按组织树深度判定支部（均未命中时回退第一个任职组织）
+        const { branchId, mine } = await resolveBranchOrg()
+        if (branchId === null) {
           setOrgs([])
           setShowOrgTree(false)
           return
         }
 
-        // 2) 按组织树深度判定支部；均未命中时回退为第一个任职组织
-        const branchId =
-          (await findBranchOrg(mine.map((o) => o.organization_id))) ?? mine[0].organization_id
-
-        // 3) 支部还有下级 → 展示「支部 + 全部下级」组织树；否则仅展示本支部成员表
+        // 2) 支部还有下级 → 展示「支部 + 全部下级」组织树；否则仅展示本支部成员表
         const children = await listSubsidiaries(branchId)
         if (children.length > 0) {
           const all = await listAllOrganizations(force)

@@ -26,7 +26,9 @@
 import {
   ArrowLeftOutlined,
   BankOutlined,
+  DeleteOutlined,
   EditOutlined,
+  PlusOutlined,
   ReloadOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
@@ -41,6 +43,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Skeleton,
   Space,
@@ -78,11 +81,21 @@ import {
 import type { CourseScoreInfo, ExamType } from '../../api/types/examinations'
 import { getLeave } from '../../api/leaves'
 import type { LeaveDetail } from '../../api/types/leaves'
-import { queryProfileDetails } from '../../api/profileDetails'
+import {
+  createProfileDetail,
+  deleteProfileDetail,
+  queryProfileDetails,
+  updateProfileDetail,
+} from '../../api/profileDetails'
 import type { ProfileDetail } from '../../api/types/profileDetails'
 import { getUser } from '../../api/users'
 import type { UserDetail } from '../../api/types/users'
-import { queryRewardings } from '../../api/rewardings'
+import {
+  createRewarding,
+  deleteRewarding,
+  queryRewardings,
+  updateRewarding,
+} from '../../api/rewardings'
 import type { RewardingDto } from '../../api/types/rewardings'
 import {
   getViolation,
@@ -106,6 +119,12 @@ import {
 } from '../../config/leaderOrg'
 import { LEAVE_STATUS_COLOR, LEAVE_TYPE_COLOR } from '../../config/leave'
 import {
+  REWARDING_AMOUNT_MAX_YUAN,
+  REWARDING_AMOUNT_MIN_YUAN,
+  REWARDING_AMOUNT_STEP_YUAN,
+  REWARDING_PROJECT_MAX_LENGTH,
+} from '../../config/rewarding'
+import {
   VIOLATION_CATEGORY_MAX_LENGTH,
   VIOLATION_DESC_MAX_LENGTH,
   VIOLATION_LOCATION_MAX_LENGTH,
@@ -117,8 +136,8 @@ import {
 import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
-import { formatCentsAsYuan } from '../../utils/money'
-import UserEditPanel from '../admin/UserEditPanel'
+import { formatCentsAsYuan, yuanToCents } from '../../utils/money'
+import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
 
 /** 成绩编辑表单值 */
 interface ScoreFormValues {
@@ -136,6 +155,32 @@ interface ViolationFormValues {
   location?: string
   occurred_at: Dayjs
   severity: ViolationSeverity
+}
+
+/** 详细信息新增/编辑表单值（user_id 由当前成员固定，不参与用户输入） */
+interface ProfileFormValues {
+  user_id: number
+  id_card: string
+  ethnic: string
+  birth_date: Dayjs
+  class_id: number
+  native_place?: string
+  household_location?: string
+  household_type?: string
+  phone?: string
+  email?: string
+  father_name?: string
+  father_phone?: string
+  father_company?: string
+  mother_name?: string
+  mother_phone?: string
+  mother_company?: string
+}
+
+/** 奖学金及补助新增/编辑表单值（uid 固定为当前成员；金额以「元」输入） */
+interface RewardingFormValues {
+  project: string
+  amount_yuan: number
 }
 
 /** 请假列表项：详情 + 由审批步骤推导的状态 */
@@ -172,8 +217,9 @@ export default function MemberDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 编辑成员信息弹窗（复用 admin/UserEditPanel）：按需加载角色/职位/组织选项
-  const [editOpen, setEditOpen] = useState(false)
+  // 成员信息编辑弹窗（复用 admin/UserEditPanel）：null 表示关闭
+  // 资料 / 系统角色 / 组织任职拆成三个独立入口，一个弹窗只编辑一个部分（每次打开时按区块重新挂载）
+  const [editSection, setEditSection] = useState<EditSection | null>(null)
   const [editRefs, setEditRefs] = useState<{
     roles: RoleInfo[]
     organizations: OrganizationInfo[]
@@ -203,28 +249,31 @@ export default function MemberDetailPage() {
     void loadUser()
   }, [loadUser])
 
-  // 打开编辑弹窗：首次打开时并行拉取角色/职位/组织选项（均走会话缓存），失败仅提示不阻塞
-  const openEdit = useCallback(async () => {
-    setEditOpen(true)
-    if (editRefs) return
-    try {
-      const [roleRes, posRes, orgList] = await Promise.all([
-        queryRoles({ page: 1, page_size: 100 }),
-        queryPositions({ page: 1, page_size: 100 }),
-        listAllOrganizations(),
-      ])
-      setEditRefs({
-        roles: roleRes.data,
-        positions: posRes.data,
-        organizations: orgList,
-      })
-    } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        message.error(extractErrorWithStatus(err))
-        setEditOpen(false)
+  // 打开指定区块的编辑弹窗：首次打开时并行拉取角色/职位/组织选项（均走会话缓存），失败仅提示不阻塞
+  const openEdit = useCallback(
+    async (section: EditSection) => {
+      setEditSection(section)
+      if (editRefs) return
+      try {
+        const [roleRes, posRes, orgList] = await Promise.all([
+          queryRoles({ page: 1, page_size: 100 }),
+          queryPositions({ page: 1, page_size: 100 }),
+          listAllOrganizations(),
+        ])
+        setEditRefs({
+          roles: roleRes.data,
+          positions: posRes.data,
+          organizations: orgList,
+        })
+      } catch (err) {
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+          message.error(extractErrorWithStatus(err))
+          setEditSection(null)
+        }
       }
-    }
-  }, [editRefs, message])
+    },
+    [editRefs, message],
+  )
 
   const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey}`)
 
@@ -278,14 +327,16 @@ export default function MemberDetailPage() {
                     locale={locale}
                     t={t}
                     canEdit={canEditBasic}
-                    onEdit={() => void openEdit()}
+                    onEdit={(section) => void openEdit(section)}
                   />
                 ),
               },
               {
                 key: 'profile',
                 label: t('memberDetail.tabProfile'),
-                children: <ProfileDetailTab uid={userId} locale={locale} t={t} />,
+                children: (
+                  <ProfileDetailTab uid={userId} locale={locale} t={t} readOnly={readOnly} />
+                ),
               },
               {
                 key: 'grades',
@@ -305,20 +356,29 @@ export default function MemberDetailPage() {
               {
                 key: 'rewarding',
                 label: t('memberDetail.tabRewarding'),
-                children: <RewardingTab uid={userId} t={t} locale={locale} />,
+                children: (
+                  <RewardingTab uid={userId} t={t} locale={locale} readOnly={readOnly} />
+                ),
               },
             ]}
           />
         )}
       </div>
 
-      {/* 编辑成员信息（仅管理端 / 党委学校端等具备用户管理权限的来源）：复用 admin/UserEditPanel */}
+      {/* 成员信息编辑（仅管理端 / 党委学校端等具备用户管理权限的来源）：复用 admin/UserEditPanel，
+          资料 / 系统角色 / 组织任职三个区块各自独立入口，一个弹窗只编辑一个部分 */}
       <Modal
-        open={editOpen}
-        title={t('memberDetail.editBasicTitle', { name: user?.name ?? `#${userId}` })}
-        width={760}
+        open={editSection !== null}
+        title={
+          editSection === 'profile'
+            ? t('memberDetail.editBasicTitle', { name: user?.name ?? `#${userId}` })
+            : editSection === 'roles'
+              ? t('memberDetail.editRolesTitle', { name: user?.name ?? `#${userId}` })
+              : t('memberDetail.editOrgsTitle', { name: user?.name ?? `#${userId}` })
+        }
+        width={editSection === 'roles' ? 560 : 720}
         footer={null}
-        onCancel={() => setEditOpen(false)}
+        onCancel={() => setEditSection(null)}
         destroyOnHidden
       >
         {editRefs ? (
@@ -327,7 +387,8 @@ export default function MemberDetailPage() {
             roles={editRefs.roles}
             organizations={editRefs.organizations}
             positions={editRefs.positions}
-            // 资料保存后刷新页面上的基本信息（弹窗保持打开，便于继续改角色/任职）
+            section={editSection ?? undefined}
+            // 任一区块保存后刷新页面上的基本信息与（基本信息面板内的）角色/组织任职展示
             onChanged={() => void loadUser()}
           />
         ) : (
@@ -353,10 +414,10 @@ function BasicInfoPanel({
   genderLabel: string
   locale: 'zh' | 'en'
   t: TranslateFn
-  /** 是否展示「编辑成员信息」入口（管理端 / 党委学校端等来源为 true） */
+  /** 是否展示编辑入口（管理端 / 党委学校端等来源为 true） */
   canEdit: boolean
-  /** 打开编辑弹窗（复用 admin/UserEditPanel） */
-  onEdit: () => void
+  /** 打开指定区块的编辑弹窗（复用 admin/UserEditPanel；一次只编辑一个部分） */
+  onEdit: (section: EditSection) => void
 }) {
   const [roles, setRoles] = useState<RoleInfo[]>([])
   const [orgs, setOrgs] = useState<OrgItem[]>([])
@@ -412,11 +473,12 @@ function BasicInfoPanel({
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      {/* 具备用户管理权限的来源（管理端 / 党委学校端）提供成员信息编辑入口 */}
+      {/* 具备用户管理权限的来源（管理端 / 党委学校端）提供三个独立编辑入口：
+          基本信息（资料表格上方，资料本身无独立卡片标题）、系统角色与组织任职（各自卡片右上角） */}
       {canEdit && (
-        <div className="approval-toolbar">
+        <div className="approval-toolbar approval-toolbar-right">
           <Tooltip title={t('memberDetail.editBasicHint')}>
-            <Button type="primary" icon={<EditOutlined />} onClick={onEdit}>
+            <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit('profile')}>
               {t('memberDetail.editBasic')}
             </Button>
           </Tooltip>
@@ -450,7 +512,7 @@ function BasicInfoPanel({
         ]}
       />
 
-      {/* 系统角色 */}
+      {/* 系统角色（编辑入口置于卡片右上角） */}
       <Card
         size="small"
         title={
@@ -458,6 +520,20 @@ function BasicInfoPanel({
             <TeamOutlined />
             {t('profile.rolesTitle')}
           </Space>
+        }
+        extra={
+          canEdit ? (
+            <Tooltip title={t('memberDetail.editRolesHint')}>
+              <Button
+                type="primary"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => onEdit('roles')}
+              >
+                {t('memberDetail.editRoles')}
+              </Button>
+            </Tooltip>
+          ) : undefined
         }
       >
         {extrasError ? (
@@ -482,7 +558,7 @@ function BasicInfoPanel({
         )}
       </Card>
 
-      {/* 组织任职（组织 + 职位 + 工作地点） */}
+      {/* 组织任职（组织 + 职位 + 工作地点；编辑入口置于卡片右上角） */}
       <Card
         size="small"
         title={
@@ -490,6 +566,20 @@ function BasicInfoPanel({
             <BankOutlined />
             {t('profile.orgsTitle')}
           </Space>
+        }
+        extra={
+          canEdit ? (
+            <Tooltip title={t('memberDetail.editOrgsHint')}>
+              <Button
+                type="primary"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => onEdit('organizations')}
+              >
+                {t('memberDetail.editOrgs')}
+              </Button>
+            </Tooltip>
+          ) : undefined
         }
       >
         {extrasError ? (
@@ -546,25 +636,42 @@ function BasicInfoPanel({
   )
 }
 
-/** 详细信息面板：读取 /api/profile-details 中该用户的档案详情 */
+/**
+ * 详细信息面板：读取 /api/profile-details 中该用户的档案详情。
+ * 非只读来源（管理端 / 党委学校端）支持新增（无档案时）、编辑与删除档案；
+ * readOnly=true（如老师端班级管理进入）时隐藏以上入口，仅作查询。
+ */
 function ProfileDetailTab({
   uid,
   locale,
   t,
+  readOnly,
 }: {
   uid: number
   locale: 'zh' | 'en'
   t: TranslateFn
+  readOnly: boolean
 }) {
+  const { message } = AntdApp.useApp()
   const [profile, setProfile] = useState<ProfileDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reload, setReload] = useState({ seq: 0, force: false })
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<ProfileDetail | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [form] = Form.useForm<ProfileFormValues>()
 
   const loadProfile = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await queryProfileDetails({ user_id: uid, page: 1, page_size: 20 })
+      const res = await queryProfileDetails(
+        { user_id: uid, page: 1, page_size: 20 },
+        reload.force,
+      )
       setProfile(res.data[0] ?? null)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
@@ -573,11 +680,105 @@ function ProfileDetailTab({
     } finally {
       setLoading(false)
     }
-  }, [uid])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, reload.seq, reload.force])
 
   useEffect(() => {
     void loadProfile()
   }, [loadProfile])
+
+  /** 打开「新增」弹窗：user_id 固定为当前成员 */
+  const openCreate = useCallback(() => {
+    setEditing(null)
+    form.resetFields()
+    form.setFieldsValue({ user_id: uid })
+    setModalOpen(true)
+  }, [form, uid])
+
+  /** 打开「编辑」弹窗：回填已有档案 */
+  const openEdit = useCallback(
+    (record: ProfileDetail) => {
+      setEditing(record)
+      form.setFieldsValue({
+        user_id: record.user_id,
+        id_card: record.id_card,
+        ethnic: record.ethnic,
+        birth_date: dayjs(record.birth_date),
+        class_id: record.class_id,
+        native_place: record.native_place ?? undefined,
+        household_location: record.household_location ?? undefined,
+        household_type: record.household_type ?? undefined,
+        phone: record.phone ?? undefined,
+        email: record.email ?? undefined,
+        father_name: record.father_name ?? undefined,
+        father_phone: record.father_phone ?? undefined,
+        father_company: record.father_company ?? undefined,
+        mother_name: record.mother_name ?? undefined,
+        mother_phone: record.mother_phone ?? undefined,
+        mother_company: record.mother_company ?? undefined,
+      })
+      setModalOpen(true)
+    },
+    [form],
+  )
+
+  /** 由表单值构造请求体（可选字段空串统一转 null） */
+  const buildBody = (values: ProfileFormValues) => ({
+    id_card: values.id_card.trim(),
+    ethnic: values.ethnic.trim(),
+    birth_date: values.birth_date.format('YYYY-MM-DD'),
+    class_id: values.class_id,
+    native_place: values.native_place?.trim() || null,
+    household_location: values.household_location?.trim() || null,
+    household_type: values.household_type?.trim() || null,
+    phone: values.phone?.trim() || null,
+    email: values.email?.trim() || null,
+    father_name: values.father_name?.trim() || null,
+    father_phone: values.father_phone?.trim() || null,
+    father_company: values.father_company?.trim() || null,
+    mother_name: values.mother_name?.trim() || null,
+    mother_phone: values.mother_phone?.trim() || null,
+    mother_company: values.mother_company?.trim() || null,
+  })
+
+  /** 提交：新增 → POST；编辑 → PATCH（user_id 不可变，更新时不带） */
+  const submit = async () => {
+    const values = await form.validateFields()
+    setSaving(true)
+    try {
+      const body = buildBody(values)
+      if (editing) {
+        await updateProfileDetail(editing.id, body)
+        message.success(t('memberDetail.profileUpdateSuccess'))
+      } else {
+        await createProfileDetail({ user_id: uid, ...body })
+        message.success(t('memberDetail.profileCreateSuccess'))
+      }
+      setModalOpen(false)
+      // 保存后强制刷新，展示最新档案
+      setReload((r) => ({ seq: r.seq + 1, force: true }))
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error(extractErrorWithStatus(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** 删除档案：成功后强制刷新（无档案则回到「新增」入口） */
+  const doDelete = async () => {
+    if (!profile) return
+    setDeleting(true)
+    try {
+      await deleteProfileDetail(profile.id)
+      message.success(t('memberDetail.profileDeleteSuccess'))
+      setReload((r) => ({ seq: r.seq + 1, force: true }))
+    } catch (err) {
+      message.error(extractErrorWithStatus(err))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (loading) return <Skeleton active paragraph={{ rows: 8 }} />
 
@@ -597,95 +798,223 @@ function ProfileDetailTab({
     )
   }
 
-  if (!profile) {
-    return <Alert type="info" showIcon title={t('memberDetail.profileEmpty')} />
-  }
-
   return (
-    <Descriptions
-      bordered
-      size="small"
-      column={2}
-      items={[
-        { key: 'id_card', label: t('memberDetail.fieldIdCard'), children: profile.id_card },
-        { key: 'ethnic', label: t('memberDetail.fieldEthnic'), children: profile.ethnic },
-        {
-          key: 'birth_date',
-          label: t('memberDetail.fieldBirthDate'),
-          children: profile.birth_date,
-        },
-        {
-          key: 'class_id',
-          label: t('memberDetail.fieldClassId'),
-          children: profile.class_id,
-        },
-        {
-          key: 'native_place',
-          label: t('memberDetail.fieldNativePlace'),
-          children: profile.native_place ?? t('profile.noData'),
-        },
-        {
-          key: 'household_location',
-          label: t('memberDetail.fieldHouseholdLocation'),
-          children: profile.household_location ?? t('profile.noData'),
-        },
-        {
-          key: 'household_type',
-          label: t('memberDetail.fieldHouseholdType'),
-          children: profile.household_type ?? t('profile.noData'),
-        },
-        {
-          key: 'phone',
-          label: t('profile.phone'),
-          children: profile.phone ?? t('profile.noData'),
-        },
-        {
-          key: 'email',
-          label: t('profile.email'),
-          children: profile.email ?? t('profile.noData'),
-        },
-        {
-          key: 'father_name',
-          label: t('memberDetail.fieldFatherName'),
-          children: profile.father_name ?? t('profile.noData'),
-        },
-        {
-          key: 'father_phone',
-          label: t('memberDetail.fieldFatherPhone'),
-          children: profile.father_phone ?? t('profile.noData'),
-        },
-        {
-          key: 'father_company',
-          label: t('memberDetail.fieldFatherCompany'),
-          children: profile.father_company ?? t('profile.noData'),
-        },
-        {
-          key: 'mother_name',
-          label: t('memberDetail.fieldMotherName'),
-          children: profile.mother_name ?? t('profile.noData'),
-        },
-        {
-          key: 'mother_phone',
-          label: t('memberDetail.fieldMotherPhone'),
-          children: profile.mother_phone ?? t('profile.noData'),
-        },
-        {
-          key: 'mother_company',
-          label: t('memberDetail.fieldMotherCompany'),
-          children: profile.mother_company ?? t('profile.noData'),
-        },
-        {
-          key: 'created_at',
-          label: t('memberDetail.fieldProfileCreatedAt'),
-          children: profile.created_at ? formatDateTime(profile.created_at, locale) : t('profile.noData'),
-        },
-        {
-          key: 'updated_at',
-          label: t('memberDetail.fieldProfileUpdatedAt'),
-          children: profile.updated_at ? formatDateTime(profile.updated_at, locale) : t('profile.noData'),
-        },
-      ]}
-    />
+    <>
+      {/* 非只读来源提供入口：有档案 → 编辑 + 删除；无档案 → 新增 */}
+      {!readOnly && (
+        <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+          {profile ? (
+            <>
+              <Tooltip title={t('memberDetail.profileEditHint')}>
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => openEdit(profile)}
+                >
+                  {t('memberDetail.edit')}
+                </Button>
+              </Tooltip>
+              <Popconfirm
+                title={t('memberDetail.profileDeleteConfirm')}
+                okText={t('common.confirm')}
+                cancelText={t('common.cancel')}
+                okButtonProps={{ danger: true, loading: deleting }}
+                onConfirm={() => void doDelete()}
+              >
+                <Tooltip title={t('memberDetail.profileDeleteHint')}>
+                  <Button danger icon={<DeleteOutlined />} loading={deleting}>
+                    {t('memberDetail.delete')}
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+            </>
+          ) : (
+            <Tooltip title={t('memberDetail.profileCreateHint')}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                {t('memberDetail.create')}
+              </Button>
+            </Tooltip>
+          )}
+        </div>
+      )}
+
+      {profile ? (
+        <Descriptions
+          bordered
+          size="small"
+          column={2}
+          items={[
+            { key: 'id_card', label: t('memberDetail.fieldIdCard'), children: profile.id_card },
+            { key: 'ethnic', label: t('memberDetail.fieldEthnic'), children: profile.ethnic },
+            {
+              key: 'birth_date',
+              label: t('memberDetail.fieldBirthDate'),
+              children: profile.birth_date,
+            },
+            {
+              key: 'class_id',
+              label: t('memberDetail.fieldClassId'),
+              children: profile.class_id,
+            },
+            {
+              key: 'native_place',
+              label: t('memberDetail.fieldNativePlace'),
+              children: profile.native_place ?? t('profile.noData'),
+            },
+            {
+              key: 'household_location',
+              label: t('memberDetail.fieldHouseholdLocation'),
+              children: profile.household_location ?? t('profile.noData'),
+            },
+            {
+              key: 'household_type',
+              label: t('memberDetail.fieldHouseholdType'),
+              children: profile.household_type ?? t('profile.noData'),
+            },
+            {
+              key: 'phone',
+              label: t('profile.phone'),
+              children: profile.phone ?? t('profile.noData'),
+            },
+            {
+              key: 'email',
+              label: t('profile.email'),
+              children: profile.email ?? t('profile.noData'),
+            },
+            {
+              key: 'father_name',
+              label: t('memberDetail.fieldFatherName'),
+              children: profile.father_name ?? t('profile.noData'),
+            },
+            {
+              key: 'father_phone',
+              label: t('memberDetail.fieldFatherPhone'),
+              children: profile.father_phone ?? t('profile.noData'),
+            },
+            {
+              key: 'father_company',
+              label: t('memberDetail.fieldFatherCompany'),
+              children: profile.father_company ?? t('profile.noData'),
+            },
+            {
+              key: 'mother_name',
+              label: t('memberDetail.fieldMotherName'),
+              children: profile.mother_name ?? t('profile.noData'),
+            },
+            {
+              key: 'mother_phone',
+              label: t('memberDetail.fieldMotherPhone'),
+              children: profile.mother_phone ?? t('profile.noData'),
+            },
+            {
+              key: 'mother_company',
+              label: t('memberDetail.fieldMotherCompany'),
+              children: profile.mother_company ?? t('profile.noData'),
+            },
+            {
+              key: 'created_at',
+              label: t('memberDetail.fieldProfileCreatedAt'),
+              children: profile.created_at
+                ? formatDateTime(profile.created_at, locale)
+                : t('profile.noData'),
+            },
+            {
+              key: 'updated_at',
+              label: t('memberDetail.fieldProfileUpdatedAt'),
+              children: profile.updated_at
+                ? formatDateTime(profile.updated_at, locale)
+                : t('profile.noData'),
+            },
+          ]}
+        />
+      ) : (
+        <Alert type="info" showIcon title={t('memberDetail.profileEmpty')} />
+      )}
+
+      {/* 新增 / 编辑共用弹窗：字段覆盖 /api/profile-details 允许修改的全部字段 */}
+      <Modal
+        open={modalOpen}
+        title={
+          editing ? t('memberDetail.profileEditTitle') : t('memberDetail.profileCreateTitle')
+        }
+        okText={t('memberDetail.save')}
+        cancelText={t('approval.cancel')}
+        confirmLoading={saving}
+        onCancel={() => setModalOpen(false)}
+        onOk={() => void submit()}
+        destroyOnHidden
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
+          {/* user_id 固定为当前成员，隐藏保存 */}
+          <Form.Item name="user_id" hidden>
+            <Input />
+          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 16 }}>
+            <Form.Item
+              name="id_card"
+              label={t('memberDetail.fieldIdCard')}
+              rules={[{ required: true, message: t('memberDetail.fieldRequired') }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="ethnic"
+              label={t('memberDetail.fieldEthnic')}
+              rules={[{ required: true, message: t('memberDetail.fieldRequired') }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="birth_date"
+              label={t('memberDetail.fieldBirthDate')}
+              rules={[{ required: true, message: t('memberDetail.fieldRequired') }]}
+            >
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              name="class_id"
+              label={t('memberDetail.fieldClassId')}
+              rules={[{ required: true, message: t('memberDetail.fieldRequired') }]}
+            >
+              <InputNumber style={{ width: '100%' }} precision={0} min={0} />
+            </Form.Item>
+            <Form.Item name="native_place" label={t('memberDetail.fieldNativePlace')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="household_location" label={t('memberDetail.fieldHouseholdLocation')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="household_type" label={t('memberDetail.fieldHouseholdType')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="phone" label={t('profile.phone')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="email" label={t('profile.email')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="father_name" label={t('memberDetail.fieldFatherName')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="father_phone" label={t('memberDetail.fieldFatherPhone')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="father_company" label={t('memberDetail.fieldFatherCompany')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="mother_name" label={t('memberDetail.fieldMotherName')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="mother_phone" label={t('memberDetail.fieldMotherPhone')}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="mother_company" label={t('memberDetail.fieldMotherCompany')}>
+              <Input />
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
+    </>
   )
 }
 
@@ -863,7 +1192,7 @@ function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly
 
   return (
     <>
-      <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
         <Tooltip title={t('memberDetail.gradesRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}
@@ -1086,7 +1415,7 @@ function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
 
   return (
     <>
-      <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
         <Tooltip title={t('memberDetail.refreshHint')}>
           <Button icon={<ReloadOutlined />} onClick={() => setReloadSeq((s) => s + 1)}>
             {t('common.refresh')}
@@ -1195,8 +1524,23 @@ function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
   )
 }
 
-/** 奖学金及补助 Tab：分页展示该成员的奖学金/补助记录，点击行查看详情（只读） */
-function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale: 'zh' | 'en' }) {
+/**
+ * 奖学金及补助 Tab：分页展示该成员的奖学金/补助记录，点击行查看详情。
+ * 非只读来源（管理端 / 党委学校端）支持新增、编辑（金额以元输入、提交转分）与删除；
+ * readOnly=true（如老师端班级管理进入）时隐藏以上入口，仅作查询。
+ */
+function RewardingTab({
+  uid,
+  t,
+  locale,
+  readOnly,
+}: {
+  uid: number
+  t: TranslateFn
+  locale: 'zh' | 'en'
+  readOnly: boolean
+}) {
+  const { message } = AntdApp.useApp()
   const [rows, setRows] = useState<RewardingDto[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -1204,6 +1548,12 @@ function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale:
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState({ seq: 0, force: false })
   const [detail, setDetail] = useState<RewardingDto | null>(null)
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<RewardingDto | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [form] = Form.useForm<RewardingFormValues>()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1228,8 +1578,73 @@ function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale:
     void load()
   }, [load])
 
-  const columns = useMemo<ColumnsType<RewardingDto>>(
-    () => [
+  /** 打开「新增」弹窗：uid 固定为当前成员 */
+  const openCreate = useCallback(() => {
+    setEditing(null)
+    form.resetFields()
+    setModalOpen(true)
+  }, [form])
+
+  /** 打开「编辑」弹窗：回填项目名称与金额（分 → 元） */
+  const openEdit = useCallback(
+    (record: RewardingDto) => {
+      setEditing(record)
+      form.setFieldsValue({
+        project: record.project,
+        amount_yuan: record.amount_cents / 100,
+      })
+      setModalOpen(true)
+    },
+    [form],
+  )
+
+  /** 提交：新增 → POST；编辑 → PATCH（金额「元」转换为后端「分」） */
+  const submit = async () => {
+    const values = await form.validateFields()
+    setSaving(true)
+    try {
+      const payload = {
+        uid,
+        project: values.project.trim(),
+        amount_cents: yuanToCents(values.amount_yuan),
+      }
+      if (editing) {
+        await updateRewarding(editing.id, payload)
+        message.success(t('rewarding.updateSuccess'))
+      } else {
+        await createRewarding(payload)
+        message.success(t('rewarding.createSuccess'))
+      }
+      setModalOpen(false)
+      // 保存后强制刷新，展示最新记录
+      setReload((r) => ({ seq: r.seq + 1, force: true }))
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      message.error(extractErrorWithStatus(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** 删除记录：成功后强制刷新 */
+  const doDelete = useCallback(
+    async (id: number) => {
+      setDeletingId(id)
+      try {
+        await deleteRewarding(id)
+        message.success(t('rewarding.deleteSuccess'))
+        setReload((r) => ({ seq: r.seq + 1, force: true }))
+      } catch (err) {
+        message.error(extractErrorWithStatus(err))
+      } finally {
+        setDeletingId(null)
+      }
+    },
+    [message, t],
+  )
+
+  const columns = useMemo<ColumnsType<RewardingDto>>(() => {
+    const cols: ColumnsType<RewardingDto> = [
       {
         title: t('rewarding.colProject'),
         dataIndex: 'project',
@@ -1252,13 +1667,54 @@ function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale:
         width: 190,
         render: (v: string) => formatDateTime(v, locale),
       },
-    ],
-    [t, locale],
-  )
+    ]
+    // 只读来源（老师端班级管理）不展示编辑/删除入口
+    if (!readOnly) {
+      cols.push({
+        title: t('approval.colAction'),
+        key: 'action',
+        width: 170,
+        render: (_: unknown, record: RewardingDto) => (
+          <div className="approval-actions">
+            <Tooltip title={t('memberDetail.rewardingEditHint')}>
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEdit(record)}
+              >
+                {t('rewarding.edit')}
+              </Button>
+            </Tooltip>
+            <Popconfirm
+              title={t('rewarding.deleteConfirm')}
+              okText={t('common.confirm')}
+              cancelText={t('common.cancel')}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
+              onConfirm={() => void doDelete(record.id)}
+            >
+              <Tooltip title={t('memberDetail.rewardingDeleteHint')}>
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  loading={deletingId === record.id}
+                >
+                  {t('rewarding.delete')}
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          </div>
+        ),
+      })
+    }
+    return cols
+  }, [t, locale, openEdit, readOnly, deletingId, doDelete])
 
   return (
     <>
-      <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
         <Tooltip title={t('memberDetail.rewardingRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}
@@ -1267,6 +1723,14 @@ function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale:
             {t('common.refresh')}
           </Button>
         </Tooltip>
+        {/* 非只读来源提供新增入口 */}
+        {!readOnly && (
+          <Tooltip title={t('memberDetail.rewardingCreateHint')}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              {t('rewarding.createTitle')}
+            </Button>
+          </Tooltip>
+        )}
       </div>
 
       {error ? (
@@ -1291,9 +1755,14 @@ function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale:
           columns={columns}
           dataSource={rows}
           locale={{ emptyText: t('common.noData') }}
-          scroll={{ x: 720 }}
+          scroll={{ x: 890 }}
           onRow={(record) => ({
-            onClick: () => setDetail(record),
+            onClick: (e: React.MouseEvent) => {
+              const target = e.target as HTMLElement
+              // 点击操作按钮或气泡确认框时不触发行详情
+              if (target.closest('button') || target.closest('.ant-popover')) return
+              setDetail(record)
+            },
             title: t('memberDetail.rewardingRowClickHint'),
             style: { cursor: 'pointer' },
           })}
@@ -1342,6 +1811,43 @@ function RewardingTab({ uid, t, locale }: { uid: number; t: TranslateFn; locale:
             ]}
           />
         )}
+      </Modal>
+
+      {/* 新增 / 编辑共用弹窗：uid 固定为当前成员，金额以元输入 */}
+      <Modal
+        open={modalOpen}
+        title={editing ? t('rewarding.editTitle') : t('rewarding.createTitle')}
+        okText={t('memberDetail.save')}
+        cancelText={t('approval.cancel')}
+        confirmLoading={saving}
+        onCancel={() => setModalOpen(false)}
+        onOk={() => void submit()}
+        destroyOnHidden
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
+          <Form.Item
+            name="project"
+            label={t('rewarding.fieldProject')}
+            rules={[{ required: true, message: t('rewarding.projectRequired') }]}
+          >
+            <Input maxLength={REWARDING_PROJECT_MAX_LENGTH} showCount />
+          </Form.Item>
+          <Form.Item
+            name="amount_yuan"
+            label={t('rewarding.fieldAmount')}
+            rules={[{ required: true, message: t('rewarding.amountRequired') }]}
+            extra={t('rewarding.amountHint')}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              prefix="¥"
+              step={REWARDING_AMOUNT_STEP_YUAN}
+              precision={2}
+              min={REWARDING_AMOUNT_MIN_YUAN}
+              max={REWARDING_AMOUNT_MAX_YUAN}
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   )
@@ -1506,7 +2012,7 @@ function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readO
 
   return (
     <>
-      <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
         <Tooltip title={t('memberDetail.violationRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}

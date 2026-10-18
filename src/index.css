@@ -946,6 +946,11 @@ h3 {
   gap: 10px;
 }
 
+/* 成员详情页各区块的操作按钮统一右对齐（叠加在 .approval-toolbar 上，不影响其他页面的左对齐工具条） */
+.approval-toolbar-right {
+  justify-content: flex-end;
+}
+
 /* 教师端成绩视图：页头工具条（组织筛选 + 刷新） */
 .student-toolbar {
   display: flex;
@@ -2522,14 +2527,36 @@ h3 {
 }
 
 .branch-todo-item {
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+}
+
+/* 待办项整行可点击（跳转对应模块），内边距放在链接上使 hover 命中整行 */
+.branch-todo-link {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 14px 20px;
-  border-radius: 10px;
-  background: var(--card-bg);
-  border: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 概况卡片可点击态（党员总数卡片跳转支部管理） */
+.branch-overview-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 可点击卡片 hover / 键盘聚焦反馈：提亮边框并加投影，提示可点击 */
+.branch-overview-link:hover,
+.branch-overview-link:focus-visible,
+.branch-todo-item:hover,
+.branch-todo-item:focus-within {
+  border-color: var(--brand-light);
+  box-shadow: 0 4px 14px rgba(47, 84, 235, 0.14);
 }
 
 .branch-todo-label {

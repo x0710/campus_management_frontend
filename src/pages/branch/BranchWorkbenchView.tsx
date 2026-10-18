@@ -1,21 +1,33 @@
-import { Alert } from 'antd'
-import { useT } from '../../i18n'
-
 /**
  * 党委支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
- * 注意：当前为【模拟数据预览页】，后端尚未提供党委支部端相关接口；
- * 接口就绪后把 MOCK_OVERVIEW / MOCK_DISTRIBUTION / MOCK_TODOS 替换为 src/api/ 请求即可。
+ *
+ * 已接入真实接口：
+ *   党员总数（人）  经 composables/useBranchOrg 定位当前用户所属支部 →
+ *                   GET /api/organizations/{id}/members 取分页 total（只需总数，page_size=1）
+ *   待审核申报（条） GET /api/approvals 按 status=waiting / pending 各取一页后合计条数；
+ *                   该接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
+ *
+ * 平均分与等级分布后端暂无对应接口，仍为模拟数据，故本页保留模拟数据提示。
+ *
+ * 卡片跳转：党员总数 → 支部管理（branch_m5），待审核申报 → 审核管理（branch_m3）。
  */
+import { Alert, Button } from 'antd'
+import axios from 'axios'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router'
+import { queryApprovals } from '../../api/approvals'
+import { extractErrorReason } from '../../api/common'
+import { queryOrgMembers } from '../../api/organizations'
+import { resolveBranchOrg } from '../../composables/useBranchOrg'
+import { useT } from '../../i18n'
 
-/** 本支部概况（模拟数据） */
-const MOCK_OVERVIEW = {
-  /** 党员总数（人） */
-  members: 128,
-  /** 平均分（分） */
-  avgScore: 82.4,
-}
+/** 待审核申报统计单页条数：GET /api/approvals 无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
+const APPROVAL_TODO_PAGE_SIZE = 100
 
-/** 等级分布（模拟数据），各等级人数合计与党员总数保持一致 */
+/** 平均分（模拟数据，后端暂无接口） */
+const MOCK_AVG_SCORE = 82.4
+
+/** 等级分布（模拟数据，后端暂无接口；各等级人数合计与党员总数保持一致） */
 const MOCK_DISTRIBUTION: { key: string; tone: string; count: number }[] = [
   { key: 'branch.grade_pioneer', tone: 'pioneer', count: 32 },
   { key: 'branch.grade_demonstration', tone: 'demonstration', count: 58 },
@@ -23,21 +35,73 @@ const MOCK_DISTRIBUTION: { key: string; tone: string; count: number }[] = [
   { key: 'branch.grade_warning', tone: 'warning', count: 12 },
 ]
 
-/** 待办事项（模拟数据） */
-const MOCK_TODOS: { id: string; labelKey: string; count: number; unitKey: string }[] = [
-  { id: 'approve', labelKey: 'branch.todo_approve', count: 5, unitKey: 'branch.todoUnitItems' },
-  { id: 'deduct', labelKey: 'branch.todo_deduct', count: 1, unitKey: 'branch.todoUnitItems' },
-  { id: 'rectify', labelKey: 'branch.todo_rectify', count: 2, unitKey: 'branch.todoUnitPeople' },
-]
-
 export default function BranchWorkbenchView() {
   const t = useT()
+  const { portalKey } = useParams<{ portalKey: string }>()
+
+  /** 本支部党员总数（人）；null 表示未取到（加载中或加载失败） */
+  const [members, setMembers] = useState<number | null>(null)
+  /** 待审核申报条数（waiting + pending） */
+  const [todoApprove, setTodoApprove] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // 注意：load 内不得在首个 await 之前 setState，否则会触发 react(set-state-in-effect) 告警
+  const load = useCallback(async () => {
+    try {
+      const { branchId } = await resolveBranchOrg()
+      const [memberPage, waitingSteps, pendingSteps] = await Promise.all([
+        branchId === null
+          ? Promise.resolve(null)
+          : queryOrgMembers(branchId, { page: 1, page_size: 1 }),
+        queryApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
+        queryApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
+      ])
+      setMembers(memberPage?.total ?? 0)
+      setTodoApprove(waitingSteps.length + pendingSteps.length)
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，此处不重复提示
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        setError(extractErrorReason(err, t))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  /** 重新加载（事件回调内可安全重置加载态） */
+  const retry = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    void load()
+  }, [load])
+
   // 横向柱状图以最高人数为满长基准
   const maxCount = Math.max(...MOCK_DISTRIBUTION.map((item) => item.count))
+  /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
+  const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
 
   return (
     <div className="party-view">
-      <Alert type="warning" showIcon title={t('common.mockHint')} />
+      {error ? (
+        <Alert
+          type="error"
+          showIcon
+          title={t('common.loadFailed')}
+          description={error}
+          action={
+            <Button size="small" onClick={retry}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      ) : (
+        <Alert type="warning" showIcon title={t('branch.mockHint')} />
+      )}
 
       {/* 本支部概况 */}
       <section className="panel-card">
@@ -46,17 +110,21 @@ export default function BranchWorkbenchView() {
         </header>
         <div className="panel-card-body">
           <div className="branch-overview">
-            <div className="branch-overview-item">
+            {/* 党员总数 → 支部管理（查看本支部及下级组织成员） */}
+            <Link
+              className="branch-overview-item branch-overview-link"
+              to={`/portal/${portalKey}/branch_m5`}
+            >
               <div className="branch-overview-label">{t('branch.statMembers')}</div>
               <div className="branch-overview-value">
-                {MOCK_OVERVIEW.members}
+                {statText(members)}
                 <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
               </div>
-            </div>
+            </Link>
             <div className="branch-overview-item">
               <div className="branch-overview-label">{t('branch.statAvgScore')}</div>
               <div className="branch-overview-value">
-                {MOCK_OVERVIEW.avgScore}
+                {MOCK_AVG_SCORE}
                 <span className="branch-overview-unit">{t('party.scoreUnit')}</span>
               </div>
             </div>
@@ -87,22 +155,23 @@ export default function BranchWorkbenchView() {
         </div>
       </section>
 
-      {/* 待办事项 */}
+      {/* 待办事项（待审核申报：GET /api/approvals 我的待办中 waiting + pending 条数） */}
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('branch.todoTitle')}</h3>
         </header>
         <div className="panel-card-body">
           <ul className="branch-todo-list">
-            {MOCK_TODOS.map((todo) => (
-              <li key={todo.id} className="branch-todo-item">
-                <span className="branch-todo-label">{t(todo.labelKey)}</span>
+            {/* 待审核申报 → 审核管理（处理待办审批） */}
+            <li className="branch-todo-item">
+              <Link className="branch-todo-link" to={`/portal/${portalKey}/branch_m3`}>
+                <span className="branch-todo-label">{t('branch.todo_approve')}</span>
                 <span className="branch-todo-count">
-                  {todo.count}
-                  <span className="branch-todo-unit">{t(todo.unitKey)}</span>
+                  {statText(todoApprove)}
+                  <span className="branch-todo-unit">{t('branch.todoUnitItems')}</span>
                 </span>
-              </li>
-            ))}
+              </Link>
+            </li>
           </ul>
         </div>
       </section>

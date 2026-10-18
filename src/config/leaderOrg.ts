@@ -28,7 +28,8 @@ export const MEMBER_DETAIL_READONLY_FROM_MODULES: string[] = [
  * 成员详情页「基本信息」可编辑的来源模块 key：
  * 管理端组织架构（admin_m3）与党委学校端组织管理（school_m2）具备用户资料、
  * 角色与组织任职的修改权限，从这些来源进入成员详情时在「基本信息」页展示
- * 「编辑成员信息」入口（复用 admin/UserEditPanel）；
+ * 「编辑基本信息 / 编辑系统角色 / 编辑组织任职」三个独立入口（复用 admin/UserEditPanel，
+ * 每个入口只编辑一个区块）；
  * 领导端 leader_m3 等只查看的来源不展示，避免出现越权的操作按钮。
  */
 export const MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES: string[] = [
