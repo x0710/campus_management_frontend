@@ -9,7 +9,6 @@
  */
 import { EditOutlined } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   Descriptions,
@@ -22,10 +21,11 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createCourse, getCourse, updateCourse } from '../api/courses'
 import type { CourseDetail, CourseType } from '../api/types/courses'
-import { extractError } from '../api/common'
+import { extractErrorReason } from '../api/common'
+import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
   COURSE_CODE_MAX_LENGTH,
   COURSE_CREDIT_MAX,
@@ -39,6 +39,7 @@ import {
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
+import ErrorState from './ErrorState'
 
 /** 弹窗模式：新增 / 编辑 / 只读查看 */
 export type CourseFormMode = 'create' | 'edit' | 'view'
@@ -86,18 +87,7 @@ export default function CourseFormModal({
   const isEdit = mode === 'edit'
 
   /** 错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
-  const showError = useCallback(
-    (code: string) => {
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   // 打开时初始化：新增用默认空值，编辑/查看拉取详情（走缓存）后回填
   useEffect(() => {
@@ -129,7 +119,7 @@ export default function CourseFormModal({
         })
       } catch (err) {
         if (cancelled) return
-        setLoadError(extractError(err))
+        setLoadError(extractErrorReason(err, t))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -138,7 +128,7 @@ export default function CourseFormModal({
     return () => {
       cancelled = true
     }
-  }, [open, mode, courseId, form])
+  }, [open, mode, courseId, form, t])
 
   /** 提交：新增 → POST；编辑 → PATCH */
   const submit = async () => {
@@ -161,7 +151,7 @@ export default function CourseFormModal({
       }
       onSaved()
     } catch (err) {
-      showError(extractError(err))
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -209,11 +199,7 @@ export default function CourseFormModal({
       destroyOnHidden
     >
       {loadError ? (
-        <Alert
-          type="error"
-          showIcon
-          title={loadError === 'network' ? t('common.networkError') : loadError}
-        />
+        <ErrorState message={loadError} />
       ) : loading ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : readOnly ? (

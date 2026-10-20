@@ -20,7 +20,7 @@ import {
 } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   createEvent,
   deleteEvent,
@@ -31,9 +31,9 @@ import type {
   CalendarEventDetail,
   EventType,
 } from '../../api/types/calendars'
-import { extractError } from '../../api/common'
 import CalendarBoard from '../../components/CalendarBoard'
 import { useCalendarEvents } from '../../composables/useCalendarEvents'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { CALENDAR_EVENT_TYPES } from '../../config/calendar'
 import { useT } from '../../i18n'
 
@@ -75,25 +75,13 @@ export default function CalendarManageView() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [form] = Form.useForm<EventFormValues>()
 
-  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = typeof err === 'string' ? err : extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
+  const reportError = useErrorFeedback()
 
   // 详情拉取失败（如 404）弹窗提示状态码
   useEffect(() => {
-    if (dayDetailsError) showError(dayDetailsError)
-  }, [dayDetailsError, showError])
+    if (dayDetailsError) reportError(dayDetailsError)
+  }, [dayDetailsError, reportError])
 
   /** 打开新增弹窗：起止日期默认取当前选中日期（默认值，非业务数据） */
   const openCreate = () => {
@@ -106,7 +94,7 @@ export default function CalendarManageView() {
       const full = await getEvent(event.id, true)
       setFormModal({ mode: 'edit', event: full })
     } catch (err) {
-      showError(err)
+      reportError(err)
     }
   }
 
@@ -155,7 +143,7 @@ export default function CalendarManageView() {
       setFormModal(null)
       await reload(true)
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -169,7 +157,7 @@ export default function CalendarManageView() {
       message.success(t('calendar.deleteSuccess'))
       await reload(true)
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setDeletingId(null)
     }

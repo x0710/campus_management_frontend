@@ -14,8 +14,30 @@
 export const BRANCH_ANCESTOR_DEPTHS: readonly number[] = [3, 4]
 
 /**
+ * 学院（二级党委）判定：组织树祖先深度为 1 时视为学院层级党委。
+ *
+ * 依据：井冈山大学 → 学院党委（2 项），祖先深度 = 链条数 - 1 = 1。
+ * 供党委学院端工作台定位当前用户所属「学院」组织并统计其党员人数。
+ */
+export const ACADEMY_ANCESTOR_DEPTHS: readonly number[] = [1]
+
+/**
+ * 学校（顶级组织）判定：组织树祖先深度为 0，即组织树的根节点（如「井冈山大学」）。
+ *
+ * 供党委学校端总览定位「学校」组织并统计其党员人数。
+ */
+export const SCHOOL_ANCESTOR_DEPTHS: readonly number[] = [0]
+
+/**
  * 组织成员「按用户 ID 搜索」定位时，最多向后扫描的成员分页页数。
  * 目标成员不在第 1 页时会按页扫描以跳到其所在页；设上限避免超大组织搜索时请求过多
  * （每页固定取 100 行，满足代码要求 12；扫描走会话缓存，重复搜索不再发起请求）。
  */
 export const MEMBER_SEARCH_MAX_PAGES = 10
+
+/**
+ * 组织成员「按姓名搜索」时 GET /api/users?keyword= 的候选上限。
+ * 同名可能对应多个用户，需逐个解析其任职组织以筛出落在当前组织范围内者（首个命中即止）；
+ * 设上限避免同名过多时请求过多（解析走会话缓存，重复搜索不再发起请求）。
+ */
+export const MEMBER_NAME_SEARCH_LIMIT = 20

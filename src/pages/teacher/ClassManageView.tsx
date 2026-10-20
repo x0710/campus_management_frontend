@@ -52,11 +52,10 @@ export default function ClassManageView() {
   }, [loadOrgs])
 
   return (
-    <>
+    <div className="org-explorer-page">
       <Alert
         type="info"
         showIcon
-        style={{ marginBottom: 12 }}
         title={t('teacherClass.scopeHint')}
       />
       <OrgMembersExplorer
@@ -68,6 +67,6 @@ export default function ClassManageView() {
         fromModuleKey="teacher_m3"
         autoSelectFirst
       />
-    </>
+    </div>
   )
 }

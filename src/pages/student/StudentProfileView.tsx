@@ -6,9 +6,10 @@ import {
   SolutionOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Card, Descriptions, Skeleton, Space, Tag, Typography } from 'antd'
+import { Button, Card, Descriptions, Skeleton, Space, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import ErrorState from '../../components/ErrorState'
 import UserProfileEditModal from '../../components/UserProfileEditModal'
 import { getCurrentUser } from '../../api/auth'
 import { getRole, queryUserRoleRelations } from '../../api/rbac'
@@ -19,6 +20,7 @@ import { getPosition } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getUser } from '../../api/users'
 import type { Gender, UserDetail } from '../../api/types/users'
+import { extractErrorReason } from '../../api/common'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
@@ -46,7 +48,7 @@ export default function StudentProfileView() {
   const [orgs, setOrgs] = useState<OrgItem[]>([])
 
   const [loading, setLoading] = useState(true)
-  // 错误信息保留后端状态码，便于调试（如 "403 Forbidden"、"404 Not Found"）
+  // 错误文案：extractErrorReason 生成的「状态码 + 中文原因」完整提示
   const [error, setError] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
 
@@ -71,8 +73,6 @@ export default function StudentProfileView() {
             const role = await getRole(rel.role_id)
             return role
           } catch (err) {
-            const ax = axios.isAxiosError(err) ? err : undefined
-            const code = ax?.response?.status
             return {
               id: rel.role_id,
               code: '',
@@ -80,7 +80,7 @@ export default function StudentProfileView() {
               description: '',
               created_at: '',
               updated_at: '',
-              loadError: code ? `${code} ${ax?.response?.statusText ?? 'Error'}` : 'Error',
+              loadError: extractErrorReason(err, t),
             } as RoleItem
           }
         }),
@@ -94,11 +94,7 @@ export default function StudentProfileView() {
           try {
             item.positionDetail = await getPosition(uo.position)
           } catch (err) {
-            const ax = axios.isAxiosError(err) ? err : undefined
-            const code = ax?.response?.status
-            item.positionError = code
-              ? `${code} ${ax?.response?.statusText ?? 'Error'}`
-              : 'Error'
+            item.positionError = extractErrorReason(err, t)
           }
           return item
         }),
@@ -108,12 +104,8 @@ export default function StudentProfileView() {
       setRoles(roleItems)
       setOrgs(orgItems)
     } catch (err) {
-      const ax = axios.isAxiosError(err) ? err : undefined
-      if (ax?.response?.status === 401) return
-      const code = ax?.response?.status
-      setError(
-        code ? `${code} ${ax?.response?.statusText ?? 'Error'}` : t('common.loadFailed'),
-      )
+      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      setError(extractErrorReason(err, t))
     } finally {
       setLoading(false)
     }
@@ -153,7 +145,7 @@ export default function StudentProfileView() {
         {loading ? (
           <Skeleton active paragraph={{ rows: 10 }} />
         ) : error ? (
-          <Alert type="error" showIcon title={error} />
+          <ErrorState message={error} />
         ) : user ? (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
             {/* 基本信息 */}

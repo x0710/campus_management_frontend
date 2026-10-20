@@ -19,8 +19,9 @@ import type {
   CalendarEventInfo,
   EventType,
 } from '../api/types/calendars'
-import { extractError } from '../api/common'
+import { extractErrorReason } from '../api/common'
 import { CALENDAR_LOOKBACK_DAYS, CALENDAR_TRAILING_DAYS } from '../config/calendar'
+import { useT } from '../i18n'
 
 /** 事件类型筛选值：可多选；空数组表示不筛选（全部类型） */
 export type CalendarTypeFilter = EventType[]
@@ -43,6 +44,7 @@ function isAuthError(err: unknown): boolean {
 }
 
 export function useCalendarEvents() {
+  const t = useT()
   /** 选中日期：其所在月份即看板当前展示的月份 */
   const [value, setValue] = useState<Dayjs>(() => dayjs())
   const [typeFilter, setTypeFilter] = useState<CalendarTypeFilter>([])
@@ -95,12 +97,12 @@ export function useCalendarEvents() {
         )
         setRawEvents(list)
       } catch (err) {
-        if (!isAuthError(err)) setError(extractError(err))
+        if (!isAuthError(err)) setError(extractErrorReason(err, t))
       } finally {
         setLoading(false)
       }
     },
-    [monthKey, typeKey],
+    [monthKey, typeKey, t],
   )
 
   // 月份或筛选变化时自动加载（相同条件命中缓存，不重复请求）
@@ -158,7 +160,7 @@ export function useCalendarEvents() {
         } catch (err) {
           return {
             detail: null,
-            error: isAuthError(err) ? null : extractError(err),
+            error: isAuthError(err) ? null : extractErrorReason(err, t),
           }
         }
       }),
@@ -176,7 +178,7 @@ export function useCalendarEvents() {
     return () => {
       cancelled = true
     }
-  }, [dayEvents, dayKey])
+  }, [dayEvents, dayKey, t])
 
   /**
    * 选中日期当天的事件完整详情：

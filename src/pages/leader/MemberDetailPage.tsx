@@ -20,7 +20,7 @@
  * 约定（代码要求）：
  * - 表格每页最多 100 行，支持页码跳转与总数展示（要求 12）；
  * - 点击表格行查看详细信息（要求 14），编辑保存后刷新表格（要求 13）；
- * - 错误提示经 extractErrorWithStatus 附带 HTTP 状态码（要求 9），按钮/选项带悬停提示（要求 10）；
+ * - 错误提示经 extractErrorReason 附带 HTTP 状态码与中文原因（要求 9），按钮/选项带悬停提示（要求 10）；
  * - 常量集中在 config/，文案走 i18n。
  */
 import {
@@ -63,7 +63,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { queryApprovals } from '../../api/approvals'
 import type { ApprovalStepStatus } from '../../api/types/approvals'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import { listAllOrganizations, listUserOrganizations } from '../../api/organizations'
 import type {
   OrganizationInfo,
@@ -107,6 +107,7 @@ import type {
   ViolationSeverity,
 } from '../../api/types/violations'
 import { useCourseDetails } from '../../composables/useCourseNames'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   EXAM_TYPE_COLOR,
   EXAM_TYPE_ORDER,
@@ -137,6 +138,7 @@ import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import { formatCentsAsYuan, yuanToCents } from '../../utils/money'
+import ErrorState from '../../components/ErrorState'
 import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
 
 /** 成绩编辑表单值 */
@@ -200,7 +202,7 @@ const { Text } = Typography
 export default function MemberDetailPage() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
-  const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const { portalKey, uid } = useParams<{ portalKey: string; uid: string }>()
   const [searchParams] = useSearchParams()
@@ -238,7 +240,7 @@ export default function MemberDetailPage() {
       setUser(await getUser(userId))
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
@@ -267,12 +269,12 @@ export default function MemberDetailPage() {
         })
       } catch (err) {
         if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-          message.error(extractErrorWithStatus(err))
+          reportError(err)
           setEditSection(null)
         }
       }
     },
-    [editRefs, message],
+    [editRefs, reportError],
   )
 
   const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey}`)
@@ -303,16 +305,7 @@ export default function MemberDetailPage() {
       </header>
       <div className="panel-card-body">
         {error ? (
-          <Alert
-            type="error"
-            showIcon
-            title={error}
-            action={
-              <Button size="small" onClick={() => void loadUser()}>
-                {t('common.retry')}
-              </Button>
-            }
-          />
+          <ErrorState message={error} onRetry={() => void loadUser()} />
         ) : (
           <Tabs
             items={[
@@ -457,12 +450,12 @@ function BasicInfoPanel({
       setOrgs(orgItems)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setExtrasError(extractErrorWithStatus(err))
+        setExtrasError(extractErrorReason(err, t))
       }
     } finally {
       setExtrasLoading(false)
     }
-  }, [user])
+  }, [user, t])
 
   useEffect(() => {
     void loadExtras()
@@ -537,7 +530,7 @@ function BasicInfoPanel({
         }
       >
         {extrasError ? (
-          <Alert type="error" showIcon title={extrasError} />
+          <ErrorState message={extrasError} />
         ) : extrasLoading ? (
           <Skeleton active paragraph={{ rows: 1 }} />
         ) : roles.length === 0 ? (
@@ -583,7 +576,7 @@ function BasicInfoPanel({
         }
       >
         {extrasError ? (
-          <Alert type="error" showIcon title={extrasError} />
+          <ErrorState message={extrasError} />
         ) : extrasLoading ? (
           <Skeleton active paragraph={{ rows: 2 }} />
         ) : orgs.length === 0 ? (
@@ -653,6 +646,7 @@ function ProfileDetailTab({
   readOnly: boolean
 }) {
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const [profile, setProfile] = useState<ProfileDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -675,7 +669,7 @@ function ProfileDetailTab({
       setProfile(res.data[0] ?? null)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
@@ -759,7 +753,7 @@ function ProfileDetailTab({
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -774,7 +768,7 @@ function ProfileDetailTab({
       message.success(t('memberDetail.profileDeleteSuccess'))
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setDeleting(false)
     }
@@ -784,16 +778,9 @@ function ProfileDetailTab({
 
   if (error) {
     return (
-      <Alert
-        type="error"
-        showIcon
-        title={t('memberDetail.profileLoadFailed')}
-        description={error}
-        action={
-          <Button size="small" onClick={() => void loadProfile()}>
-            {t('common.retry')}
-          </Button>
-        }
+      <ErrorState
+        message={error}
+        onRetry={() => void loadProfile()}
       />
     )
   }
@@ -1024,6 +1011,7 @@ function ProfileDetailTab({
  */
 function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
 
   const [scores, setScores] = useState<CourseScoreInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -1047,7 +1035,7 @@ function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly
       setScores(await listAllScoresForUser(uid, reload.force))
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
@@ -1081,14 +1069,14 @@ function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly
         })
       } catch (err) {
         if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-          message.error(extractErrorWithStatus(err))
+          reportError(err)
         }
         setEditTarget(null)
       } finally {
         setEditLoading(false)
       }
     },
-    [form, message],
+    [form, reportError],
   )
 
   const submit = async () => {
@@ -1108,7 +1096,7 @@ function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -1204,15 +1192,9 @@ function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly
       </div>
 
       {error ? (
-        <Alert
-          type="error"
-          showIcon
-          title={error}
-          action={
-            <Button size="small" onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}>
-              {t('common.retry')}
-            </Button>
-          }
+        <ErrorState
+          message={error}
+          onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
         />
       ) : (
         <Table<CourseScoreInfo>
@@ -1359,12 +1341,12 @@ function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
       setRows(results.filter((r): r is LeaveRow => r !== null))
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
     }
-  }, [uid])
+  }, [uid, t])
 
   useEffect(() => {
     void load()
@@ -1424,15 +1406,9 @@ function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
       </div>
 
       {error ? (
-        <Alert
-          type="error"
-          showIcon
-          title={error}
-          action={
-            <Button size="small" onClick={() => setReloadSeq((s) => s + 1)}>
-              {t('common.retry')}
-            </Button>
-          }
+        <ErrorState
+          message={error}
+          onRetry={() => setReloadSeq((s) => s + 1)}
         />
       ) : (
         <Table<LeaveRow>
@@ -1541,6 +1517,7 @@ function RewardingTab({
   readOnly: boolean
 }) {
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const [rows, setRows] = useState<RewardingDto[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -1567,12 +1544,12 @@ function RewardingTab({
       setTotal(res.total)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
     }
-  }, [uid, page, reload.seq, reload.force])
+  }, [uid, page, reload.seq, reload.force, t])
 
   useEffect(() => {
     void load()
@@ -1620,7 +1597,7 @@ function RewardingTab({
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -1635,12 +1612,12 @@ function RewardingTab({
         message.success(t('rewarding.deleteSuccess'))
         setReload((r) => ({ seq: r.seq + 1, force: true }))
       } catch (err) {
-        message.error(extractErrorWithStatus(err))
+        reportError(err)
       } finally {
         setDeletingId(null)
       }
     },
-    [message, t],
+    [reportError, message, t],
   )
 
   const columns = useMemo<ColumnsType<RewardingDto>>(() => {
@@ -1734,18 +1711,9 @@ function RewardingTab({
       </div>
 
       {error ? (
-        <Alert
-          type="error"
-          showIcon
-          title={error}
-          action={
-            <Button
-              size="small"
-              onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-            >
-              {t('common.retry')}
-            </Button>
-          }
+        <ErrorState
+          message={error}
+          onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
         />
       ) : (
         <Table<RewardingDto>
@@ -1859,6 +1827,7 @@ function RewardingTab({
  */
 function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const locale = useSettingsStore((s) => s.locale)
 
   const [list, setList] = useState<ViolationDto[]>([])
@@ -1886,7 +1855,7 @@ function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readO
       setTotal(res.total)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
@@ -1905,12 +1874,12 @@ function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readO
       setDetail(await getViolation(id, true))
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        message.error(extractErrorWithStatus(err))
+        reportError(err)
       }
     } finally {
       setDetailLoading(false)
     }
-  }, [message])
+  }, [reportError])
 
   /** 打开编辑弹窗（列表项即完整详情，直接回填） */
   const openEdit = useCallback(
@@ -1947,7 +1916,7 @@ function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readO
       setReload((r) => ({ seq: r.seq + 1, force: true }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -2024,15 +1993,9 @@ function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readO
       </div>
 
       {error ? (
-        <Alert
-          type="error"
-          showIcon
-          title={error}
-          action={
-            <Button size="small" onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}>
-              {t('common.retry')}
-            </Button>
-          }
+        <ErrorState
+          message={error}
+          onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
         />
       ) : (
         <Table<ViolationDto>

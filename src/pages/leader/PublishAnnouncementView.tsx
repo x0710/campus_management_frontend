@@ -9,7 +9,7 @@
  * 悬停提示见 Tooltip；错误提示带 HTTP 状态码。
  */
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, App as AntdApp, Button, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
+import { App as AntdApp, Button, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -25,8 +25,10 @@ import type {
   AnnouncementType,
 } from '../../api/types/announcements'
 import { getCurrentUser } from '../../api/auth'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import type { PageQuery } from '../../api/types/common'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   ANNOUNCEMENT_PRIORITY_COLOR,
   ANNOUNCEMENT_STATUS_COLOR,
@@ -47,11 +49,13 @@ export default function PublishAnnouncementView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const { portalKey, moduleKey } = useParams<{ portalKey: string; moduleKey?: string }>()
 
   const [uid, setUid] = useState<number | null>(null)
-  const [uidError, setUidError] = useState(false)
+  /** 当前用户加载失败的完整错误文案（状态码 + 中文原因）；null 表示未失败 */
+  const [uidError, setUidError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<AnnouncementStatus | 'all'>('all')
   const [actingId, setActingId] = useState<number | null>(null)
 
@@ -73,13 +77,13 @@ export default function PublishAnnouncementView() {
       } catch (err) {
         if (cancelled) return
         if (axios.isAxiosError(err) && err.response?.status === 401) return
-        setUidError(true)
+        setUidError(extractErrorReason(err, t))
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t])
 
   // uid / 状态筛选就绪或变化后重新拉列表（走会话缓存，不强制绕过；手动刷新按钮才 force）
   useEffect(() => {
@@ -117,7 +121,7 @@ export default function PublishAnnouncementView() {
       refresh()
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setActingId(null)
     }
@@ -240,21 +244,9 @@ export default function PublishAnnouncementView() {
       </header>
       <div className="panel-card-body">
         {uidError || error ? (
-          <Alert
-            type="error"
-            showIcon
-            title={
-              uidError
-                ? t('common.loadFailed')
-                : error === 'network'
-                  ? t('common.networkError')
-                  : t('common.loadFailed')
-            }
-            action={
-              <Button size="small" onClick={refresh}>
-                {t('common.retry')}
-              </Button>
-            }
+          <ErrorState
+            message={uidError ?? error ?? ''}
+            onRetry={refresh}
           />
         ) : (
           <Table<AnnouncementListItem>

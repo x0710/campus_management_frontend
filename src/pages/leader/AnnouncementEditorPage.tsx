@@ -4,7 +4,7 @@
  *
  * 复用与约定（代码要求）：
  * - 表单字段与校验规则沿用原发布表单；正文用 RichTextEditor（所见即所得，存 Markdown）；
- * - 错误提示经 extractErrorWithStatus 附带 HTTP 状态码（代码要求 9）；
+ * - 错误提示经 extractErrorReason 附带 HTTP 状态码与中文原因（代码要求 9）；
  * - 可见组织（org_id）不可通过 PATCH 修改，编辑态隐藏该字段；
  * - 本页渲染在 PortalWorkspace 布局壳内，只输出内容区，不重复渲染顶栏/侧栏。
  */
@@ -33,8 +33,10 @@ import type {
 } from '../../api/types/announcements'
 import { queryOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import RichTextEditor from '../../components/RichTextEditor'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   ANNOUNCEMENT_PRIORITIES,
   ANNOUNCEMENT_TYPES,
@@ -62,6 +64,7 @@ function toDayjs(value: string | null | undefined): Dayjs | null {
 export default function AnnouncementEditorPage() {
   const t = useT()
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const location = useLocation()
   const { portalKey, id } = useParams<{ portalKey: string; id?: string }>()
@@ -107,7 +110,7 @@ export default function AnnouncementEditorPage() {
         } catch (err) {
           if (cancelled) return
           if (axios.isAxiosError(err) && err.response?.status === 401) return
-          setLoadError(extractErrorWithStatus(err))
+          setLoadError(extractErrorReason(err, t))
         } finally {
           if (!cancelled) setLoading(false)
         }
@@ -152,7 +155,7 @@ export default function AnnouncementEditorPage() {
       backToList()
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
-      message.error(extractErrorWithStatus(err))
+      reportError(err)
     } finally {
       setSubmitting(false)
     }
@@ -168,15 +171,10 @@ export default function AnnouncementEditorPage() {
         </div>
 
         {loadError ? (
-          <Alert
-            type="error"
-            showIcon
-            title={loadError}
-            action={
-              <Button size="small" onClick={backToList}>
-                {t('announcement.backToList')}
-              </Button>
-            }
+          <ErrorState
+            message={loadError}
+            onRetry={backToList}
+            retryText={t('announcement.backToList')}
           />
         ) : (
           <>

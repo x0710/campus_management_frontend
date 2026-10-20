@@ -1,7 +1,11 @@
 /**
- * 组织成员「按 ID 搜索」通用逻辑（代码要求 1：各门户的组织成员页面复用同一套实现）。
+ * 组织成员「按学号 / 姓名搜索」通用逻辑（代码要求 1：各门户的组织成员页面复用同一套实现）。
  *
- * 流程：
+ * 学号 / 姓名解析（resolveSearchTarget）：
+ *   - 纯数字 → 视为学号（用户 ID），直接取该用户任职组织；
+ *   - 其他 → 视为姓名，先 GET /api/users?keyword= 查候选用户，再取首个落在当前展示组织范围内者。
+ *
+ * 定位流程：
  *   1. GET /api/organization-members?uids={uid} 取该用户全部任职组织；
  *   2. 取第一个落在当前展示组织范围内的组织作为目标组织（有组织树 / 单组织两种模式通用）；
  *   3. 展开组织树到目标组织的祖先链并选中该组织（由宿主的 onSelectOrg / onClearFilter 回调落库）；
@@ -15,10 +19,12 @@
 import { App as AntdApp } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useRef, useState, type Key } from 'react'
-import { extractErrorReason } from '../api/common'
 import { listUserOrganizations, queryOrgMembers } from '../api/organizations'
-import { MEMBER_SEARCH_MAX_PAGES } from '../config/organization'
+import type { UserOrganization } from '../api/types/organizations'
+import { queryUsers } from '../api/users'
+import { MEMBER_NAME_SEARCH_LIMIT, MEMBER_SEARCH_MAX_PAGES } from '../config/organization'
 import { useT } from '../i18n'
+import { useErrorFeedback } from './useErrorFeedback'
 
 /** 搜索所需的组织最小信息（OrganizationInfo / OrgNode / 任职组织均可直接传入） */
 export interface MemberSearchOrg {
@@ -103,8 +109,71 @@ async function findMemberPage(
   return null
 }
 
+/** resolveSearchTarget 的解析结果 */
+type ResolveResult =
+  | {
+      kind: 'hit'
+      /** 命中的用户 ID */
+      uid: number
+      /** 目标组织 ID */
+      targetId: number
+      /** 目标组织名称 */
+      orgName: string
+      /** 是否由姓名搜索得到（用于提示文案） */
+      byName: boolean
+    }
+  /** 学号未找到（范围内无该用户的任职组织） */
+  | { kind: 'notFoundId'; uid: number }
+  /** 姓名未找到（范围内无同名用户的任职组织） */
+  | { kind: 'notFoundName'; name: string }
+
 /**
- * 组织成员「按 ID 搜索」控制器。
+ * 解析搜索关键字为命中的成员与目标组织。
+ *
+ * - 纯数字 → 视为学号（用户 ID），直接查其任职组织；
+ * - 其他 → 视为姓名，先 GET /api/users?keyword= 查候选用户（上限 MEMBER_NAME_SEARCH_LIMIT），
+ *   再逐个解析任职组织，取首个落在当前展示组织范围内者。
+ *
+ * @param raw 搜索关键字（必填，已 trim）
+ * @param orgs 当前展示的组织列表（必填）
+ * @returns 命中结果；未命中时区分「学号未找到」与「姓名未找到」
+ */
+async function resolveSearchTarget(raw: string, orgs: MemberSearchOrg[]): Promise<ResolveResult> {
+  // 同一组织范围判定：用户的任职组织中是否存在当前展示的组织
+  const inScope = (owned: UserOrganization[]) =>
+    owned.find((o) => orgs.some((x) => x.id === o.organization_id))
+
+  if (/^\d+$/.test(raw)) {
+    const uid = Number(raw)
+    const targetOrg = inScope(await listUserOrganizations(uid))
+    if (!targetOrg) return { kind: 'notFoundId', uid }
+    return {
+      kind: 'hit',
+      uid,
+      targetId: targetOrg.organization_id,
+      orgName: targetOrg.organization_name,
+      byName: false,
+    }
+  }
+
+  const res = await queryUsers({ keyword: raw, page: 1, page_size: MEMBER_NAME_SEARCH_LIMIT })
+  for (const user of res.data) {
+    const targetOrg = inScope(await listUserOrganizations(user.uid))
+    if (targetOrg) {
+      return {
+        kind: 'hit',
+        uid: user.uid,
+        targetId: targetOrg.organization_id,
+        orgName: targetOrg.organization_name,
+        byName: true,
+      }
+    }
+  }
+  return { kind: 'notFoundName', name: raw }
+}
+
+/**
+ * 组织成员「按学号 / 姓名搜索」控制器。
  *
  * @param options 宿主上下文（必填，见 UseMemberSearchOptions）
  * @returns 搜索状态与操作（query / run / hitUid / focusKeys / consumePendingPage 等）
@@ -120,6 +189,7 @@ export function useMemberSearch({
 }: UseMemberSearchOptions): MemberSearchController {
   const t = useT()
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
 
   const [query, setQuery] = useState('')
   const [hitUid, setHitUid] = useState<number | null>(null)
@@ -129,46 +199,50 @@ export function useMemberSearch({
   const pendingPageRef = useRef<number | null>(null)
 
   const run = useCallback(async () => {
-    const uid = Number(query.trim())
-    if (!Number.isInteger(uid) || uid <= 0) {
-      message.warning(t('orgExplorer.searchMemberInvalidId'))
+    const raw = query.trim()
+    if (!raw) {
+      message.warning(t('orgExplorer.searchMemberEmpty'))
       return
     }
     setSearching(true)
     try {
-      // 该用户的全部任职组织（GET /api/organization-members?uids=）
-      const owned = await listUserOrganizations(uid)
-      // 取第一个落在当前展示组织范围内的组织（组织树 / 单组织两种模式通用）
-      const targetOrg = owned.find((o) => orgs.some((x) => x.id === o.organization_id))
-      if (!targetOrg) {
+      // 解析关键字：纯数字按学号查，否则按姓名查（GET /api/users?keyword=）
+      const result = await resolveSearchTarget(raw, orgs)
+      if (result.kind !== 'hit') {
         setHitUid(null)
-        message.warning(t('orgExplorer.searchMemberNotFound', { uid: String(uid) }))
+        message.warning(
+          result.kind === 'notFoundId'
+            ? t('orgExplorer.searchMemberNotFound', { uid: String(result.uid) })
+            : t('orgExplorer.searchMemberNameNotFound', { name: result.name }),
+        )
         return
       }
-      const targetId = targetOrg.organization_id
       // 目标不在第 1 页时，先扫描出其所在页
-      const page = (await findMemberPage(targetId, uid, memberPageSize)) ?? 1
-      setHitUid(uid)
+      const page = (await findMemberPage(result.targetId, result.uid, memberPageSize)) ?? 1
+      setHitUid(result.uid)
       message.success(
-        t('orgExplorer.searchMemberHit', {
-          uid: String(uid),
-          org: targetOrg.organization_name,
-        }),
+        result.byName
+          ? t('orgExplorer.searchMemberHitByName', {
+              name: raw,
+              uid: String(result.uid),
+              org: result.orgName,
+            })
+          : t('orgExplorer.searchMemberHit', { uid: String(result.uid), org: result.orgName }),
       )
-      if (targetId === activeOrgId) {
+      if (result.targetId === activeOrgId) {
         // 组织未变化（含单组织模式）：直接按目标页加载
-        onLoadPage(targetId, page)
+        onLoadPage(result.targetId, page)
       } else {
         // 组织变化：清掉组织名称过滤、展开并选中目标组织，由切换 effect 按目标页加载
         onClearFilter?.()
-        setFocusKeys(orgAncestorKeys(orgs, targetId))
+        setFocusKeys(orgAncestorKeys(orgs, result.targetId))
         pendingPageRef.current = page
-        onSelectOrg(targetId)
+        onSelectOrg(result.targetId)
       }
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        message.error(extractErrorReason(err, t))
+        reportError(err)
       }
     } finally {
       setSearching(false)
@@ -177,6 +251,7 @@ export function useMemberSearch({
     query,
     message,
     t,
+    reportError,
     orgs,
     memberPageSize,
     activeOrgId,

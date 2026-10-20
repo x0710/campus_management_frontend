@@ -37,6 +37,7 @@ import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
 import { useUiStateStore } from '../store/uiState'
+import ErrorState from './ErrorState'
 
 /** 组织树节点所需的最小组织信息（领导端传 OrganizationInfo，老师端传本人任职组织） */
 export interface OrgNode {
@@ -93,6 +94,9 @@ export default function OrgMembersExplorer({
   // 左侧组织树的收起状态（按模块 key 记忆，跨路由返回仍保持）
   const treeCollapsed = useUiStateStore((s) => s.collapsedOrgTrees[fromModuleKey] ?? false)
   const setTreeCollapsed = useUiStateStore((s) => s.setOrgTreeCollapsed)
+  // 已展开的树节点（按模块 key 记忆，切走再回来仍保持刚刚查看的展开状态）
+  const storedExpandedKeys = useUiStateStore((s) => s.expandedOrgTreeKeys[fromModuleKey])
+  const setOrgTreeExpanded = useUiStateStore((s) => s.setOrgTreeExpanded)
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState<string | null>(null)
@@ -146,10 +150,15 @@ export default function OrgMembersExplorer({
     memberRows: members,
   })
 
-  // 组织树展开节点：未手动调整/未搜索命中时默认全展开（与原 defaultExpandAll 观感一致）
+  // 组织树默认只展开根节点（进入页面不全量展开，避免树过长铺满；深层分支点击再展开）
+  const rootKeys = useMemo<React.Key[]>(
+    () => orgs.filter((o) => (o.parent_id ?? null) === null).map((o) => o.id),
+    [orgs],
+  )
+  // 展开节点：搜索命中时展开到目标组织链；否则用上次手动展开的节点（跨路由保留）；再否则只展开根节点
   const expandedKeys = useMemo<React.Key[]>(
-    () => search.focusKeys ?? orgs.map((o) => o.id),
-    [search.focusKeys, orgs],
+    () => search.focusKeys ?? storedExpandedKeys ?? rootKeys,
+    [search.focusKeys, storedExpandedKeys, rootKeys],
   )
   // 解构出稳定引用（useCallback），避免把每次渲染都新建的 search 对象放进 effect 依赖
   const { consumePendingPage } = search
@@ -283,16 +292,7 @@ export default function OrgMembersExplorer({
         </header>
         <div className="panel-card-body">
           {orgsError ? (
-            <Alert
-              type="error"
-              showIcon
-              title={orgsError}
-              action={
-                <Button size="small" onClick={() => onReloadOrgs(true)}>
-                  {t('common.retry')}
-                </Button>
-              }
-            />
+            <ErrorState message={orgsError} onRetry={() => onReloadOrgs(true)} />
           ) : (
             <>
               <Input.Search
@@ -309,9 +309,13 @@ export default function OrgMembersExplorer({
                   <Alert type="info" showIcon title={t('orgExplorer.emptyOrgs')} />
                 ) : (
                   <Tree
+                    key={(treeData?.length ?? 0) > 0 ? 'tree-loaded' : 'tree-empty'}
                     treeData={treeData}
                     expandedKeys={expandedKeys}
-                    onExpand={(keys: React.Key[]) => search.setFocusKeys(keys)}
+                    onExpand={(keys: React.Key[]) => {
+                      search.setFocusKeys(keys)
+                      setOrgTreeExpanded(fromModuleKey, keys.map((k) => Number(k)))
+                    }}
                     selectedKeys={selectedId !== null ? [selectedId] : []}
                     onSelect={(keys: React.Key[]) =>
                       setSelectedId(fromModuleKey, keys.length ? Number(keys[0]) : null)
@@ -379,21 +383,18 @@ export default function OrgMembersExplorer({
           </div>
         </header>
         <div className="panel-card-body">
-          {!selectedOrg ? (
+          {/* 组织树隐藏（showOrgTree=false）或已收起（treeCollapsed）时，组织加载错误不会在
+              左侧树卡片中展示，需在成员卡片体兜底提示，避免报错被静默吞掉（代码要求 3） */}
+          {orgsError && (!showOrgTree || treeCollapsed) ? (
+            <ErrorState message={orgsError} onRetry={() => onReloadOrgs(true)} />
+          ) : !orgsLoading && orgs.length === 0 ? (
+            <Alert type="info" showIcon title={t('orgExplorer.emptyOrgs')} />
+          ) : !selectedOrg ? (
             <Alert type="info" showIcon title={t('adminOrg.selectHint')} />
           ) : membersError ? (
-            <Alert
-              type="error"
-              showIcon
-              title={membersError}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => void loadMembers(selectedOrg.id, memberPage, true)}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={membersError}
+              onRetry={() => void loadMembers(selectedOrg.id, memberPage, true)}
             />
           ) : (
             <Table<OrganizationMember>

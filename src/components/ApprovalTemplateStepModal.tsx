@@ -13,7 +13,7 @@ import { App as AntdApp, Form, Input, InputNumber, Modal, Select } from 'antd'
 import { useEffect, useState } from 'react'
 import { addApprovalTemplateStep, updateApprovalTemplateStep } from '../api/approvalmodel'
 import type { ApprovalStep } from '../api/types/approvalmodel'
-import { extractErrorReason } from '../api/common'
+import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
   APPROVAL_STEP_ASSIGNEE_MAX_LENGTH,
   APPROVAL_STEP_DESC_MAX_LENGTH,
@@ -68,9 +68,7 @@ export default function ApprovalTemplateStepModal({
   const [saving, setSaving] = useState(false)
 
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
-  const showError = (err: unknown) => {
-    message.error(extractErrorReason(err, t))
-  }
+  const reportError = useErrorFeedback()
 
   // 打开时初始化：新增用默认空值，编辑用传入数据回填
   useEffect(() => {
@@ -109,7 +107,7 @@ export default function ApprovalTemplateStepModal({
     } catch (err) {
       // 表单校验失败由 Form 自行提示，不重复弹窗
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setSaving(false)
     }

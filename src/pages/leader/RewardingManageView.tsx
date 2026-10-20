@@ -14,7 +14,6 @@
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   DatePicker,
@@ -30,10 +29,12 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteRewarding, queryRewardings } from '../../api/rewardings'
 import type { RewardingDto } from '../../api/types/rewardings'
-import { extractError } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import RewardingFormModal, {
   type RewardingFormMode,
 } from '../../components/RewardingFormModal'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   REWARDING_AMOUNT_MAX_YUAN,
   REWARDING_AMOUNT_MIN_YUAN,
@@ -166,20 +167,8 @@ export default function RewardingManageView() {
   const [modal, setModal] = useState<ModalState | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
+  const reportError = useErrorFeedback()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -207,12 +196,12 @@ export default function RewardingManageView() {
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractError(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
     }
-  }, [page, keyword, applied, reload.seq, reload.force])
+  }, [page, keyword, applied, reload.seq, reload.force, t])
 
   useEffect(() => {
     void load()
@@ -241,12 +230,12 @@ export default function RewardingManageView() {
         message.success(t('rewarding.deleteSuccess'))
         setReload((r) => ({ seq: r.seq + 1, force: false }))
       } catch (err) {
-        showError(err)
+        reportError(err)
       } finally {
         setDeletingId(null)
       }
     },
-    [message, t, showError],
+    [message, t, reportError],
   )
 
   const columns = useMemo<ColumnsType<RewardingDto>>(
@@ -379,18 +368,9 @@ export default function RewardingManageView() {
           <RewardingFilterBar onApply={applyFilters} />
 
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Table<RewardingDto>

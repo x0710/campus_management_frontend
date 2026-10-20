@@ -43,7 +43,9 @@ import type { OrganizationInfo } from '../../api/types/organizations'
 import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getCurrentUser } from '../../api/auth'
-import { extractError } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import UserEditPanel from './UserEditPanel'
@@ -118,19 +120,7 @@ export default function UsersAdminView() {
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchPreview, setBatchPreview] = useState<ParsedUser[] | null>(null)
 
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   // 基础数据：角色、组织、职位、当前 uid
   useEffect(() => {
@@ -188,11 +178,11 @@ export default function UsersAdminView() {
         }
       }
     } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) setError(extractError(err))
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) setError(extractErrorReason(err, t))
     } finally {
       setLoading(false)
     }
-  }, [page, keyword, status, reload.seq, reload.force])
+  }, [page, keyword, status, reload.seq, reload.force, t])
 
   useEffect(() => {
     void load()
@@ -244,7 +234,7 @@ export default function UsersAdminView() {
       })
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setCreating(false)
     }
@@ -360,7 +350,7 @@ export default function UsersAdminView() {
       setPage(1)
       setReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setBatchRunning(false)
     }
@@ -395,7 +385,7 @@ export default function UsersAdminView() {
       setResetUid(null)
       resetPwdForm.resetFields()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setResetRunning(false)
     }
@@ -408,7 +398,7 @@ export default function UsersAdminView() {
       message.success(t('adminUsers.deleteSuccess'))
       setReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActingUid(null)
     }
@@ -548,22 +538,9 @@ export default function UsersAdminView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={
-                error === 'network' ? t('common.networkError') : t('common.loadFailed')
-              }
-              action={
-                <Button
-                  size="small"
-                  onClick={() =>
-                    setReload((r) => ({ seq: r.seq + 1, force: true }))
-                  }
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Table<UserInfo>

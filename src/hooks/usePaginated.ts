@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import axios from 'axios'
+import { extractErrorReason } from '../api/common'
 import type { PaginatedResponse, PageQuery } from '../api/types/common'
+import { useT } from '../i18n'
 
 interface PaginatedState<T> {
   data: T[]
@@ -20,6 +22,7 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
   fetcher: (query: Q, force?: boolean) => Promise<PaginatedResponse<T>>,
   initialQuery?: Omit<Q, 'page' | 'page_size'>,
 ) {
+  const t = useT()
   const [page, setPage] = useState(1)
   // 默认每页 100 行（代码要求 12：表格每页最多 100 行）
   const [pageSize, setPageSizeState] = useState(100)
@@ -47,13 +50,8 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
       .catch((err: unknown) => {
         if (cancelled || (axios.isAxiosError(err) && err.response?.status === 401)) return
         if (!cancelled) {
-          setState((s) => ({
-            ...s,
-            loading: false,
-            error: axios.isAxiosError(err) && !err.response
-              ? 'network'
-              : 'failed',
-          }))
+          // 记录「状态码 + 中文原因」的完整文案，消费端直接展示即可
+          setState((s) => ({ ...s, loading: false, error: extractErrorReason(err, t) }))
         }
       })
     return () => {

@@ -1,9 +1,10 @@
 import { ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Table, Tag } from 'antd'
+import { Button, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useMemo } from 'react'
 import type { LeaveInfo, LeaveType } from '../../api/types/leaves'
 import { queryLeaves } from '../../api/leaves'
+import ErrorState from '../../components/ErrorState'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
@@ -73,15 +74,9 @@ export default function LeavesView() {
       </header>
       <div className="panel-card-body">
         {error ? (
-          <Alert
-            type="error"
-            showIcon
-            title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-            action={
-              <Button size="small" onClick={refresh}>
-                {t('common.retry')}
-              </Button>
-            }
+          <ErrorState
+            message={error}
+            onRetry={refresh}
           />
         ) : (
           <Table<LeaveInfo>

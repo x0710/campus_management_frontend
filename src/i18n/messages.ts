@@ -1007,10 +1007,12 @@ const messages = {
     },
     orgExplorer: {
       emptyOrgs: '未查询到您所在的组织，请联系管理员确认组织归属',
-      searchMemberPlaceholder: '输入用户 ID 搜索成员',
-      searchMemberInvalidId: '请输入有效的用户 ID（数字）',
-      searchMemberNotFound: '未在当前组织范围内找到 ID 为 {uid} 的成员',
-      searchMemberHit: '已定位 UID {uid}，所在组织：{org}',
+      searchMemberPlaceholder: '输入学号或姓名搜索成员',
+      searchMemberEmpty: '请输入学号或姓名',
+      searchMemberNotFound: '未在当前组织范围内找到学号为 {uid} 的成员',
+      searchMemberNameNotFound: '未在当前组织范围内找到姓名为「{name}」的成员',
+      searchMemberHit: '已定位学号 {uid}，所在组织：{org}',
+      searchMemberHitByName: '已定位「{name}」（学号 {uid}），所在组织：{org}',
     },
     teacherClass: {
       scopeHint: '仅展示您所在组织的全部人员，点击任意一行可查看该成员的成绩、请假与违规信息',
@@ -1218,6 +1220,7 @@ const messages = {
       pendingTitle: '待党委认定',
       pendingItem: '{count}条加分待认定',
       pendingHint: '加分认定功能开发中，敬请期待',
+      mockHint: '本页「平均分 / 各支部排名 / 待党委认定」暂为模拟数据（后端暂无对应接口），全院党员总数为真实接口数据',
     },
     academyMetrics: {
       title: '学院指标管理',
@@ -1238,6 +1241,7 @@ const messages = {
       statAvgScore: '平均分',
       membersUnit: '人',
       rankingTitle: '各二级党委排名',
+      mockHint: '本页「平均分 / 各二级党委排名」暂为模拟数据（后端暂无对应接口），全校党员总数为真实接口数据',
     },
     password: {
       menuLabel: '重置密码',
@@ -2224,10 +2228,13 @@ const messages = {
     },
     orgExplorer: {
       emptyOrgs: 'No organization found for your account. Please contact an administrator.',
-      searchMemberPlaceholder: 'Search member by ID',
-      searchMemberInvalidId: 'Please enter a valid numeric user ID',
-      searchMemberNotFound: 'No member with ID {uid} found in the current organization scope',
-      searchMemberHit: 'Located UID {uid} in {org}',
+      searchMemberPlaceholder: 'Search member by student ID or name',
+      searchMemberEmpty: 'Please enter a student ID or name',
+      searchMemberNotFound:
+        'No member with student ID {uid} found in the current organization scope',
+      searchMemberNameNotFound: 'No member named "{name}" found in the current organization scope',
+      searchMemberHit: 'Located student ID {uid} in {org}',
+      searchMemberHitByName: 'Located "{name}" (student ID {uid}) in {org}',
     },
     teacherClass: {
       scopeHint:
@@ -2471,6 +2478,8 @@ const messages = {
       pendingTitle: 'Pending Party Committee Approval',
       pendingItem: '{count} bonus items pending approval',
       pendingHint: 'Bonus approval is under development',
+      mockHint:
+        'Average score, branch ranking and pending approvals on this page are mock data (no backend API yet); the academy member total comes from real APIs',
     },
     academyMetrics: {
       title: 'Academy Metrics',
@@ -2491,6 +2500,8 @@ const messages = {
       statAvgScore: 'Average score',
       membersUnit: 'people',
       rankingTitle: 'Committee Ranking',
+      mockHint:
+        'Average score and committee ranking on this page are mock data (no backend API yet); the school member total comes from real APIs',
     },
     password: {
       menuLabel: 'Reset password',

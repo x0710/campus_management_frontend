@@ -970,21 +970,61 @@ h3 {
   font-size: 13px;
 }
 
-/* 管理端：组织架构 */
+/* 管理端：组织架构（左侧组织树卡片 + 右侧成员卡片，各自独立滚动，撑满工作区高度） */
 .admin-org-view {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 16px;
+  height: 100%;
+  min-height: 0;
+  /* 兜底：不超出视口可用高度（顶栏 56px + 内容区上下内边距 48px），
+     即使父容器高度不可确定也能保证卡片仅在内部滚动 */
+  max-height: calc(100vh - 104px);
 }
 
+/* 左侧组织树卡片 / 右侧成员卡片：各自为独立卡片框架（头部固定，卡片体内部滚动） */
 .org-tree-card {
   width: 320px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .org-members-card {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 卡片头部固定不滚动；卡片体撑满剩余高度并各自滚动：
+   下滑只滚动本卡片内容，另一张卡片与其他区域不动；屏幕过小时可在卡片内上下/左右滑动 */
+.admin-org-view .panel-card-header {
+  flex: none;
+}
+
+.admin-org-view .panel-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 复用组织成员浏览器的页面外层（如老师端班级管理，卡片上方另有提示条）：
+   撑满工作区高度，使内部组织/成员卡片各自滚动 */
+.org-explorer-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+}
+
+.org-explorer-page > .admin-org-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 /* 组织树收起后：隐藏左侧组织树卡片，成员表自动占满整行 */
@@ -1108,11 +1148,18 @@ h3 {
 }
 
 @media (max-width: 1100px) {
+  /* 窄屏改为上下堆叠：组织树卡片限高（超出则在卡内滚动），成员卡片占满其余高度 */
   .admin-org-view {
     flex-direction: column;
   }
   .org-tree-card {
     width: 100%;
+    flex: none;
+    max-height: 45%;
+  }
+  .org-members-card {
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .user-post-row {
     grid-template-columns: 1fr 1fr;

@@ -9,7 +9,6 @@
  */
 import { ReloadOutlined } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   Form,
@@ -29,7 +28,10 @@ import type {
   ApprovalStepStatus,
 } from '../../api/types/approvals'
 import { getCurrentUser } from '../../api/auth'
+import { extractErrorReason } from '../../api/common'
+import ErrorState from '../../components/ErrorState'
 import LeaveDetailModal from '../../components/LeaveDetailModal'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
@@ -55,6 +57,7 @@ export default function LeaveApprovalView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
 
   const [uid, setUid] = useState<number | null>(null)
   const [rows, setRows] = useState<ApprovalInstanceStep[]>([])
@@ -89,15 +92,13 @@ export default function LeaveApprovalView() {
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         // 401 由全局拦截器处理，这里不重复提示
-      } else if (axios.isAxiosError(err) && !err.response) {
-        setError('network')
       } else {
-        setError('failed')
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
     }
-  }, [page, status])
+  }, [page, status, t])
 
   useEffect(() => {
     void load()
@@ -138,11 +139,7 @@ export default function LeaveApprovalView() {
       commentForm.resetFields()
       void load()
     } catch (err) {
-      const data = axios.isAxiosError(err) ? err.response?.data : null
-      const detail = typeof data === 'string' && data.trim() ? data.trim() : null
-      if (detail) message.error(detail)
-      else if (axios.isAxiosError(err) && !err.response) message.error(t('common.networkError'))
-      else message.error(t('common.loadFailed'))
+      reportError(err)
     } finally {
       setSubmitting(false)
     }
@@ -252,15 +249,9 @@ export default function LeaveApprovalView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-              action={
-                <Button size="small" onClick={() => void load()}>
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => void load()}
             />
           ) : (
             <Table<ApprovalInstanceStep>

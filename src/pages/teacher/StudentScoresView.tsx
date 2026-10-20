@@ -15,18 +15,19 @@
  *   - 弹窗内点击某条成绩，通过 GET /api/examinations/{id} 加载该条成绩的完整详情。
  */
 import { ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Descriptions, Modal, Select, Table, Tag, Typography } from 'antd'
+import { Button, Descriptions, Modal, Select, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentUser } from '../../api/auth'
-import { extractError } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import { getScore, listAllScoresForUser } from '../../api/examinations'
 import type {
   CourseScoreDetail,
   CourseScoreInfo,
   ExamType,
 } from '../../api/types/examinations'
+import ErrorState from '../../components/ErrorState'
 import { useCourseNames } from '../../composables/useCourseNames'
 import { useOrgStudents, type OrgStudent } from '../../composables/useOrgStudents'
 import { useUserNames } from '../../composables/useUserNames'
@@ -76,13 +77,13 @@ function ScoreDetailTable({
       } catch (err) {
         // 401 由全局拦截器处理，这里不重复提示
         if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-          setDetailError(extractError(err))
+          setDetailError(extractErrorReason(err, t))
         }
       } finally {
         setDetailLoading(false)
       }
     },
-    [],
+    [t],
   )
 
   const columns = useMemo<ColumnsType<CourseScoreInfo>>(
@@ -147,7 +148,7 @@ function ScoreDetailTable({
   return (
     <>
       {detailError && (
-        <Alert type="error" showIcon title={detailError} style={{ marginBottom: 12 }} />
+        <ErrorState message={detailError} style={{ marginBottom: 12 }} />
       )}
       {detail && (
         <Descriptions
@@ -225,12 +226,12 @@ export default function StudentScoresView() {
       setUid((await getCurrentUser()).uid)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setUidError(extractError(err))
+        setUidError(extractErrorReason(err, t))
       }
     } finally {
       setUidLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void loadMe()
@@ -451,35 +452,18 @@ export default function StudentScoresView() {
         </header>
         <div className="panel-card-body">
           {errorText ? (
-            <Alert
-              type="error"
-              showIcon
-              title={
-                errorText === 'network'
-                  ? t('common.networkError')
-                  : errorText === 'failed'
-                    ? t('common.loadFailed')
-                    : errorText
-              }
-              action={
-                <Button
-                  size="small"
-                  onClick={() => {
-                    void loadMe()
-                    doRefresh()
-                  }}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={errorText}
+              onRetry={() => {
+                void loadMe()
+                doRefresh()
+              }}
             />
           ) : (
             <>
               {scoresError && (
-                <Alert
-                  type="error"
-                  showIcon
-                  title={t('teacherGrades.scoresLoadFailed')}
+                <ErrorState
+                  message={t('teacherGrades.scoresLoadFailed')}
                   style={{ marginBottom: 12 }}
                 />
               )}

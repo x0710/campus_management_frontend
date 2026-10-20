@@ -1,12 +1,14 @@
 /** 用户资料编辑弹窗 */
-import { App as AntdApp, Alert, DatePicker, Form, Input, Modal, Select, Skeleton } from 'antd'
+import { App as AntdApp, DatePicker, Form, Input, Modal, Select, Skeleton } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import {  updateUser, getUser } from '../api/users'
 import type { Gender, UserDetail } from '../api/types/users'
+import { extractErrorReason } from '../api/common'
 import { useT } from '../i18n'
+import ErrorState from './ErrorState'
 
 interface ProfileFormValues {
   name?: string
@@ -38,23 +40,6 @@ export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Pr
   const [loading, setLoading] = useState(false)  // 加载状态，用于显示加载中提示
   const [saving, setSaving] = useState(false)  // 保存状态，用于显示保存中提示
   const [errorText, setErrorText] = useState<string | null>(null)  // 错误提示文本，用于显示 API 错误信息
-  // 构建错误提示文本，包含 HTTP 状态码和错误信息
-  const buildErrorText = useCallback(
-    (err: unknown): string => {  
-      // 错误提示需包含 HTTP 状态码（如 400、404、500），便于调试
-      if (axios.isAxiosError(err) && err.response) {  //当错误是 axios 错误且后端有响应时
-        const body =
-          typeof err.response.data === 'string' && err.response.data.trim()  //判断响应数据是否是字符串且非空
-            ? err.response.data.trim()  //返回响应数据的非空字符串
-            : err.response.statusText  //返回响应状态文本
-        return body ? `${err.response.status} ${body}` : String(err.response.status)
-      }
-      if (axios.isAxiosError(err) && !err.response) return t('common.networkError')  //返回网络错误提示
-      // 其他错误，返回加载失败提示
-      return t('common.loadFailed')
-    },
-    [t],
-  )
 
   const fillForm = useCallback(async () => {
     setLoading(true)
@@ -72,11 +57,12 @@ export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Pr
       })
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
-      setErrorText(buildErrorText(err))
+      // 错误提示包含 HTTP 状态码与中文原因（如 404 目标数据不存在或已被删除）
+      setErrorText(extractErrorReason(err, t))
     } finally {
       setLoading(false)
     }
-  }, [uid, form, buildErrorText])
+  }, [uid, form, t])
 
   useEffect(() => {
     if (open) void fillForm()
@@ -105,7 +91,7 @@ export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Pr
       onSaved?.(await getUser(uid))
       onClose()
     } catch (err) {
-      setErrorText(buildErrorText(err))
+      setErrorText(extractErrorReason(err, t))
     } finally {
       setSaving(false)
     }
@@ -128,7 +114,7 @@ export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Pr
       ) : (
         <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
           {errorText ? (
-            <Alert type="error" showIcon title={errorText} style={{ marginBottom: 12 }} />
+            <ErrorState message={errorText} style={{ marginBottom: 12 }} />
           ) : null}
           <Form.Item name="name" label={t('profile.name')}>
             <Input maxLength={64} />

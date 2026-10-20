@@ -8,7 +8,7 @@
  *   故非本人公告的「编辑」按钮置灰并悬停说明原因）。
  */
 import { ReloadOutlined } from '@ant-design/icons'
-import { Alert, App as AntdApp, Button, Popconfirm, Table, Tag, Tooltip, Typography } from 'antd'
+import { App as AntdApp, Button, Popconfirm, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import type { FilterValue } from 'antd/es/table/interface'
 import axios from 'axios'
@@ -25,7 +25,7 @@ import type {
   AnnouncementType,
 } from '../../api/types/announcements'
 import { getCurrentUser } from '../../api/auth'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import {
   ANNOUNCEMENT_DISPLAY_STATUS_COLOR,
   ANNOUNCEMENT_PRIORITIES,
@@ -37,8 +37,10 @@ import {
 } from '../../config/announcement'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
+import ErrorState from '../../components/ErrorState'
 import { formatDateTime } from '../../utils/datetime'
 import { useUserNames } from '../../composables/useUserNames'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 
 const { Text } = Typography
 
@@ -53,6 +55,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const { portalKey, moduleKey } = useParams<{
     portalKey: string  // 门户键名，来源：/home/portal/:key，必填
@@ -99,22 +102,6 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
-  const buildErrorText = useCallback(
-    (err: unknown): string => {
-      // 按 代码要求：错误提示包含 HTTP 状态码（如 403、500），便于调试
-      if (axios.isAxiosError(err) && err.response) {
-        const body =
-          typeof err.response.data === 'string' && err.response.data.trim()
-            ? err.response.data.trim()
-            : err.response.statusText
-        return body ? `${err.response.status} ${body}` : String(err.response.status)
-      }
-      if (axios.isAxiosError(err) && !err.response) return t('common.networkError')
-      return t('common.loadFailed')
-    },
-    [t],
-  )
-
   const load = useCallback(
     async (force?: boolean) => {
       setLoading(true)
@@ -123,12 +110,13 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
         setItems(await listAllAnnouncements(force))
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 401) return
-        setErrorText(buildErrorText(err))
+        // 错误文案包含 HTTP 状态码与中文原因（如 403 无权限、404 目标数据不存在或已被删除）
+        setErrorText(extractErrorReason(err, t))
       } finally {
         setLoading(false)
       }
     },
-    [buildErrorText],
+    [t],
   )
 
   useEffect(() => {
@@ -173,12 +161,12 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
         await load(true)
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 401) return
-        message.error(extractErrorWithStatus(err))
+        reportError(err)
       } finally {
         setActingId(null)
       }
     },
-    [message, t, load],
+    [message, t, reportError, load],
   )
 
   // 筛选项配置（选项文本支持悬停查看完整名称）
@@ -370,15 +358,9 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
       </header>
       <div className="panel-card-body">
         {errorText ? (
-          <Alert
-            type="error"
-            showIcon
-            title={errorText}
-            action={
-              <Button size="small" onClick={() => void load(true)}>
-                {t('common.retry')}
-              </Button>
-            }
+          <ErrorState
+            message={errorText}
+            onRetry={() => void load(true)}
           />
         ) : (
           <Table<AnnouncementListItem>

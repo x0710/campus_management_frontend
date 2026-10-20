@@ -37,7 +37,9 @@ import type {
   Permission as PermInfo,
   RoleInfo,
 } from '../../api/types/rbac'
-import { extractError } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
 import RoleDataScopeModal from '../../components/RoleDataScopeModal'
@@ -117,19 +119,7 @@ export default function RolesAdminView() {
   // 角色-数据范围配置
   const [dataScopeRole, setDataScopeRole] = useState<RoleInfo | null>(null)
 
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   // ============ 角色加载 ============
   const loadRoles = useCallback(async () => {
@@ -148,12 +138,12 @@ export default function RolesAdminView() {
       setRoleTotal(res.total)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setRolesError(extractError(err))
+        setRolesError(extractErrorReason(err, t))
       }
     } finally {
       setRolesLoading(false)
     }
-  }, [rolePage, roleKeyword, roleReload.seq, roleReload.force])
+  }, [rolePage, roleKeyword, roleReload.seq, roleReload.force, t])
 
   useEffect(() => {
     void loadRoles()
@@ -176,12 +166,12 @@ export default function RolesAdminView() {
       setPermTotal(res.total)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setPermsError(extractError(err))
+        setPermsError(extractErrorReason(err, t))
       }
     } finally {
       setPermsLoading(false)
     }
-  }, [permPage, permKeyword, permReload.seq, permReload.force])
+  }, [permPage, permKeyword, permReload.seq, permReload.force, t])
 
   useEffect(() => {
     void loadPerms()
@@ -226,7 +216,7 @@ export default function RolesAdminView() {
       setRoleReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setRoleSaving(false)
     }
@@ -239,7 +229,7 @@ export default function RolesAdminView() {
       message.success(t('adminRoles.deleteSuccess'))
       setRoleReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActingId(null)
     }
@@ -284,7 +274,7 @@ export default function RolesAdminView() {
       setPermReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setPermSaving(false)
     }
@@ -297,7 +287,7 @@ export default function RolesAdminView() {
       message.success(t('adminRoles.permDeleteSuccess'))
       setPermReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActingId(null)
     }
@@ -320,7 +310,7 @@ export default function RolesAdminView() {
       setAssignSelected(ids)
       setAssignInitial(ids)
     } catch (err) {
-      showError(err)
+      reportError(err)
       setAssignRole(null)
     } finally {
       setAssignLoading(false)
@@ -336,7 +326,7 @@ export default function RolesAdminView() {
       message.success(t('adminRoles.assignSuccess'))
       setAssignRole(null)
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setAssignSaving(false)
     }
@@ -517,23 +507,10 @@ export default function RolesAdminView() {
                       </Button>
                     </div>
                     {rolesError ? (
-                      <Alert
-                        type="error"
-                        showIcon
-                        title={
-                          rolesError === 'network'
-                            ? t('common.networkError')
-                            : t('common.loadFailed')
-                        }
-                        action={
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              setRoleReload((r) => ({ seq: r.seq + 1, force: true }))
-                            }
-                          >
-                            {t('common.retry')}
-                          </Button>
+                      <ErrorState
+                        message={rolesError}
+                        onRetry={() =>
+                          setRoleReload((r) => ({ seq: r.seq + 1, force: true }))
                         }
                       />
                     ) : (
@@ -586,23 +563,10 @@ export default function RolesAdminView() {
                       </Button>
                     </div>
                     {permsError ? (
-                      <Alert
-                        type="error"
-                        showIcon
-                        title={
-                          permsError === 'network'
-                            ? t('common.networkError')
-                            : t('common.loadFailed')
-                        }
-                        action={
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              setPermReload((r) => ({ seq: r.seq + 1, force: true }))
-                            }
-                          >
-                            {t('common.retry')}
-                          </Button>
+                      <ErrorState
+                        message={permsError}
+                        onRetry={() =>
+                          setPermReload((r) => ({ seq: r.seq + 1, force: true }))
                         }
                       />
                     ) : (

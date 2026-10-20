@@ -26,8 +26,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { invalidate } from '../api/cache'
 import { changeMyPassword, getCurrentUser, getMyRoles } from '../api/auth'
-import { extractErrorReason } from '../api/common'
 import { getMyProfile } from '../api/users'
+import { useErrorFeedback } from '../composables/useErrorFeedback'
 import { getAccessiblePortalKeys, getPortal, PORTALS, type PortalKey } from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
@@ -49,6 +49,7 @@ interface ResetPasswordForm {
 export default function PortalHeader({ left }: PortalHeaderProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
+  const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const location = useLocation()
   const username = useAuthStore((s) => s.username) // 账户名（登录态自带，作为姓名的兜底展示）
@@ -186,7 +187,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        message.error(extractErrorReason(err, t))
+        reportError(err)
       }
     } finally {
       setResetting(false)

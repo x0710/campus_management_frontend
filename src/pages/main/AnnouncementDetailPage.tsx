@@ -9,13 +9,15 @@
  *  - 发布人与发布时间之间保留视觉间距。
  */
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { Alert, Button, Skeleton, Space, Tag, Typography } from 'antd'
+import { Button, Skeleton, Space, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
+import ErrorState from '../../components/ErrorState'
 import MarkdownView from '../../components/MarkdownView'
 import { useUserNames } from '../../composables/useUserNames'
 import { getAnnouncement } from '../../api/announcements'
+import { extractErrorReason } from '../../api/common'
 import type { AnnouncementDetail } from '../../api/types/announcements'
 import {
   ANNOUNCEMENT_PRIORITY_COLOR,
@@ -63,22 +65,6 @@ export default function AnnouncementDetailPage() {
   // 批量解析发布人 ID → 姓名（通过 getUser 走缓存）
   const publisherNames = useUserNames(detail ? [detail.publisher_id] : [])
 
-  const buildErrorText = useCallback(
-    (err: unknown): string => {
-      // 按 代码要求：错误提示包含 HTTP 状态码（如 404、500），便于调试
-      if (axios.isAxiosError(err) && err.response) {
-        const body =
-          typeof err.response.data === 'string' && err.response.data.trim()
-            ? err.response.data.trim()
-            : err.response.statusText
-        return body ? `${err.response.status} ${body}` : String(err.response.status)
-      }
-      if (axios.isAxiosError(err) && !err.response) return t('common.networkError')
-      return t('common.loadFailed')
-    },
-    [t],
-  )
-
   const load = useCallback(
     async (numId: number, force?: boolean) => {
       setLoading(true)
@@ -87,12 +73,13 @@ export default function AnnouncementDetailPage() {
         setDetail(await getAnnouncement(numId, force))
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 401) return
-        setErrorText(buildErrorText(err))
+        // 错误文案包含 HTTP 状态码与中文原因（如 404 目标数据不存在或已被删除）
+        setErrorText(extractErrorReason(err, t))
       } finally {
         setLoading(false)
       }
     },
-    [buildErrorText],
+    [t],
   )
 
   useEffect(() => {
@@ -135,15 +122,10 @@ export default function AnnouncementDetailPage() {
         {loading ? (
           <Skeleton active paragraph={{ rows: 6 }} />
         ) : errorText ? (
-          <Alert
-            type="error"
-            showIcon
-            title={errorText}
-            action={
-              <Button size="small" onClick={backToList}>
-                {t('announcement.backToList')}
-              </Button>
-            }
+          <ErrorState
+            message={errorText}
+            onRetry={backToList}
+            retryText={t('announcement.backToList')}
           />
         ) : detail ? (
           <div className="announcement-detail">

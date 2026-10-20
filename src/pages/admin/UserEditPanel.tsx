@@ -31,7 +31,7 @@ import type { PositionDetail } from '../../api/types/positions'
 import { assignUserRoles, queryUserRoleRelations } from '../../api/rbac'
 import { getUser, updateUser } from '../../api/users'
 import type { UserDetail, Gender } from '../../api/types/users'
-import { extractError } from '../../api/common'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useT } from '../../i18n'
 
 interface ProfileFormValues {
@@ -85,19 +85,7 @@ export default function UserEditPanel({
   const [newWorkplace, setNewWorkplace] = useState('')
   const [orgBusy, setOrgBusy] = useState<string | null>(null)
 
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -113,11 +101,11 @@ export default function UserEditPanel({
         gender: (d.gender as Gender | null) ?? undefined,
       })
     } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) showError(err)
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
     } finally {
       setLoading(false)
     }
-  }, [uid, form, showError])
+  }, [uid, form, reportError])
 
   // 当前用户的角色：GET /rbac/users/{uid}/role-relations 仅返回 role_id（走会话缓存）
   const loadRoleRelations = useCallback(async () => {
@@ -165,7 +153,7 @@ export default function UserEditPanel({
       onChanged()
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setSavingProfile(false)
     }
@@ -183,7 +171,7 @@ export default function UserEditPanel({
       message.success(t('adminUsers.roleSaved'))
       onChanged()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setSavingRoles(false)
     }
@@ -207,7 +195,7 @@ export default function UserEditPanel({
       // 通知宿主刷新（成员详情页需更新「组织任职」区块的展示）
       onChanged()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setOrgBusy(null)
     }
@@ -222,7 +210,7 @@ export default function UserEditPanel({
       // 通知宿主刷新（成员详情页需更新「组织任职」区块的展示）
       onChanged()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setOrgBusy(null)
     }

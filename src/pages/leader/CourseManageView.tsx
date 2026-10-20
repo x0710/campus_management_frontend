@@ -12,14 +12,16 @@
  * 表单弹窗为可复用组件 CourseFormModal（新增/编辑/详情三模式共用）。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
+import { App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteCourse, queryCourses } from '../../api/courses'
 import type { CourseInfo, CourseType } from '../../api/types/courses'
-import { extractError } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import CourseFormModal, { type CourseFormMode } from '../../components/CourseFormModal'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { COURSE_PAGE_SIZE, COURSE_TYPE_COLOR, COURSE_TYPE_OPTIONS } from '../../config/course'
 import { useT } from '../../i18n'
 
@@ -52,20 +54,8 @@ export default function CourseManageView() {
   const [modal, setModal] = useState<ModalState | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  /** 统一错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
+  const reportError = useErrorFeedback()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,12 +75,12 @@ export default function CourseManageView() {
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractError(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
     }
-  }, [page, keyword, typeFilter, reload.seq, reload.force])
+  }, [page, keyword, typeFilter, reload.seq, reload.force, t])
 
   useEffect(() => {
     void load()
@@ -105,12 +95,12 @@ export default function CourseManageView() {
         message.success(t('course.deleteSuccess'))
         setReload((r) => ({ seq: r.seq + 1, force: false }))
       } catch (err) {
-        showError(err)
+        reportError(err)
       } finally {
         setDeletingId(null)
       }
     },
-    [message, t, showError],
+    [message, t, reportError],
   )
 
   const columns = useMemo<ColumnsType<CourseInfo>>(
@@ -233,18 +223,9 @@ export default function CourseManageView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Table<CourseInfo>

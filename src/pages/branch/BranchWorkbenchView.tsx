@@ -2,7 +2,7 @@
  * 党委支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
  *
  * 已接入真实接口：
- *   党员总数（人）  经 composables/useBranchOrg 定位当前用户所属支部 →
+ *   党员总数（人）  经 composables/usePortalOrg 定位当前用户所属支部 →
  *                   GET /api/organizations/{id}/members 取分页 total（只需总数，page_size=1）
  *   待审核申报（条） GET /api/approvals 按 status=waiting / pending 各取一页后合计条数；
  *                   该接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
@@ -11,14 +11,16 @@
  *
  * 卡片跳转：党员总数 → 支部管理（branch_m5），待审核申报 → 审核管理（branch_m3）。
  */
-import { Alert, Button } from 'antd'
+import { Alert } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { queryApprovals } from '../../api/approvals'
 import { extractErrorReason } from '../../api/common'
 import { queryOrgMembers } from '../../api/organizations'
-import { resolveBranchOrg } from '../../composables/useBranchOrg'
+import ErrorState from '../../components/ErrorState'
+import { resolvePortalOrg } from '../../composables/usePortalOrg'
+import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
 
 /** 待审核申报统计单页条数：GET /api/approvals 无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
@@ -49,11 +51,11 @@ export default function BranchWorkbenchView() {
   // 注意：load 内不得在首个 await 之前 setState，否则会触发 react(set-state-in-effect) 告警
   const load = useCallback(async () => {
     try {
-      const { branchId } = await resolveBranchOrg()
+      const { orgId } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
       const [memberPage, waitingSteps, pendingSteps] = await Promise.all([
-        branchId === null
+        orgId === null
           ? Promise.resolve(null)
-          : queryOrgMembers(branchId, { page: 1, page_size: 1 }),
+          : queryOrgMembers(orgId, { page: 1, page_size: 1 }),
         queryApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
         queryApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
       ])
@@ -88,16 +90,9 @@ export default function BranchWorkbenchView() {
   return (
     <div className="party-view">
       {error ? (
-        <Alert
-          type="error"
-          showIcon
-          title={t('common.loadFailed')}
-          description={error}
-          action={
-            <Button size="small" onClick={retry}>
-              {t('common.retry')}
-            </Button>
-          }
+        <ErrorState
+          message={error}
+          onRetry={retry}
         />
       ) : (
         <Alert type="warning" showIcon title={t('branch.mockHint')} />

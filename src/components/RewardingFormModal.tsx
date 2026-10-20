@@ -9,7 +9,6 @@
  */
 import { EditOutlined } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   Descriptions,
@@ -20,10 +19,11 @@ import {
   Skeleton,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRewarding, getRewarding, updateRewarding } from '../api/rewardings'
 import type { RewardingDto } from '../api/types/rewardings'
-import { extractError } from '../api/common'
+import { extractErrorReason } from '../api/common'
+import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
   REWARDING_AMOUNT_MAX_YUAN,
   REWARDING_AMOUNT_MIN_YUAN,
@@ -35,6 +35,7 @@ import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
 import { formatCentsAsYuan, yuanToCents } from '../utils/money'
+import ErrorState from './ErrorState'
 
 /** 弹窗模式：新增 / 编辑 / 只读查看 */
 export type RewardingFormMode = 'create' | 'edit' | 'view'
@@ -80,18 +81,7 @@ export default function RewardingFormModal({
   const isEdit = mode === 'edit'
 
   /** 错误提示：网络错误走文案，其余回显后端状态码/信息（代码要求 9） */
-  const showError = useCallback(
-    (code: string) => {
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   // 打开时初始化：新增用默认空值，编辑/查看拉取详情（走缓存）后回填
   useEffect(() => {
@@ -121,7 +111,7 @@ export default function RewardingFormModal({
         })
       } catch (err) {
         if (cancelled) return
-        setLoadError(extractError(err))
+        setLoadError(extractErrorReason(err, t))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -130,7 +120,7 @@ export default function RewardingFormModal({
     return () => {
       cancelled = true
     }
-  }, [open, mode, rewardingId, form])
+  }, [open, mode, rewardingId, form, t])
 
   /** 提交：新增 → POST；编辑 → PATCH（金额「元」转换为后端「分」） */
   const submit = async () => {
@@ -151,7 +141,7 @@ export default function RewardingFormModal({
       }
       onSaved()
     } catch (err) {
-      showError(extractError(err))
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -199,11 +189,7 @@ export default function RewardingFormModal({
       destroyOnHidden
     >
       {loadError ? (
-        <Alert
-          type="error"
-          showIcon
-          title={loadError === 'network' ? t('common.networkError') : loadError}
-        />
+        <ErrorState message={loadError} />
       ) : loading ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : readOnly ? (

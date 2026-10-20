@@ -12,7 +12,6 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   Descriptions,
@@ -36,7 +35,9 @@ import {
   updatePosition,
 } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   POSITION_CODE_MAX_LENGTH,
   POSITION_DESC_MAX_LENGTH,
@@ -85,31 +86,7 @@ export default function PositionsAdminView() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  /** 统一错误提示：带 HTTP 状态码（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractErrorWithStatus(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
-
-  /** 把内部错误码映射为可展示文案 */
-  const errorText = useCallback(
-    (code: string) =>
-      code === 'network'
-        ? t('common.networkError')
-        : code === 'failed'
-          ? t('common.loadFailed')
-          : code,
-    [t],
-  )
+  const reportError = useErrorFeedback()
 
   // ============ 列表加载 ============
   const load = useCallback(async () => {
@@ -128,7 +105,7 @@ export default function PositionsAdminView() {
       setTotal(res.total)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
@@ -148,7 +125,7 @@ export default function PositionsAdminView() {
     try {
       setDetail(await getPosition(code))
     } catch (err) {
-      setDetailError(extractErrorWithStatus(err))
+      setDetailError(extractErrorReason(err, t))
     } finally {
       setDetailLoading(false)
     }
@@ -193,7 +170,7 @@ export default function PositionsAdminView() {
       setReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -206,7 +183,7 @@ export default function PositionsAdminView() {
       message.success(t('adminPositions.deleteSuccess'))
       setReload((r) => ({ seq: r.seq + 1, force: false }))
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActingCode(null)
     }
@@ -306,18 +283,9 @@ export default function PositionsAdminView() {
           </div>
 
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={errorText(error)}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Table<PositionDetail>
@@ -405,7 +373,7 @@ export default function PositionsAdminView() {
         destroyOnHidden
       >
         {detailError ? (
-          <Alert type="error" showIcon title={errorText(detailError)} />
+          <ErrorState message={detailError} />
         ) : (
           <Spin spinning={detailLoading}>
             <Descriptions

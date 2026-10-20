@@ -10,7 +10,6 @@
  */
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   Descriptions,
@@ -37,6 +36,7 @@ import {
 import type { ApprovalStep, ApprovalTemplateDetail } from '../api/types/approvalmodel'
 import { queryPositions } from '../api/positions'
 import { extractErrorReason } from '../api/common'
+import { useErrorFeedback } from '../composables/useErrorFeedback'
 import ApprovalTemplateStepModal, {
   type ApprovalTemplateStepMode,
 } from './ApprovalTemplateStepModal'
@@ -54,6 +54,7 @@ import {
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
+import ErrorState from './ErrorState'
 
 /** 弹窗模式：新增 / 编辑 / 只读查看 */
 export type ApprovalTemplateFormMode = 'create' | 'edit' | 'view'
@@ -121,12 +122,7 @@ export default function ApprovalTemplateFormModal({
   const businessTypeValue = Form.useWatch('business_type', form)
 
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      message.error(extractErrorReason(err, t))
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   /** 拉取详情并回填表单（force=true 绕过缓存，用于步骤变更后刷新） */
   const loadDetail = useCallback(
@@ -196,7 +192,7 @@ export default function ApprovalTemplateFormModal({
       .catch((err) => {
         if (cancelledRef.cancelled) return
         setPositionOptions([])
-        showError(err)
+        reportError(err)
       })
       .finally(() => {
         if (!cancelledRef.cancelled) setPositionsLoading(false)
@@ -204,7 +200,7 @@ export default function ApprovalTemplateFormModal({
     return () => {
       cancelledRef.cancelled = true
     }
-  }, [open, showError])
+  }, [open, reportError])
 
   /** 职位编码 → 职位名称映射（未命中时回退显示编码本身，兼容职位已被删除的历史数据） */
   const positionNameMap = useMemo(
@@ -253,7 +249,7 @@ export default function ApprovalTemplateFormModal({
     } catch (err) {
       // 表单校验失败由 Form 自行提示，不重复弹窗
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setSaving(false)
     }
@@ -269,7 +265,7 @@ export default function ApprovalTemplateFormModal({
       await refreshDetail()
       onStepsChanged?.()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setDeletingStepId(null)
     }
@@ -390,12 +386,7 @@ export default function ApprovalTemplateFormModal({
         destroyOnHidden
       >
         {loadError ? (
-          <Alert
-            type="error"
-            showIcon
-            title={t('common.loadFailed')}
-            description={loadError}
-          />
+          <ErrorState message={loadError} />
         ) : loading ? (
           <Skeleton active paragraph={{ rows: 6 }} />
         ) : readOnly ? (

@@ -51,7 +51,9 @@ import type {
 } from '../../api/types/organizations'
 import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
-import { extractError } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useMemberSearch } from '../../composables/useMemberSearch'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
@@ -93,6 +95,9 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   // 左侧组织树的收起状态（按模块 key 记忆，跨路由返回仍保持）
   const treeCollapsed = useUiStateStore((s) => s.collapsedOrgTrees[uiKey] ?? false)
   const setTreeCollapsed = useUiStateStore((s) => s.setOrgTreeCollapsed)
+  // 已展开的树节点（按模块 key 记忆，切走再回来仍保持刚刚查看的展开状态）
+  const storedExpandedKeys = useUiStateStore((s) => s.expandedOrgTreeKeys[uiKey])
+  const setOrgTreeExpanded = useUiStateStore((s) => s.setOrgTreeExpanded)
 
   // 组织搜索关键词（仅前端过滤树节点）
   const [orgSearch, setOrgSearch] = useState('')
@@ -120,19 +125,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   /** 新增成员弹窗开关（成员操作收进弹窗，避免与表头上方的搜索框混在一起） */
   const [addModalOpen, setAddModalOpen] = useState(false)
 
-  const showError = useCallback(
-    (err: unknown) => {
-      const code = extractError(err)
-      message.error(
-        code === 'network'
-          ? t('common.networkError')
-          : code === 'failed'
-            ? t('common.loadFailed')
-            : code,
-      )
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   const loadOrgs = useCallback(async (force?: boolean) => {
     setOrgsLoading(true)
@@ -142,12 +135,12 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
       setOrgs(list)
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setOrgsError(extractError(err))
+        setOrgsError(extractErrorReason(err, t))
       }
     } finally {
       setOrgsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void loadOrgs()
@@ -177,12 +170,12 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
         setMembers(res.data)
         setMemberTotal(res.total)
       } catch (err) {
-        if (!(axios.isAxiosError(err) && err.response?.status === 401)) showError(err)
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
       } finally {
         setMembersLoading(false)
       }
     },
-    [showError],
+    [reportError],
   )
 
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
@@ -200,10 +193,15 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   })
   const { consumePendingPage } = search
 
-  // 组织树展开节点：未手动调整/未搜索命中时默认全展开（与原 defaultExpandAll 观感一致）
+  // 组织树默认只展开根节点（进入页面不全量展开，避免树过长铺满；深层分支点击再展开）
+  const rootKeys = useMemo<React.Key[]>(
+    () => orgs.filter((o) => o.parent_id === null).map((o) => o.id),
+    [orgs],
+  )
+  // 展开节点：搜索命中时展开到目标组织链；否则用上次手动展开的节点（跨路由保留）；再否则只展开根节点
   const expandedKeys = useMemo<React.Key[]>(
-    () => search.focusKeys ?? orgs.map((o) => o.id),
-    [search.focusKeys, orgs],
+    () => search.focusKeys ?? storedExpandedKeys ?? rootKeys,
+    [search.focusKeys, storedExpandedKeys, rootKeys],
   )
 
   // 切换组织后加载成员：默认回到第 1 页；若为搜索命中则按目标页加载
@@ -330,7 +328,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
       await loadOrgs()
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
-      showError(err)
+      reportError(err)
     } finally {
       setOrgSaving(false)
     }
@@ -344,7 +342,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
       if (selectedId === org.id) setSelectedId(uiKey, null)
       await loadOrgs()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActingKey(null)
     }
@@ -364,7 +362,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
       setAddModalOpen(false)
       await loadMembers(selectedId, memberPage)
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setAddingMember(false)
     }
@@ -378,7 +376,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
       message.success(t('adminOrg.memberRemoveSuccess'))
       await loadMembers(selectedId, memberPage)
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActingKey(null)
     }
@@ -502,13 +500,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
         </header>
         <div className="panel-card-body">
           {orgsError ? (
-            <Alert
-              type="error"
-              showIcon
-              title={
-                orgsError === 'network' ? t('common.networkError') : t('common.loadFailed')
-              }
-            />
+            <ErrorState message={orgsError} />
           ) : (
             <>
               <Input.Search
@@ -521,10 +513,17 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setOrgSearch(e.target.value)}
               />
               <Spin spinning={orgsLoading}>
+                {/* 以「数据是否就绪」作为 key：组织数据到达后强制重挂载 Tree。
+                    rc-tree 在 treeData 为空（数据未加载）时挂载会忽略随后传入的受控
+                    expandedKeys，导致切走再返回组织树时展开态丢失；重挂载后可正常生效。 */}
                 <Tree
+                  key={(treeData?.length ?? 0) > 0 ? 'tree-loaded' : 'tree-empty'}
                   treeData={treeData}
                   expandedKeys={expandedKeys}
-                  onExpand={(keys: React.Key[]) => search.setFocusKeys(keys)}
+                  onExpand={(keys: React.Key[]) => {
+                    search.setFocusKeys(keys)
+                    setOrgTreeExpanded(uiKey, keys.map((k) => Number(k)))
+                  }}
                   selectedKeys={selectedId !== null ? [selectedId] : []}
                   onSelect={onSelectTree}
                   showLine

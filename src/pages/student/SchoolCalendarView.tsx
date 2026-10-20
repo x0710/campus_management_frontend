@@ -29,7 +29,7 @@ export default function SchoolCalendarView() {
   // 详情拉取失败（如 404）弹窗提示状态码，便于调试（代码要求 9）
   useEffect(() => {
     if (dayDetailsError) {
-      message.error(dayDetailsError === 'network' ? t('common.networkError') : dayDetailsError)
+      message.error(dayDetailsError)
     }
   }, [dayDetailsError, message, t])
 

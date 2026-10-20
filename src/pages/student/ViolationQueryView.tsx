@@ -13,7 +13,7 @@
  * 表格每页 20 行（支持上下页 + 输入页码跳转 + 显示总页数），点击任意一行查看该条违规详情（代码要求 14）。
  */
 import { ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Descriptions, Input, Modal, Select, Spin, Table, Tag, Tooltip } from 'antd'
+import { Button, Descriptions, Input, Modal, Select, Spin, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -21,6 +21,7 @@ import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import { getViolation, queryViolations } from '../../api/violations'
 import type { ViolationDto, ViolationSeverity } from '../../api/types/violations'
+import ErrorState from '../../components/ErrorState'
 import {
   VIOLATION_FETCH_SIZE,
   VIOLATION_PAGE_SIZE,
@@ -251,18 +252,9 @@ export default function ViolationQueryView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Table<ViolationDto>

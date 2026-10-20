@@ -20,7 +20,6 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import {
-  Alert,
   Button,
   Calendar,
   DatePicker,
@@ -43,6 +42,7 @@ import {
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime, formatDayLabel, formatMonthLabel } from '../utils/datetime'
+import ErrorState from './ErrorState'
 
 interface CalendarBoardProps {
   /** 页面标题（学生端「校历日历」/ 领导端「校历管理」） */
@@ -205,16 +205,9 @@ export default function CalendarBoard({
 
           {error ? (
             <div className="panel-card-body">
-              <Alert
-                type="error"
-                showIcon
-                title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-                description={error === 'network' ? undefined : error}
-                action={
-                  <Button size="small" onClick={() => onRefresh(true)}>
-                    {t('common.retry')}
-                  </Button>
-                }
+              <ErrorState
+                message={error}
+                onRetry={() => onRefresh(true)}
               />
             </div>
           ) : (

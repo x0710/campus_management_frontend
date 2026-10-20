@@ -12,6 +12,12 @@ interface UiState {
   /** 各组织视图左侧组织树的收起状态，按模块 key 记忆（true 表示已收起，仅看成员表） */
   collapsedOrgTrees: Partial<Record<string, boolean>>
   setOrgTreeCollapsed: (moduleKey: string, collapsed: boolean) => void
+  /**
+   * 各组织视图左侧组织树已展开的节点 ID，按模块 key 记忆（跨路由切换保留，刷新后重置）。
+   * 缺省（undefined）表示用户未手动调整过，此时按默认「仅展开根节点」渲染。
+   */
+  expandedOrgTreeKeys: Partial<Record<string, number[]>>
+  setOrgTreeExpanded: (moduleKey: string, keys: number[]) => void
 }
 
 export const useUiStateStore = create<UiState>()((set) => ({
@@ -21,4 +27,7 @@ export const useUiStateStore = create<UiState>()((set) => ({
   collapsedOrgTrees: {},
   setOrgTreeCollapsed: (moduleKey, collapsed) =>
     set((s) => ({ collapsedOrgTrees: { ...s.collapsedOrgTrees, [moduleKey]: collapsed } })),
+  expandedOrgTreeKeys: {},
+  setOrgTreeExpanded: (moduleKey, keys) =>
+    set((s) => ({ expandedOrgTreeKeys: { ...s.expandedOrgTreeKeys, [moduleKey]: keys } })),
 }))

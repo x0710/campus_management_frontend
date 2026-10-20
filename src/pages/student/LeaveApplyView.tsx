@@ -36,8 +36,10 @@ import type {
   LeaveInfo,
   LeaveType,
 } from '../../api/types/leaves'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
+import ErrorState from '../../components/ErrorState'
 import LeaveDetailModal from '../../components/LeaveDetailModal'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { LEAVE_CONFLICT_CHECK_DEBOUNCE_MS } from '../../config/leave'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
@@ -134,10 +136,7 @@ export default function LeaveApplyView() {
   )
 
   /** 统一错误提示：网络错误走文案，其余回显带状态码的后端信息（代码要求 9） */
-  const showError = (err: unknown) => {
-    const code = extractErrorWithStatus(err)
-    message.error(code === 'network' ? t('common.networkError') : code)
-  }
+  const reportError = useErrorFeedback()
 
   // 监听请假时间：填写完整且合法后，防抖调用 check-conflict 做冲突预检
   const range = Form.useWatch('range', form)
@@ -160,7 +159,7 @@ export default function LeaveApplyView() {
         .catch((err: unknown) => {
           if (cancelled) return
           setConflict(null)
-          setConflictError(extractErrorWithStatus(err))
+          setConflictError(extractErrorReason(err, t))
         })
         .finally(() => {
           if (!cancelled) setChecking(false)
@@ -170,7 +169,7 @@ export default function LeaveApplyView() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [rangeValid, startIso, endIso])
+  }, [rangeValid, startIso, endIso, t])
 
   /** 冲突预检提示（含冲突记录的时间段，便于学生调整） */
   const conflictAlert = () => {
@@ -180,10 +179,8 @@ export default function LeaveApplyView() {
     }
     if (conflictError) {
       return (
-        <Alert
-          type="error"
-          showIcon
-          title={t('leaveApply.conflictCheckFailed')}
+        <ErrorState
+          message={t('leaveApply.conflictCheckFailed')}
           description={conflictError}
         />
       )
@@ -220,7 +217,7 @@ export default function LeaveApplyView() {
       setDetailId(null)
       refresh()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActing(null)
     }
@@ -235,7 +232,7 @@ export default function LeaveApplyView() {
       setDetailId(null)
       refresh()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActing(null)
     }
@@ -274,17 +271,14 @@ export default function LeaveApplyView() {
       setPage(1)
       refresh()
     } catch (err) {
-      // 后端错误响应为纯文本（如 400 冲突 / 403 无权限 / 404 数据不存在），原样展示
+      // 400 为后端校验/冲突提示（纯文本），优先原样展示；
+      // 其余错误统一按「状态码 + 中文原因 + 后端原文」展示（含网络不可达说明）
       const data = axios.isAxiosError(err) ? err.response?.data : null
       const detail = typeof data === 'string' && data.trim() ? data.trim() : null
       if (axios.isAxiosError(err) && err.response?.status === 400) {
         message.error(detail || t('leaveApply.errConflictOrInvalid'))
-      } else if (detail) {
-        message.error(detail)
-      } else if (axios.isAxiosError(err) && !err.response) {
-        message.error(t('common.networkError'))
       } else {
-        message.error(t('common.loadFailed'))
+        message.error(extractErrorReason(err, t))
       }
     }
   }
@@ -362,15 +356,9 @@ export default function LeaveApplyView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-              action={
-                <Button size="small" onClick={refresh}>
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={refresh}
             />
           ) : (
             <Table<LeaveInfo>

@@ -14,7 +14,7 @@
  * 交互：工具栏可按业务类型多选、启用状态筛选；点击表格任意一行或「详情」按钮查看详情。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
+import { App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -24,6 +24,8 @@ import { extractErrorReason } from '../../api/common'
 import ApprovalTemplateFormModal, {
   type ApprovalTemplateFormMode,
 } from '../../components/ApprovalTemplateFormModal'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   APPROVAL_BUSINESS_TYPE_OPTIONS,
   APPROVAL_TEMPLATE_FETCH_SIZE,
@@ -66,12 +68,7 @@ export default function ApprovalTemplateManageView() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      message.error(extractErrorReason(err, t))
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -145,12 +142,12 @@ export default function ApprovalTemplateManageView() {
         message.success(t('approvalTemplate.deleteSuccess'))
         setReload((r) => ({ seq: r.seq + 1, force: false }))
       } catch (err) {
-        showError(err)
+        reportError(err)
       } finally {
         setDeletingId(null)
       }
     },
-    [message, t, showError],
+    [message, t, reportError],
   )
 
   const columns = useMemo<ColumnsType<ApprovalTemplate>>(
@@ -306,19 +303,9 @@ export default function ApprovalTemplateManageView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={t('common.loadFailed')}
-              description={error}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Table<ApprovalTemplate>

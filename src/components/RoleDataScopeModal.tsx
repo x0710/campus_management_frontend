@@ -13,7 +13,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { assignRoleDataScopes, getRoleDataScopes } from '../api/rbac'
 import type { DataScope, RoleInfo } from '../api/types/rbac'
-import { extractErrorReason } from '../api/common'
+import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
   DATA_SCOPE_OPTIONS,
   RBAC_DATA_SCOPE_MAX_ROWS,
@@ -60,12 +60,7 @@ export default function RoleDataScopeModal({
   const keySeq = useRef(0)
 
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
-  const showError = useCallback(
-    (err: unknown) => {
-      message.error(extractErrorReason(err, t))
-    },
-    [message, t],
-  )
+  const reportError = useErrorFeedback()
 
   const roleId = role?.id ?? null
 
@@ -86,11 +81,11 @@ export default function RoleDataScopeModal({
         })),
       )
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setLoading(false)
     }
-  }, [open, roleId, showError])
+  }, [open, roleId, reportError])
 
   // 打开时按角色拉取已有数据范围配置
   useEffect(() => {
@@ -153,7 +148,7 @@ export default function RoleDataScopeModal({
       onSaved()
       onCancel()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setSaving(false)
     }

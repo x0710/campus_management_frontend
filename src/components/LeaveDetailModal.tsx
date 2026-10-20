@@ -1,13 +1,15 @@
 /** 请假详情弹窗（学生端 / 教师端共用，只读详情 + 可选操作插槽） */
-import { Alert, Button, Descriptions, Modal, Skeleton, Tag, Typography } from 'antd'
+import { Descriptions, Modal, Skeleton, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { getLeave } from '../api/leaves'
 import type { LeaveDetail } from '../api/types/leaves'
+import { extractErrorReason } from '../api/common'
 import { LEAVE_TYPE_COLOR } from '../config/leave'
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
+import ErrorState from './ErrorState'
 
 const { Link: TypographyLink, Paragraph, Text } = Typography
 
@@ -46,22 +48,6 @@ export default function LeaveDetailModal({
   const [loading, setLoading] = useState(false)
   const [errorText, setErrorText] = useState<string | null>(null)
 
-  const buildErrorText = useCallback(
-    (err: unknown): string => {
-      // 按 代码要求：错误提示包含 HTTP 状态码（如 404、500），便于调试
-      if (axios.isAxiosError(err) && err.response) {
-        const body =
-          typeof err.response.data === 'string' && err.response.data.trim()
-            ? err.response.data.trim()
-            : err.response.statusText
-        return body ? `${err.response.status} ${body}` : String(err.response.status)
-      }
-      if (axios.isAxiosError(err) && !err.response) return t('common.networkError')
-      return t('common.loadFailed')
-    },
-    [t],
-  )
-
   const load = useCallback(
     async (id: number, force?: boolean) => {
       setLoading(true)
@@ -70,12 +56,13 @@ export default function LeaveDetailModal({
         setDetail(await getLeave(id, force))
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 401) return
-        setErrorText(buildErrorText(err))
+        // 错误提示包含 HTTP 状态码与中文原因（如 404 目标数据不存在或已被删除）
+        setErrorText(extractErrorReason(err, t))
       } finally {
         setLoading(false)
       }
     },
-    [buildErrorText],
+    [t],
   )
 
   useEffect(() => {
@@ -94,17 +81,9 @@ export default function LeaveDetailModal({
       {loading ? (
         <Skeleton active paragraph={{ rows: 8 }} />
       ) : errorText ? (
-        <Alert
-          type="error"
-          showIcon
-          title={errorText}
-          action={
-            leaveId !== null ? (
-              <Button size="small" onClick={() => void load(leaveId, true)}>
-                {t('common.retry')}
-              </Button>
-            ) : undefined
-          }
+        <ErrorState
+          message={errorText}
+          onRetry={leaveId !== null ? () => void load(leaveId, true) : undefined}
         />
       ) : detail ? (
         <Descriptions column={2} bordered size="small">

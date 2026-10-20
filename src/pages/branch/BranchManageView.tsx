@@ -2,7 +2,7 @@
  * 党委支部端 / 党委学院端：支部管理（所属支部及其下级组织的成员信息）。
  * 两端共用本组件，仅侧栏高亮与详情页返回来源（fromModuleKey）不同。
  *
- * 所属支部判定（需求：支部位于组织树第 3 / 4 层，规则已抽到 composables/useBranchOrg.ts，
+ * 所属支部判定（需求：支部位于组织树第 3 / 4 层，规则已抽到 composables/usePortalOrg.ts，
  * 与支部工作台 BranchWorkbenchView 共用）：
  *   1. GET /api/credentials/me                   当前登录用户 uid
  *   2. GET /api/organization-members?uids={uid}  该用户全部任职组织
@@ -28,7 +28,8 @@ import { listAllOrganizations, listSubsidiaries } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
 import OrgMembersExplorer from '../../components/OrgMembersExplorer'
 import type { OrgNode } from '../../components/OrgMembersExplorer'
-import { resolveBranchOrg } from '../../composables/useBranchOrg'
+import { resolvePortalOrg } from '../../composables/usePortalOrg'
+import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
 
 /**
@@ -85,22 +86,22 @@ export default function BranchManageView({ fromModuleKey }: BranchManageViewProp
       setOrgsError(null)
       try {
         // 1) 当前登录用户的全部任职组织，并按组织树深度判定支部（均未命中时回退第一个任职组织）
-        const { branchId, mine } = await resolveBranchOrg()
-        if (branchId === null) {
+        const { orgId, mine } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
+        if (orgId === null) {
           setOrgs([])
           setShowOrgTree(false)
           return
         }
 
         // 2) 支部还有下级 → 展示「支部 + 全部下级」组织树；否则仅展示本支部成员表
-        const children = await listSubsidiaries(branchId)
+        const children = await listSubsidiaries(orgId)
         if (children.length > 0) {
           const all = await listAllOrganizations(force)
-          setOrgs(collectSubtree(all, branchId))
+          setOrgs(collectSubtree(all, orgId))
           setShowOrgTree(true)
         } else {
-          const self = mine.find((o) => o.organization_id === branchId)
-          setOrgs([{ id: branchId, name: self?.organization_name ?? '' }])
+          const self = mine.find((o) => o.organization_id === orgId)
+          setOrgs([{ id: orgId, name: self?.organization_name ?? '' }])
           setShowOrgTree(false)
         }
       } catch (err) {

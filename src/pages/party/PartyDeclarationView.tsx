@@ -15,7 +15,6 @@
 import { ReloadOutlined, UploadOutlined } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import {
-  Alert,
   App as AntdApp,
   Button,
   DatePicker,
@@ -31,12 +30,13 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { useMemo, useState } from 'react'
-import { extractErrorWithStatus } from '../../api/common'
 import { uploadFiles } from '../../api/file'
 import { cancelLeave, createLeave, deleteLeave, queryLeaves } from '../../api/leaves'
 import type { UploadedFileResponse } from '../../api/types/file'
 import type { LeaveCreateRequest, LeaveInfo, LeaveType } from '../../api/types/leaves'
 import LeaveDetailModal from '../../components/LeaveDetailModal'
+import ErrorState from '../../components/ErrorState'
+import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { LEAVE_TYPE_COLOR } from '../../config/leave'
 import {
   DECLARATION_DEFAULT_TYPE,
@@ -126,11 +126,8 @@ export default function PartyDeclarationView() {
     [t, locale],
   )
 
-  /** 统一错误提示：网络错误走文案，其余回显带状态码的后端信息（代码要求 9） */
-  const showError = (err: unknown) => {
-    const code = extractErrorWithStatus(err)
-    message.error(code === 'network' ? t('common.networkError') : code)
-  }
+  /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
+  const reportError = useErrorFeedback()
 
   /** 佐证材料上传：走 POST /api/files，成功后把返回的文件 id 在提交时写入 attachment_id */
   const uploadEvidence: UploadProps['customRequest'] = async (options) => {
@@ -140,7 +137,7 @@ export default function PartyDeclarationView() {
       onSuccess?.(uploaded)
     } catch (err) {
       onError?.(err as Error)
-      showError(err)
+      reportError(err)
     }
   }
 
@@ -164,7 +161,7 @@ export default function PartyDeclarationView() {
       setDetailId(null)
       refresh()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActing(null)
     }
@@ -179,7 +176,7 @@ export default function PartyDeclarationView() {
       setDetailId(null)
       refresh()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setActing(null)
     }
@@ -211,7 +208,7 @@ export default function PartyDeclarationView() {
       setPage(1)
       refresh()
     } catch (err) {
-      showError(err)
+      reportError(err)
     } finally {
       setSubmitting(false)
     }
@@ -300,15 +297,9 @@ export default function PartyDeclarationView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={error === 'network' ? t('common.networkError') : t('common.loadFailed')}
-              action={
-                <Button size="small" onClick={refresh}>
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={refresh}
             />
           ) : (
             <Table<LeaveInfo>

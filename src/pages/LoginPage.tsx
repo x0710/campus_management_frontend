@@ -17,13 +17,15 @@ import {
   SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Alert, App as AntdApp, Button, Checkbox, Dropdown, Form, Input } from 'antd'
+import { App as AntdApp, Button, Checkbox, Dropdown, Form, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import axios from 'axios'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
+import ErrorState from '../components/ErrorState'
 import { login } from '../api/auth'
+import { extractErrorReason } from '../api/common'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
@@ -117,7 +119,8 @@ export default function LoginPage() {
         } else if (status === 403) {
           setErrorMsg(t('login.errDisabled'))
         } else if (!err.response) {
-          setErrorMsg(t('common.networkError'))
+          // 网络不可达：展示含后端不可达说明的完整提示
+          setErrorMsg(extractErrorReason(err, t))
         } else {
           setErrorMsg(`${t('login.errGeneric')}（HTTP ${status}）`)
         }
@@ -193,7 +196,7 @@ export default function LoginPage() {
           </div>
 
           {errorMsg && (
-            <Alert className="login-alert" type="error" showIcon title={errorMsg} />
+            <ErrorState message={errorMsg} className="login-alert" />
           )}
 
           <Form<LoginFormValues>

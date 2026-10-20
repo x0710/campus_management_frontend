@@ -18,7 +18,6 @@
 /* eslint-disable react/set-state-in-effect */
 import { ReloadOutlined } from '@ant-design/icons'
 import {
-  Alert,
   Button,
   Card,
   Col,
@@ -37,13 +36,14 @@ import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentUser } from '../../api/auth'
-import { extractErrorWithStatus } from '../../api/common'
+import { extractErrorReason } from '../../api/common'
 import { getScore, listAllScoresForUser } from '../../api/examinations'
 import type {
   CourseScoreDetail,
   CourseScoreInfo,
   ExamType,
 } from '../../api/types/examinations'
+import ErrorState from '../../components/ErrorState'
 import { useCourseDetails } from '../../composables/useCourseNames'
 import {
   EXAM_TYPE_COLOR,
@@ -91,16 +91,6 @@ export default function GradesView() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  const errorText = useCallback(
-    (code: string) =>
-      code === 'network'
-        ? t('common.networkError')
-        : code === 'failed'
-          ? t('common.loadFailed')
-          : code,
-    [t],
-  )
-
   // ============ 本人成绩加载 ============
   const load = useCallback(async () => {
     setLoading(true)
@@ -112,7 +102,7 @@ export default function GradesView() {
     } catch (err) {
       // 401 由全局拦截器处理，这里不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorWithStatus(err))
+        setError(extractErrorReason(err, t))
       }
     } finally {
       setLoading(false)
@@ -177,13 +167,13 @@ export default function GradesView() {
         setDetail(await getScore(id))
       } catch (err) {
         if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-          setDetailError(extractErrorWithStatus(err))
+          setDetailError(extractErrorReason(err, t))
         }
       } finally {
         setDetailLoading(false)
       }
     },
-    [],
+    [t],
   )
 
   // ============ 列定义 ============
@@ -294,18 +284,9 @@ export default function GradesView() {
         </header>
         <div className="panel-card-body">
           {error ? (
-            <Alert
-              type="error"
-              showIcon
-              title={errorText(error)}
-              action={
-                <Button
-                  size="small"
-                  onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
+            <ErrorState
+              message={error}
+              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -372,7 +353,7 @@ export default function GradesView() {
         destroyOnHidden
       >
         {detailError ? (
-          <Alert type="error" showIcon title={errorText(detailError)} />
+          <ErrorState message={detailError} />
         ) : (
           <Spin spinning={detailLoading}>
             <Descriptions

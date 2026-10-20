@@ -19,9 +19,10 @@
  */
 import axios from 'axios'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { extractError } from '../api/common'
+import { extractErrorReason } from '../api/common'
 import { listUserOrganizations, queryOrgMembers } from '../api/organizations'
 import { ORG_MEMBER_FETCH_PAGE_SIZE } from '../config/examination'
+import { useT } from '../i18n'
 
 /** 组织内的学生（uid + 所属组织信息，用于列表展示与筛选） */
 export interface OrgStudent {
@@ -40,11 +41,12 @@ interface OrgStudentsState {
   orgs: TeacherOrg[]
   students: OrgStudent[]
   loading: boolean
-  /** 错误码：'network' / 'failed' / 后端返回的文本（含状态码由 extractError 提取） */
+  /** 错误文案：extractErrorReason 生成的「状态码 + 中文原因」完整提示 */
   error: string | null
 }
 
 export function useOrgStudents(uid: number | null) {
+  const t = useT()
   const [state, setState] = useState<OrgStudentsState>({
     orgs: [],
     students: [],
@@ -112,14 +114,14 @@ export function useOrgStudents(uid: number | null) {
           setState((s) => ({ ...s, loading: false }))
           return
         }
-        setState({ orgs: [], students: [], loading: false, error: extractError(err) })
+        setState({ orgs: [], students: [], loading: false, error: extractErrorReason(err, t) })
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [uid, reloadKey])
+  }, [uid, reloadKey, t])
 
   const refresh = useCallback(() => {
     forceRef.current = true
