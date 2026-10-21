@@ -1,22 +1,16 @@
 /**
- * 党员端「成绩申报」相关常量。
+ * 党员端「成绩申报」相关常量（代码要求 7：常量集中管理）。
  *
- * 说明：后端尚未提供申报接口，当前【临时】借用请假接口承载申报数据
- * （POST/GET /api/leaves、GET /api/leaves/{id}、PATCH /api/leaves/{id}/cancel、DELETE /api/leaves/{id}）。
- * 因此申报类型暂时映射到请假类型编码（leave_type），「目的地」「家长确认」两个字段按需求隐藏，
- * 但仍需按接口契约提交默认值（空串 / false）。
- * 正式申报接口就绪后，只需替换本文件的映射与 PartyDeclarationView 内的接口调用，页面结构无需改动。
+ * 申报数据对接后端党建活动加分接口（/api/party-scores）：创建加分申请需要 template_id，
+ * 因此页面「申报类型」取自审批模板（GET /api/approvals/templates）。
+ * 这里限定只取业务类型为 PARTY_TEMPLATE_BUSINESS_TYPE 的模板，过滤掉与成绩申报无关的其他模板。
  */
-import type { LeaveType } from '../api/types/leaves'
 
-/** 申报类型可选项（临时映射到 leave_type 编码，数组顺序即下拉展示顺序） */
-export const DECLARATION_TYPES: LeaveType[] = ['personal', 'sick', 'public', 'other']
+/** 成绩申报对应的审批模板业务类型（api.json: ApprovalTemplate.business_type） */
+export const PARTY_TEMPLATE_BUSINESS_TYPE = 'party'
 
-/** 默认申报类型（表单初始值，如「学术成果」） */
-export const DECLARATION_DEFAULT_TYPE: LeaveType = 'personal'
+/** 申报记录每页条数（代码要求 12：表格单页最多 100 行） */
+export const PARTY_DECLARATION_PAGE_SIZE = 100
 
-/** 佐证材料：最多上传文件数 */
-export const DECLARATION_EVIDENCE_MAX_COUNT = 5
-
-/** 佐证材料：单个文件最大体积（MB） */
-export const DECLARATION_EVIDENCE_MAX_SIZE_MB = 5
+/** 党员端首页「近期记录」展示条数（取最近的若干条成绩申报） */
+export const PARTY_RECENT_RECORD_LIMIT = 5

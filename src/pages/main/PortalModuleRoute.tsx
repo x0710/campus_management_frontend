@@ -37,6 +37,7 @@ const PartyHomeView = lazy(() => import('../party/PartyHomeView'))
 const PartyDeclarationView = lazy(() => import('../party/PartyDeclarationView'))
 const PartyImprovementView = lazy(() => import('../party/PartyImprovementView'))
 const PartyProfileView = lazy(() => import('../party/PartyProfileView'))
+const PartyScoreApprovalView = lazy(() => import('../party/PartyScoreApprovalView'))
 const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
 const BranchManageView = lazy(() => import('../branch/BranchManageView'))
 const AcademyWorkbenchView = lazy(() => import('../academy/AcademyWorkbenchView'))
@@ -78,16 +79,16 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'party:party_m3': PartyImprovementView,
   'party:party_m4': PartyProfileView,
   'branch:branch_m1': BranchWorkbenchView,
-  // 党委支部端「审核管理」：复用教师端请假审批页面（查看审批列表 + 同意/驳回，详情走 /api/leaves/{id}）
-  'branch:branch_m3': LeaveApprovalView,
+  // 党委支部端「审核管理」：党建活动加分审批（步骤列表前端合成 + PUT 通过/驳回/转交）
+  'branch:branch_m3': PartyScoreApprovalView,
   // 党委支部端「我的」：与党员端「我的」复用同一页面
   'branch:branch_m4': PartyProfileView,
   // 党委支部端「支部管理」：判定所属支部后展示其成员（有下级支部则展示组织树）
   'branch:branch_m5': BranchManageModule,
   'academy:academy_m1': AcademyWorkbenchView,
   'academy:academy_m2': AcademyMetricsView,
-  // 党委学院端「审核管理」：复用教师端请假审批页面（查看审批列表 + 同意/驳回，详情走 /api/leaves/{id}）
-  'academy:academy_m3': LeaveApprovalView,
+  // 党委学院端「审核管理」：党建活动加分审批
+  'academy:academy_m3': PartyScoreApprovalView,
   // 党委学院端「我的」：与党员端「我的」复用同一页面
   'academy:academy_m4': PartyProfileView,
   // 党委学院端「学院支部管理」：与支部端同一支部判定逻辑（所属支部 + 下级组织成员）
@@ -97,8 +98,8 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'school:school_m2': SchoolOrgAdminView,
   // 党委学校端「系统权限管理」：与管理端「角色权限」复用同一页面（接真实 RBAC 接口）
   'school:school_m3': RolesAdminView,
-  // 党委学校端「审批管理」：复用教师端请假审批页面（查看审批列表 + 同意/驳回，详情走 /api/leaves/{id}）
-  'school:school_m4': LeaveApprovalView,
+  // 党委学校端「审批管理」：党建活动加分审批
+  'school:school_m4': PartyScoreApprovalView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

@@ -4,8 +4,9 @@
  * 已接入真实接口：
  *   党员总数（人）  经 composables/usePortalOrg 定位当前用户所属支部 →
  *                   GET /api/organizations/{id}/members 取分页 total（只需总数，page_size=1）
- *   待审核申报（条） GET /api/approvals 按 status=waiting / pending 各取一页后合计条数；
- *                   该接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
+ *   待审核申报（条） 前端用 GET /api/party-scores + /api/approvals 合成党建加分审批步骤，
+ *                   按 status=waiting / pending 各取一页后合计条数；
+ *                   底层接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
  *
  * 平均分与等级分布后端暂无对应接口，仍为模拟数据，故本页保留模拟数据提示。
  *
@@ -15,7 +16,7 @@ import { Alert } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { queryApprovals } from '../../api/approvals'
+import { queryPartyScoreApprovals } from '../../api/partyScores'
 import { extractErrorReason } from '../../api/common'
 import { queryOrgMembers } from '../../api/organizations'
 import ErrorState from '../../components/ErrorState'
@@ -23,7 +24,7 @@ import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
 
-/** 待审核申报统计单页条数：GET /api/approvals 无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
+/** 待审核申报统计单页条数：底层审批步骤接口无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
 const APPROVAL_TODO_PAGE_SIZE = 100
 
 /** 平均分（模拟数据，后端暂无接口） */
@@ -56,8 +57,8 @@ export default function BranchWorkbenchView() {
         orgId === null
           ? Promise.resolve(null)
           : queryOrgMembers(orgId, { page: 1, page_size: 1 }),
-        queryApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
-        queryApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
+        queryPartyScoreApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
+        queryPartyScoreApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
       ])
       setMembers(memberPage?.total ?? 0)
       setTodoApprove(waitingSteps.length + pendingSteps.length)
@@ -150,7 +151,7 @@ export default function BranchWorkbenchView() {
         </div>
       </section>
 
-      {/* 待办事项（待审核申报：GET /api/approvals 我的待办中 waiting + pending 条数） */}
+      {/* 待办事项（待审核申报：我的党建加分审批待办中 waiting + pending 条数） */}
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('branch.todoTitle')}</h3>

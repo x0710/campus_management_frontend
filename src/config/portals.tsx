@@ -81,21 +81,24 @@ export interface PortalDef {
 
 export const PORTALS: PortalDef[] = [
   {
-    // 党员端门户：后端暂无接口，首页（先锋指数）、成绩申报、整改提升、我的均使用虚拟数据预览
+    // 党员端门户：首页近期记录接真实成绩申报接口（先锋指数仍为模拟数据，页面内有说明）；
+    // 成绩申报、整改提升、我的仍使用虚拟数据预览
     key: 'party',
     icon: <FlagOutlined />,
     gradient: 'linear-gradient(135deg, #a8071a 0%, #f5222d 100%)',
     accent: '#a8071a',
     modules: [
-      { key: 'party_m1', status: 'preview', icon: <HomeOutlined /> },
-      { key: 'party_m2', status: 'preview', icon: <FormOutlined /> },
+      { key: 'party_m1', status: 'ready', icon: <HomeOutlined /> },
+      { key: 'party_m2', status: 'ready', icon: <FormOutlined /> },
       { key: 'party_m3', status: 'preview', icon: <RiseOutlined /> },
       { key: 'party_m4', status: 'preview', icon: <UserOutlined /> },
     ],
   },
   {
     // 党委支部端门户：工作台（党员总数、待审核申报接真实接口，平均分/等级分布为虚拟数据）、
-    // 我的使用虚拟数据预览；审核管理复用教师端请假审批页面（GET /api/approvals + PUT /api/approvals），
+    // 我的使用虚拟数据预览；审核管理接入党建活动加分审批接口
+    // （审批步骤由 GET /api/party-scores + /api/approvals 前端合成，
+    //   审核动作走 PUT /api/party-scores/approvals/{id}/approve|reject|transfer），
     // 支部管理按组织树深度判定所属支部并展示其成员（有下级支部则展示组织树），均接真实接口
     key: 'branch',
     icon: <ApartmentOutlined />,
@@ -110,7 +113,7 @@ export const PORTALS: PortalDef[] = [
   },
   {
     // 党委学院端门户：工作台（党员总数接真实接口，平均分/排名/待认定为虚拟数据）、指标、我的使用虚拟数据预览；
-    // 审核管理复用教师端请假审批页面（GET /api/approvals + PUT /api/approvals），
+    // 审核管理接入党建活动加分审批接口（加分审批步骤 / 通过 / 驳回 / 转交），
     // 学院支部管理与支部端同一套支部判定逻辑，均接真实接口
     key: 'academy',
     icon: <BookOutlined />,
@@ -127,7 +130,7 @@ export const PORTALS: PortalDef[] = [
   {
     // 党委学校端门户：总览（党员总数接真实接口，平均分/排名为虚拟数据）；
     // 组织管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
-    // 审批管理复用教师端请假审批页面，均接真实接口
+    // 审批管理接入党建活动加分审批接口，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
     gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',

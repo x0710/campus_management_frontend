@@ -23,11 +23,6 @@ interface Props {
    * 不传则不渲染底部栏（关闭统一用右上角的 ×，不再重复放「关闭」按钮）。
    */
   footerExtra?: ReactNode
-  /**
-   * 隐藏请假专属字段（目的地 / 家长确认）。
-   * 党员端「成绩申报」临时借用请假接口，申报场景无这两个概念，置 true 后不展示。
-   */
-  hideLeaveOnlyFields?: boolean
 }
 
 /**
@@ -39,7 +34,6 @@ export default function LeaveDetailModal({
   leaveId,
   onClose,
   footerExtra,
-  hideLeaveOnlyFields = false,
 }: Props) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -101,25 +95,21 @@ export default function LeaveDetailModal({
           <Descriptions.Item label={t('leaveDetail.endTime')}>
             {formatDateTime(detail.end_time, locale)}
           </Descriptions.Item>
-          {hideLeaveOnlyFields ? null : (
-            <Descriptions.Item label={t('leaveDetail.destination')} span={2}>
-              {detail.destination}
-            </Descriptions.Item>
-          )}
+          <Descriptions.Item label={t('leaveDetail.destination')} span={2}>
+            {detail.destination}
+          </Descriptions.Item>
           <Descriptions.Item label={t('leaveDetail.reason')} span={2}>
             <Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
               {detail.reason}
             </Paragraph>
           </Descriptions.Item>
-          {hideLeaveOnlyFields ? null : (
-            <Descriptions.Item label={t('leaveDetail.parentConfirm')}>
-              {detail.parent_confirm ? (
-                <Text type="success">{t('leaveDetail.confirmed')}</Text>
-              ) : (
-                <Text type="secondary">{t('leaveDetail.notConfirmed')}</Text>
-              )}
-            </Descriptions.Item>
-          )}
+          <Descriptions.Item label={t('leaveDetail.parentConfirm')}>
+            {detail.parent_confirm ? (
+              <Text type="success">{t('leaveDetail.confirmed')}</Text>
+            ) : (
+              <Text type="secondary">{t('leaveDetail.notConfirmed')}</Text>
+            )}
+          </Descriptions.Item>
           <Descriptions.Item label={t('leaveDetail.attachment')}>
             {detail.attachment_url && detail.attachment_url.trim() ? (
               <TypographyLink href={detail.attachment_url} target="_blank" rel="noreferrer">

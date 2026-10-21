@@ -38,6 +38,7 @@ import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
 import { useUiStateStore } from '../store/uiState'
 import ErrorState from './ErrorState'
+import PersonSearchBox from './PersonSearchBox'
 
 /** 组织树节点所需的最小组织信息（领导端传 OrganizationInfo，老师端传本人任职组织） */
 export interface OrgNode {
@@ -361,14 +362,10 @@ export default function OrgMembersExplorer({
             </h3>
           </div>
           <div className="org-members-actions">
-            <Input.Search
-              allowClear
-              style={{ width: 300 }}
-              enterButton={t('common.search')}
-              prefix={<SearchOutlined />}
-              placeholder={t('orgExplorer.searchMemberPlaceholder')}
+            <PersonSearchBox
+              width={300}
               value={search.query}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => search.setQuery(e.target.value)}
+              onChange={search.setQuery}
               onSearch={search.run}
               loading={search.searching}
             />

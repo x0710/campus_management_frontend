@@ -9,10 +9,12 @@ export type ApprovalStepStatus = 'waiting' | 'pending' | 'approved' | 'rejected'
 /** 审批决定（api.json: ApprovalRecordStatus；注意落库值 approve 由后端映射，前端仍传 agree） */
 export type ApprovalDecision = 'agree' | 'reject' | 'transfer'
 
-/** 审批步骤条目（GET /api/approvals 数组元素） */
+/** 审批步骤条目（api.json: ApprovalInstanceStep，GET /api/approvals 与 GET /api/party-scores/approvals 共用） */
 export interface ApprovalInstanceStep {
   id: number
   instance_id: number
+  /** 审批步骤所属组织 ID */
+  organization_id: number
   step_order: number
   approver_id: number
   status: ApprovalStepStatus
@@ -37,6 +39,8 @@ export interface ApprovalTodoQuery {
   /** 不传 approver_id/applicant_id 时，后端默认按"我的待办（approver_id=自己）"过滤 */
   approver_id?: number
   applicant_id?: number
+  /** 按审批步骤所属组织 ID 精确筛选 */
+  organization_id?: number
   status?: ApprovalStepStatus
   page?: number
   page_size?: number

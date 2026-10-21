@@ -24,6 +24,7 @@ import type { UserOrganization } from '../api/types/organizations'
 import { queryUsers } from '../api/users'
 import { MEMBER_NAME_SEARCH_LIMIT, MEMBER_SEARCH_MAX_PAGES } from '../config/organization'
 import { useT } from '../i18n'
+import { isUidTerm } from '../utils/personSearch'
 import { useErrorFeedback } from './useErrorFeedback'
 
 /** 搜索所需的组织最小信息（OrganizationInfo / OrgNode / 任职组织均可直接传入） */
@@ -143,7 +144,8 @@ async function resolveSearchTarget(raw: string, orgs: MemberSearchOrg[]): Promis
   const inScope = (owned: UserOrganization[]) =>
     owned.find((o) => orgs.some((x) => x.id === o.organization_id))
 
-  if (/^\d+$/.test(raw)) {
+  // 纯数字视为学号（用户 ID），否则按姓名查询（判定逻辑与用户与账户页共用，见 utils/personSearch）
+  if (isUidTerm(raw)) {
     const uid = Number(raw)
     const targetOrg = inScope(await listUserOrganizations(uid))
     if (!targetOrg) return { kind: 'notFoundId', uid }

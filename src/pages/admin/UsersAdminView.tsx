@@ -45,9 +45,11 @@ import type { PositionDetail } from '../../api/types/positions'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
+import { isUidTerm } from '../../utils/personSearch'
 import UserEditPanel from './UserEditPanel'
 
 /** 用户列表每页条数（代码要求 12：表格每页最多 100 行） */
@@ -85,6 +87,10 @@ export default function UsersAdminView() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
+  // 人员搜索框内容（学号或姓名）；提交后按学号(ids)/姓名(keyword)二选一筛选
+  const [searchInput, setSearchInput] = useState('')
+  // 学号精确筛选（对应后端 ids 查询参数）
+  const [uidFilter, setUidFilter] = useState('')
   const [status, setStatus] = useState<UserStatus | 'all'>('all')
   // 列表重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
   const [reload, setReload] = useState<{ seq: number; force: boolean }>({
@@ -151,6 +157,7 @@ export default function UsersAdminView() {
           page,
           page_size: PAGE_SIZE,
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+          ...(uidFilter ? { ids: uidFilter } : {}),
           ...(status === 'all' ? {} : { status }),
         },
         reload.force,
@@ -182,11 +189,47 @@ export default function UsersAdminView() {
     } finally {
       setLoading(false)
     }
-  }, [page, keyword, status, reload.seq, reload.force, t])
+  }, [page, keyword, uidFilter, status, reload.seq, reload.force, t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  /**
+   * 人员搜索：提交后按输入内容筛选列表。
+   * - 纯数字 → 视为学号，用 ids 精确筛选（当前列表字段为 keyword/ids 二选一，此处清空 keyword）；
+   * - 其他 → 视为姓名，用 keyword 模糊筛选（清空 ids）；
+   * - 空串 → 同时清空两者，恢复完整列表。
+   * 判定为学号的规则与组织架构页共用（见 utils/personSearch）。
+   * @param raw 搜索框输入值（必填，可含首尾空白）
+   */
+  const onSearchPerson = (raw: string) => {
+    const term = raw.trim()
+    if (!term) {
+      setKeyword('')
+      setUidFilter('')
+    } else if (isUidTerm(term)) {
+      setUidFilter(term)
+      setKeyword('')
+    } else {
+      setKeyword(term)
+      setUidFilter('')
+    }
+    setPage(1)
+  }
+
+  /**
+   * 搜索框输入变化：同步输入值；清空输入即清空筛选，恢复完整列表。
+   * @param value 输入框最新值（必填）
+   */
+  const onChangePersonInput = (value: string) => {
+    setSearchInput(value)
+    if (value === '') {
+      setKeyword('')
+      setUidFilter('')
+      setPage(1)
+    }
+  }
 
   const orgOptions = useMemo(
     () => organizations.map((o) => ({ value: o.id, title: `${o.name}（${o.code}）` })),
@@ -500,14 +543,12 @@ export default function UsersAdminView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminUsers.title')}</h3>
           <div className="approval-toolbar">
-            <Input.Search
-              allowClear
+            <PersonSearchBox
               className="admin-search"
+              value={searchInput}
+              onChange={onChangePersonInput}
+              onSearch={onSearchPerson}
               placeholder={t('adminUsers.searchPlaceholder')}
-              onSearch={(v: string) => {
-                setPage(1)
-                setKeyword(v)
-              }}
             />
             <Select
               value={status}

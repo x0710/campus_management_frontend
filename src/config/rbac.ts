@@ -35,11 +35,14 @@ export const DATA_SCOPE_OPTIONS: DataScopeOption[] = [
   { value: 'custom', labelKey: 'adminRoles.scopeCustom', descKey: 'adminRoles.scopeCustomDesc' },
 ]
 
-/** 角色数据范围配置最大行数（代码要求 12：表格每页最多 100 行） */
-export const RBAC_DATA_SCOPE_MAX_ROWS = 100
+/** 权限列表每页条数（代码要求 12：表格每页最多 100 行） */
+export const RBAC_PERMISSION_PAGE_SIZE = 100
 
-/** 数据范围「资源」字段最大长度 */
-export const RBAC_DATA_SCOPE_RESOURCE_MAX_LENGTH = 64
+/**
+ * 角色权限分配弹窗内，权限搜索框的防抖时长（毫秒）。
+ * 用户停止输入该时长后才对本地缓存的权限列表做模糊匹配，避免每次按键都过滤长列表。
+ */
+export const RBAC_PERM_SEARCH_DEBOUNCE_MS = 800
 
 /** 数据范围「自定义组织 ID」字段最大长度 */
 export const RBAC_DATA_SCOPE_VALUE_MAX_LENGTH = 200

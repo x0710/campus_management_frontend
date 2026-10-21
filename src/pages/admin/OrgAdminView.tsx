@@ -53,6 +53,7 @@ import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useMemberSearch } from '../../composables/useMemberSearch'
 import { usePositionNames } from '../../composables/usePositionNames'
@@ -608,14 +609,10 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
         <div className="panel-card-body">
           {/* 成员 ID 搜索（添加成员入口已移至表头，避免与搜索按钮混淆） */}
           <div className="org-member-actions">
-            <Input.Search
-              allowClear
-              style={{ width: 320 }}
-              enterButton={t('common.search')}
-              prefix={<SearchOutlined />}
-              placeholder={t('orgExplorer.searchMemberPlaceholder')}
+            <PersonSearchBox
+              width={320}
               value={search.query}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => search.setQuery(e.target.value)}
+              onChange={search.setQuery}
               onSearch={search.run}
               loading={search.searching}
             />

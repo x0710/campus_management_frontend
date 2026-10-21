@@ -3,10 +3,8 @@ import {
   EditOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import {
-  Alert,
   App as AntdApp,
   Button,
   Form,
@@ -22,12 +20,10 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSettingsStore } from '../../store/settings'
 import {
-  assignRolePermissions,
   createPermission,
   createRole,
   deletePermission,
   deleteRole,
-  getRolePermissions,
   queryPermissions,
   queryRoles,
   updatePermission,
@@ -39,10 +35,10 @@ import type {
 } from '../../api/types/rbac'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import RolePermissionsModal from '../../components/RolePermissionsModal'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
-import RoleDataScopeModal from '../../components/RoleDataScopeModal'
 
 /** 角色/权限关联表每页条数（代码要求 12：表格每页最多 100 行） */
 const PAGE_SIZE = 100
@@ -108,16 +104,8 @@ export default function RolesAdminView() {
   const [permSaving, setPermSaving] = useState(false)
   const [permForm] = Form.useForm<PermFormValues>()
 
-  // 角色-权限分配
+  // 角色-权限分配（合并数据范围配置，弹窗内容与状态由 RolePermissionsModal 自行管理）
   const [assignRole, setAssignRole] = useState<RoleInfo | null>(null)
-  const [assignAllPerms, setAssignAllPerms] = useState<PermInfo[]>([])
-  const [assignSelected, setAssignSelected] = useState<number[]>([])
-  const [assignInitial, setAssignInitial] = useState<number[]>([])
-  const [assignLoading, setAssignLoading] = useState(false)
-  const [assignSaving, setAssignSaving] = useState(false)
-
-  // 角色-数据范围配置
-  const [dataScopeRole, setDataScopeRole] = useState<RoleInfo | null>(null)
 
   const reportError = useErrorFeedback()
 
@@ -293,45 +281,6 @@ export default function RolesAdminView() {
     }
   }
 
-  // ============ 角色-权限分配 ============
-  const openAssign = async (role: RoleInfo) => {
-    setAssignRole(role)
-    setAssignLoading(true)
-    setAssignSelected([])
-    setAssignInitial([])
-    try {
-      // 拉取全部权限（最多 100 条，足够覆盖典型权限规模）
-      const [allRes, current] = await Promise.all([
-        queryPermissions({ page: 1, page_size: 100 }),
-        getRolePermissions(role.id),
-      ])
-      setAssignAllPerms(allRes.data)
-      const ids = current.map((p) => p.id)
-      setAssignSelected(ids)
-      setAssignInitial(ids)
-    } catch (err) {
-      reportError(err)
-      setAssignRole(null)
-    } finally {
-      setAssignLoading(false)
-    }
-  }
-
-  const submitAssign = async () => {
-    if (!assignRole) return
-    setAssignSaving(true)
-    try {
-      await assignRolePermissions(assignRole.id, assignSelected)
-      setAssignInitial(assignSelected)
-      message.success(t('adminRoles.assignSuccess'))
-      setAssignRole(null)
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setAssignSaving(false)
-    }
-  }
-
   // ============ 列定义 ============
   const roleColumns = useMemo<ColumnsType<RoleInfo>>(
     () => [
@@ -360,14 +309,11 @@ export default function RolesAdminView() {
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: 340,
+        width: 260,
         render: (_, record) => (
           <div className="approval-actions">
-            <Button type="link" size="small" onClick={() => openAssign(record)}>
+            <Button type="link" size="small" onClick={() => setAssignRole(record)}>
               {t('adminRoles.assignPerms')}
-            </Button>
-            <Button type="link" size="small" onClick={() => setDataScopeRole(record)}>
-              {t('adminRoles.dataScope')}
             </Button>
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openRoleEdit(record)}>
               {t('adminRoles.edit')}
@@ -442,32 +388,6 @@ export default function RolesAdminView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, locale, actingId],
   )
-
-  const assignColumns = useMemo<ColumnsType<PermInfo>>(
-    () => [
-      { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
-      {
-        title: t('adminRoles.fieldCode'),
-        dataIndex: 'code',
-        key: 'code',
-        render: (v: string) => <Tag color="geekblue">{v}</Tag>,
-      },
-      { title: t('adminRoles.fieldName'), dataIndex: 'name', key: 'name' },
-      {
-        title: t('adminRoles.fieldDesc'),
-        dataIndex: 'description',
-        key: 'description',
-        render: (v: string) => v || '—',
-      },
-    ],
-    [t],
-  )
-
-  const assignDirty = useMemo(() => {
-    if (assignSelected.length !== assignInitial.length) return true
-    const init = new Set(assignInitial)
-    return !assignSelected.every((id) => init.has(id))
-  }, [assignSelected, assignInitial])
 
   return (
     <div className="student-view">
@@ -660,53 +580,14 @@ export default function RolesAdminView() {
         </Form>
       </Modal>
 
-      {/* 角色-权限分配 */}
-      <Modal
-        open={assignRole !== null}
-        title={
-          assignRole
-            ? `${t('adminRoles.assignPermsTitle')}：${assignRole.name}（${assignRole.code}）`
-            : t('adminRoles.assignPermsTitle')
-        }
-        width={720}
-        okText={t('adminRoles.save')}
-        cancelText={t('approval.cancel')}
-        confirmLoading={assignSaving}
-        okButtonProps={{ disabled: !assignDirty }}
-        onCancel={() => setAssignRole(null)}
-        onOk={() => void submitAssign()}
-        destroyOnHidden
-      >
-        <Alert
-          type="info"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          title={t('adminRoles.assignHint')}
-          style={{ marginBottom: 12 }}
+      {/* 角色-权限分配（合并数据范围配置） */}
+      {assignRole && (
+        <RolePermissionsModal
+          role={assignRole}
+          onCancel={() => setAssignRole(null)}
+          onSaved={() => setRoleReload((r) => ({ seq: r.seq + 1, force: false }))}
         />
-        <Table<PermInfo>
-          rowKey="id"
-          size="small"
-          loading={assignLoading}
-          columns={assignColumns}
-          dataSource={assignAllPerms}
-          locale={{ emptyText: t('common.noData') }}
-          pagination={false}
-          scroll={{ y: 320 }}
-          rowSelection={{
-            selectedRowKeys: assignSelected,
-            onChange: (keys: React.Key[]) => setAssignSelected(keys.map(Number)),
-          }}
-        />
-      </Modal>
-
-      {/* 角色-数据范围配置 */}
-      <RoleDataScopeModal
-        open={dataScopeRole !== null}
-        role={dataScopeRole}
-        onCancel={() => setDataScopeRole(null)}
-        onSaved={() => setRoleReload((r) => ({ seq: r.seq + 1, force: false }))}
-      />
+      )}
     </div>
   )
 }
