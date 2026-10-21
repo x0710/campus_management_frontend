@@ -10,6 +10,10 @@ import { Navigate, useParams } from 'react-router'
 import { lazy, type ComponentType } from 'react'
 import { Tag } from 'antd'
 import { getPortal, type PortalKey, type PortalModule } from '../../config/portals'
+import {
+  ACADEMY_ANCESTOR_DEPTHS,
+  BRANCH_ANCESTOR_DEPTHS,
+} from '../../config/organization'
 import { useT } from '../../i18n'
 const AnnouncementsView = lazy(() => import('./AnnouncementsView'))
 const LeaveApplyView = lazy(() => import('../student/LeaveApplyView'))
@@ -60,13 +64,17 @@ const SchoolOrgAdminView = () => <OrgAdminView uiKey="school_m2" />
  * 党委支部端「支部管理」：按组织树深度判定当前用户所属支部后展示其成员
  * （支部还有下级支部时展示「支部 + 全部下级」组织树）。
  */
-const BranchManageModule = () => <BranchManageView fromModuleKey="branch_m5" />
+const BranchManageModule = () => (
+  <BranchManageView fromModuleKey="branch_m5" ancestorDepths={BRANCH_ANCESTOR_DEPTHS} />
+)
 
 /**
- * 党委学院端「学院支部管理」：与支部端使用同一套支部判定与组织树显隐逻辑，
- * 仅侧栏高亮/详情页返回来源不同。
+ * 党委学院端「学院支部管理」：按学院层级（深度 1）定位所属学院党委，
+ * 展示「学院党委 + 下属全部支部」的组织树；未命中学院深度时回退第一个任职组织。
  */
-const AcademyBranchManageModule = () => <BranchManageView fromModuleKey="academy_m5" />
+const AcademyBranchManageModule = () => (
+  <BranchManageView fromModuleKey="academy_m5" ancestorDepths={ACADEMY_ANCESTOR_DEPTHS} />
+)
 
 /**
  * 模块视图注册表。

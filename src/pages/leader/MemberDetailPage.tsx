@@ -9,7 +9,8 @@
  * 管理端 admin_m3 / 党委学校端 school_m2）时在「基本信息」页额外提供「编辑成员信息」入口，
  * 复用 admin/UserEditPanel 修改资料、角色与组织任职。
  *
- * 六个 Tab：
+ * 六个 Tab（党委支部端 / 学院端 / 学校端的组织管理只保留前三个，
+ * 见 MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES）：
  *   1. 基本信息：GET /api/users/{id}（可编辑来源另提供资料/角色/组织任职编辑）
  *   2. 详细信息：GET /api/profile-details?user_id=成员
  *   3. 成绩信息（可编辑）：GET /api/examinations?uid=成员 → 点击行编辑 → PATCH /api/examinations/{id}
@@ -115,6 +116,7 @@ import {
 } from '../../config/examination'
 import {
   MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES,
+  MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES,
   MEMBER_DETAIL_PAGE_SIZE,
   MEMBER_DETAIL_READONLY_FROM_MODULES,
 } from '../../config/leaderOrg'
@@ -213,6 +215,8 @@ export default function MemberDetailPage() {
   const readOnly = MEMBER_DETAIL_READONLY_FROM_MODULES.includes(fromModuleKey)
   // 可编辑成员资料的来源（管理端 / 党委学校端）在「基本信息」页展示编辑入口
   const canEditBasic = MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES.includes(fromModuleKey)
+  // 党委支部端 / 学院端 / 学校端的组织管理不需要请假、违规与奖助信息
+  const hideExtraTabs = MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES.includes(fromModuleKey)
   const userId = Number(uid)
 
   const [user, setUser] = useState<UserDetail | null>(null)
@@ -336,23 +340,27 @@ export default function MemberDetailPage() {
                 label: t('memberDetail.tabGrades'),
                 children: <GradesTab uid={userId} t={t} readOnly={readOnly} />,
               },
-              {
-                key: 'leave',
-                label: t('memberDetail.tabLeave'),
-                children: <LeaveTab uid={userId} t={t} />,
-              },
-              {
-                key: 'violation',
-                label: t('memberDetail.tabViolation'),
-                children: <ViolationTab uid={userId} t={t} readOnly={readOnly} />,
-              },
-              {
-                key: 'rewarding',
-                label: t('memberDetail.tabRewarding'),
-                children: (
-                  <RewardingTab uid={userId} t={t} locale={locale} readOnly={readOnly} />
-                ),
-              },
+              ...(hideExtraTabs
+                ? []
+                : [
+                    {
+                      key: 'leave',
+                      label: t('memberDetail.tabLeave'),
+                      children: <LeaveTab uid={userId} t={t} />,
+                    },
+                    {
+                      key: 'violation',
+                      label: t('memberDetail.tabViolation'),
+                      children: <ViolationTab uid={userId} t={t} readOnly={readOnly} />,
+                    },
+                    {
+                      key: 'rewarding',
+                      label: t('memberDetail.tabRewarding'),
+                      children: (
+                        <RewardingTab uid={userId} t={t} locale={locale} readOnly={readOnly} />
+                      ),
+                    },
+                  ]),
             ]}
           />
         )}

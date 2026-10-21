@@ -2,19 +2,19 @@
  * 党委支部端 / 党委学院端：支部管理（所属支部及其下级组织的成员信息）。
  * 两端共用本组件，仅侧栏高亮与详情页返回来源（fromModuleKey）不同。
  *
- * 所属支部判定（需求：支部位于组织树第 3 / 4 层，规则已抽到 composables/usePortalOrg.ts，
- * 与支部工作台 BranchWorkbenchView 共用）：
+ * 组织定位（规则已抽到 composables/usePortalOrg.ts，与支部/学院工作台共用）：
  *   1. GET /api/credentials/me                   当前登录用户 uid
  *   2. GET /api/organization-members?uids={uid}  该用户全部任职组织
  *   3. 对每个任职组织 GET /api/organizations/{id}/tree →「根 → 该组织」链路（含 level）
- *   4. 链路深度（上级组织数量 = 链条数 - 1）命中 BRANCH_ANCESTOR_DEPTHS(3 或 4) 即为支部；
+ *   4. 链路深度（上级组织数量 = 链条数 - 1）命中 ancestorDepths 即为目标组织：
+ *      支部端传 BRANCH_ANCESTOR_DEPTHS(3 或 4)，学院端传 ACADEMY_ANCESTOR_DEPTHS(1)；
  *      多个任职组织命中时取任职列表中的第一个；均未命中则回退为该用户第一个任职组织，
- *      保证学院层级等非支部账号进入本页也能看到自己组织的人员（而非空白页）。
+ *      保证层级不完全匹配的账号进入本页也能看到自己组织的人员（而非空白页）。
  *
- * 组织树展示（需求：支部还有下级支部才展示组织树）：
- *   GET /api/organizations/{id}/subsidiaries 判断该支部是否还有直接下级；
- *   有下级 → 加载全部组织（listAllOrganizations）取「支部 + 其全部下级」子树并展示组织树；
- *   无下级 → 仅传该支部本身，由 OrgMembersExplorer 以 showOrgTree=false 仅展示成员表。
+ * 组织树展示（需求：目标组织还有下级才展示组织树）：
+ *   GET /api/organizations/{id}/subsidiaries 判断该组织是否还有直接下级；
+ *   有下级 → 加载全部组织（listAllOrganizations）取「该组织 + 其全部下级」子树并展示组织树；
+ *   无下级 → 仅传该组织本身，由 OrgMembersExplorer 以 showOrgTree=false 仅展示成员表。
  *
  * 复用说明（代码要求 1）：组织树、成员分页表格与「点击成员进入详情页」全部复用公共组件
  * OrgMembersExplorer（showOrgTree=false 时隐藏组织树、以 orgs[0] 为唯一组织）；
@@ -29,7 +29,6 @@ import type { OrganizationInfo } from '../../api/types/organizations'
 import OrgMembersExplorer from '../../components/OrgMembersExplorer'
 import type { OrgNode } from '../../components/OrgMembersExplorer'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
-import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
 
 /**
@@ -67,33 +66,38 @@ function collectSubtree(all: OrganizationInfo[], rootId: number): OrganizationIn
 interface BranchManageViewProps {
   /** 侧栏高亮与详情页返回目标使用的模块 key（支部端 branch_m5 / 学院端 academy_m5） */
   fromModuleKey: string
+  /** 目标组织的祖先深度：支部端 BRANCH_ANCESTOR_DEPTHS，学院端 ACADEMY_ANCESTOR_DEPTHS */
+  ancestorDepths: readonly number[]
 }
 
-/** 党委支部端 / 党委学院端：支部管理（支部及其下级组织成员查看） */
-export default function BranchManageView({ fromModuleKey }: BranchManageViewProps) {
+/** 党委支部端 / 党委学院端：支部管理（目标组织及其下级组织成员查看） */
+export default function BranchManageView({
+  fromModuleKey,
+  ancestorDepths,
+}: BranchManageViewProps) {
   const t = useT()
 
   const [orgs, setOrgs] = useState<OrgNode[]>([])
-  /** 支部是否还有下级：有下级才展示组织树（需求） */
+  /** 目标组织是否还有下级：有下级才展示组织树（需求） */
   const [showOrgTree, setShowOrgTree] = useState(false)
   const [orgsLoading, setOrgsLoading] = useState(true)
   const [orgsError, setOrgsError] = useState<string | null>(null)
 
-  /** 解析所属支部并加载其组织范围（force=true 绕过组织缓存，代码要求 5） */
+  /** 解析目标层级组织并加载其组织范围（force=true 绕过组织缓存，代码要求 5） */
   const loadOrgs = useCallback(
     async (force?: boolean) => {
       setOrgsLoading(true)
       setOrgsError(null)
       try {
-        // 1) 当前登录用户的全部任职组织，并按组织树深度判定支部（均未命中时回退第一个任职组织）
-        const { orgId, mine } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
+        // 1) 当前登录用户的全部任职组织，并按组织树深度判定目标组织（均未命中时回退第一个任职组织）
+        const { orgId, mine } = await resolvePortalOrg(ancestorDepths)
         if (orgId === null) {
           setOrgs([])
           setShowOrgTree(false)
           return
         }
 
-        // 2) 支部还有下级 → 展示「支部 + 全部下级」组织树；否则仅展示本支部成员表
+        // 2) 目标组织还有下级 → 展示「目标组织 + 全部下级」组织树；否则仅展示本组织成员表
         const children = await listSubsidiaries(orgId)
         if (children.length > 0) {
           const all = await listAllOrganizations(force)
@@ -113,7 +117,7 @@ export default function BranchManageView({ fromModuleKey }: BranchManageViewProp
         setOrgsLoading(false)
       }
     },
-    [t],
+    [ancestorDepths, t],
   )
 
   useEffect(() => {
@@ -129,6 +133,7 @@ export default function BranchManageView({ fromModuleKey }: BranchManageViewProp
       fromModuleKey={fromModuleKey}
       showOrgTree={showOrgTree}
       autoSelectFirst={showOrgTree}
+      autoSelectFirstWithMembers
     />
   )
 }

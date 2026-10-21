@@ -68,6 +68,13 @@ interface OrgMembersExplorerProps {
   /** 组织加载完成后是否自动选中第一个组织（可选，默认 false） */
   autoSelectFirst?: boolean
   /**
+   * 自动选中时是否跳过没有直属成员的组织（可选，默认 false）。
+   * 开启后按组织树顺序探测成员总数，选中第一个有成员的组织；
+   * 学院根节点通常只有少量直属成员，避免进入页面后成员表近乎为空。
+   * 仅当 autoSelectFirst 为 true 时生效。
+   */
+  autoSelectFirstWithMembers?: boolean
+  /**
    * 是否展示左侧组织树（可选，默认 true）。
    * 置为 false 时隐藏组织树与组织切换，仅展示唯一组织（orgs[0]）的成员表，
    * 适用于「支部」等最底层组织（无下级组织，无需树形切换）。
@@ -83,6 +90,7 @@ export default function OrgMembersExplorer({
   fromModuleKey,
   memberPageSize = LEADER_ORG_MEMBER_PAGE_SIZE,
   autoSelectFirst = false,
+  autoSelectFirstWithMembers = false,
   showOrgTree = true,
 }: OrgMembersExplorerProps) {
   const t = useT()
@@ -129,13 +137,51 @@ export default function OrgMembersExplorer({
   // 展示组织树时取用户在树中选中的组织；不展示组织树时固定为唯一组织（orgs[0]）
   const activeOrgId = showOrgTree ? selectedId : (orgs[0]?.id ?? null)
 
-  // 自动选中首个组织（老师端/学院端通常只有一个/少数组织，避免多一次点击）
+  // 自动选中首个组织（老师端/学院端通常只有一个/少数组织，避免多一次点击）。
+  // autoSelectFirstWithMembers 开启时按组织树顺序（广度优先：根 → 下级）探测成员总数，
+  // 选中第一个有直属成员的组织；全部为空时回退根节点。
+  // 探测与成员表首页使用同一组参数，命中会话缓存，不会额外多打一次接口。
   useEffect(() => {
     if (!showOrgTree) return
-    if (autoSelectFirst && selectedId === null && orgs.length > 0) {
+    if (!autoSelectFirst || selectedId !== null || orgs.length === 0) return
+    if (!autoSelectFirstWithMembers) {
       setSelectedId(fromModuleKey, orgs[0].id)
+      return
     }
-  }, [showOrgTree, autoSelectFirst, orgs, selectedId, fromModuleKey, setSelectedId])
+
+    let cancelled = false
+    void (async () => {
+      for (const org of orgs) {
+        try {
+          const res = await queryOrgMembers(
+            org.id,
+            { page: 1, page_size: memberPageSize },
+          )
+          if (cancelled) return
+          if (res.total > 0) {
+            setSelectedId(fromModuleKey, org.id)
+            return
+          }
+        } catch {
+          if (cancelled) return
+        }
+      }
+      if (!cancelled) setSelectedId(fromModuleKey, orgs[0].id)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    showOrgTree,
+    autoSelectFirst,
+    autoSelectFirstWithMembers,
+    orgs,
+    selectedId,
+    fromModuleKey,
+    memberPageSize,
+    setSelectedId,
+  ])
 
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
   const search = useMemberSearch({

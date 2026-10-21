@@ -25,6 +25,7 @@ export interface UserDetail {
   /** YYYY-MM-DD */
   birthday: string | null
   gender: string | null
+  /** 头像（图片地址） */
   avatar: string | null
   created_at: string
   updated_at: string
@@ -59,5 +60,6 @@ export interface UserUpdateRequest {
   /** YYYY-MM-DD */
   birthday?: string | null
   gender?: Gender
+  /** 头像（图片地址） */
   avatar?: string
 }

@@ -2,16 +2,18 @@
  * 党建活动加分审核（党委支部端 / 党委学院端 / 党委学校端共用页面）。
  *
  * 数据源：
- *   GET /api/party-scores + /api/approvals 前端合成当前审批人的党建加分审批步骤列表
+ *   GET /api/approvals                     按显式 approver_id（当前登录用户）取审批步骤
+ *   GET /api/party-scores                 按 approval_instance_id 精确反查，判定步骤是否属于加分业务
  *     （后端 GET /api/party-scores/approvals 与 /api/party-scores/{id} 路由冲突，不能直接调用）
- *   GET /api/party-scores                 按 approval_instance_id 反查加分申请详情，补齐列表与详情
  *   PUT /api/party-scores/approvals/{id}/approve   通过
  *   PUT /api/party-scores/approvals/{id}/reject    驳回
  *   PUT /api/party-scores/approvals/{id}/transfer  转交
  *   GET /api/users                         转交对象搜索
  *
- * 审批步骤后端不返回申请人/申请分数等业务字段，因此前端按实例 ID 批量反查加分申请；
- * 所有 GET 均走会话缓存，写操作后自动失效 party-scores 前缀缓存并刷新表格。
+ * 审批步骤后端不返回申请人/申请分数等业务字段，因此前端按实例 ID 反查加分申请；
+ * 判定归属时必须按实例精确查询，不能改成「拉全部加分申请再取交集」——
+ * 后者会受调用者数据范围与分页影响，导致别人的申请被静默过滤掉。
+ * 所有 GET 均走会话缓存，写操作后自动失效缓存并刷新表格。
  */
 import { ReloadOutlined } from '@ant-design/icons'
 import {
@@ -134,14 +136,18 @@ export default function PartyScoreApprovalView() {
       setLoading(true)
       setError(null)
       try {
-        const [me, steps] = await Promise.all([
-          getCurrentUser(),
-          queryPartyScoreApprovals(
-            { page, page_size: PARTY_SCORE_APPROVAL_PAGE_SIZE },
-            force,
-          ),
-        ])
+        // 先拿当前用户，再显式带 approver_id 查询：不依赖后端「缺省按本人待办」的隐式行为，
+        // 也保证缓存键包含审批人，避免不同账号之间串用缓存
+        const me = await getCurrentUser()
         setMyUid(me.uid)
+        const steps = await queryPartyScoreApprovals(
+          {
+            approver_id: me.uid,
+            page,
+            page_size: PARTY_SCORE_APPROVAL_PAGE_SIZE,
+          },
+          force,
+        )
         const scoreMap = await fetchPartyScoreMap(steps.map((step) => step.instance_id))
         setRows(
           steps.map((step) => ({

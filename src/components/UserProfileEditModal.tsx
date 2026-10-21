@@ -30,7 +30,7 @@ interface Props {
 /**
  * 可复用的用户资料编辑弹窗：
  * 打开时拉取用户最新信息并回填表单，提交 PATCH /api/users/{id}。
- * 仅编辑资料字段（姓名/性别/邮箱/电话/生日/格言），角色与组织任职不在此处理。
+ * 仅编辑资料字段（姓名/性别/邮箱/电话/生日/头像），角色与组织任职不在此处理。
  */
 export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Props) {
   const t = useT()
@@ -144,7 +144,8 @@ export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Pr
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="avatar" label={t('profile.avatar')}>
-            <Input.TextArea rows={3} maxLength={512} showCount />
+            {/* avatar 为头像图片地址，单行输入 */}
+            <Input maxLength={512} allowClear />
           </Form.Item>
         </Form>
       )}

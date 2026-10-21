@@ -5,8 +5,9 @@ import {
   EditOutlined,
   SolutionOutlined,
   TeamOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Descriptions, Skeleton, Space, Tag, Typography } from 'antd'
+import { Avatar, Button, Card, Descriptions, Skeleton, Space, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ErrorState from '../../components/ErrorState'
@@ -25,7 +26,7 @@ import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
-const { Paragraph, Text } = Typography
+const { Text } = Typography
 
 /** 角色详情含查询失败标记，便于在 UI 中区分「无角色」与「加载失败」 */
 interface RoleItem extends RoleInfo {
@@ -148,44 +149,62 @@ export default function StudentProfileView() {
           <ErrorState message={error} />
         ) : user ? (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            {/* 基本信息 */}
-            <Card
-              size="small"
-              title={
-                <Space>
-                  <SolutionOutlined />
-                  {t('profile.basicInfo')}
-                </Space>
-              }
+            {/* 基本信息与头像并排：基本信息自适应占据剩余宽度，头像固定在右侧；窄屏自动换行 */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 16,
+                alignItems: 'stretch',
+                width: '100%',
+              }}
             >
-              <Descriptions column={2} bordered size="small">
-                <Descriptions.Item label={t('profile.name')}>
-                  {user.name ?? t('profile.noData')}
-                </Descriptions.Item>
-                <Descriptions.Item label={t('profile.gender')}>
-                  {genderLabel}
-                </Descriptions.Item>
-                <Descriptions.Item label={t('profile.email')}>
-                  {user.email ?? t('profile.noData')}
-                </Descriptions.Item>
-                <Descriptions.Item label={t('profile.phone')}>
-                  {user.phone ?? t('profile.noData')}
-                </Descriptions.Item>
-                <Descriptions.Item label={t('profile.birthday')}>
-                  {user.birthday ?? t('profile.noData')}
-                </Descriptions.Item>
-                <Descriptions.Item label={t('profile.createdAt')}>
-                  {formatDateTime(user.created_at, locale)}
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
+              {/* 基本信息 */}
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <SolutionOutlined />
+                    {t('profile.basicInfo')}
+                  </Space>
+                }
+                style={{ flex: '1 1 480px', minWidth: 0 }}
+              >
+                <Descriptions column={2} bordered size="small">
+                  <Descriptions.Item label={t('profile.name')}>
+                    {user.name ?? t('profile.noData')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.gender')}>
+                    {genderLabel}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.email')}>
+                    {user.email ?? t('profile.noData')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.phone')}>
+                    {user.phone ?? t('profile.noData')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.birthday')}>
+                    {user.birthday ?? t('profile.noData')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.createdAt')}>
+                    {formatDateTime(user.created_at, locale)}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
 
-            {/* 格言（avatar 字段实际存储格言） */}
-            <Card size="small" title={t('profile.avatar')}>
-              <Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
-                {user.avatar && user.avatar.trim() ? user.avatar : t('profile.noData')}
-              </Paragraph>
-            </Card>
+              {/* 头像（avatar 字段存储头像图片地址） */}
+              <Card
+                size="small"
+                title={t('profile.avatar')}
+                style={{ flex: '0 0 168px' }}
+              >
+                {user.avatar && user.avatar.trim() ? (
+                  <Avatar shape="square" size={96} src={user.avatar} />
+                ) : (
+                  <Avatar shape="square" size={96} icon={<UserOutlined />} />
+                )}
+              </Card>
+            </div>
 
             {/* 系统角色 */}
             <Card

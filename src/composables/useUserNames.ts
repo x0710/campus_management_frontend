@@ -18,14 +18,19 @@ import { queryUsers } from '../api/users'
 export function useUserNames(ids: number[]): Map<number, string | null> {
   const [names, setNames] = useState<Map<number, string | null>>(new Map())
 
-  const uniqueIds = useMemo(() => {
+  // 依赖稳定的字符串 key 而不是数组引用：调用方常写成
+  // useUserNames(detail ? [detail.user_id] : [])，每次渲染都会新建数组。
+  // 若直接依赖数组，会出现 effect → setNames → 重渲染 → 新数组 → effect 的无限循环；
+  // 请求失败（如缺少 user.read 权限返回 403）时失败结果不进缓存，表现为持续重复请求。
+  const idsKey = useMemo(() => {
     const set = new Set(ids.filter((id) => Number.isFinite(id) && id > 0))
-    return [...set]
+    return [...set].sort((a, b) => a - b).join(',')
   }, [ids])
 
   useEffect(() => {
-    if (uniqueIds.length === 0) return
+    if (!idsKey) return
 
+    const uniqueIds = idsKey.split(',').map(Number)
     let cancelled = false
     const fetched = new Map<number, string | null>()
 
@@ -58,7 +63,7 @@ export function useUserNames(ids: number[]): Map<number, string | null> {
     return () => {
       cancelled = true
     }
-  }, [uniqueIds])
+  }, [idsKey])
 
   return names
 }

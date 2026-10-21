@@ -36,3 +36,15 @@ export const MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES: string[] = [
   'admin_m3',
   'school_m2',
 ]
+
+/**
+ * 成员详情页隐藏「请假 / 违规信息 / 奖学金及补助」三个 Tab 的来源模块 key：
+ * 党委支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5、
+ * 党委学校端组织管理 school_m2 的组织管理只关注成员基础资料与成绩，
+ * 不需要这三块业务数据，因此从这些来源进入成员详情时不展示对应 Tab。
+ */
+export const MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES: string[] = [
+  'branch_m5',
+  'academy_m5',
+  'school_m2',
+]
