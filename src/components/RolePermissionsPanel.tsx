@@ -1,6 +1,6 @@
 /**
- * 角色权限分配弹窗（合并版，可复用组件）：
- * 一次操作同时完成「分配权限」与「配置数据范围」——
+ * 角色权限分配子页面（非弹窗，可复用组件）：
+ * 从角色列表进入后，以页面内的子页面展示「分配权限」与「配置数据范围」——
  * 勾选权限后，在同行选择该权限所属资源的数据范围，点保存一并提交。
  * - 打开时并行拉取全部权限、角色已分配权限、角色已有数据范围配置；
  * - 顶部搜索框：输入停止 RBAC_PERM_SEARCH_DEBOUNCE_MS 后对本地缓存的权限列表做
@@ -10,12 +10,12 @@
  * - 保存：先 PUT permissions 覆盖权限，再 PUT data-scopes 覆盖数据范围
  *   （仅提交已勾选权限对应的资源），成功后回调 onSaved（代码要求 13）。
  */
-import { SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons'
 import {
   Alert,
   App as AntdApp,
+  Button,
   Input,
-  Modal,
   Select,
   Table,
   Tag,
@@ -55,10 +55,10 @@ interface ScopeConfig {
   scopeValue: string
 }
 
-interface RolePermissionsModalProps {
-  /** 目标角色（必填；每次打开由父组件重新挂载，内部状态天然重置） */
+interface RolePermissionsPanelProps {
+  /** 目标角色（必填；返回列表后再次进入会重新挂载，内部状态自然重置） */
   role: RoleInfo
-  /** 取消/关闭时触发（必填） */
+  /** 点击「返回角色列表」或「取消」时触发（必填） */
   onCancel: () => void
   /** 保存成功后触发，用于刷新列表（必填） */
   onSaved: () => void
@@ -99,10 +99,7 @@ function fuzzyMatch(text: string, keyword: string): boolean {
  * @param resources 参与比较的资源列表（已排序）
  * @returns 字符串签名
  */
-function scopeSignature(
-  map: Record<string, ScopeConfig>,
-  resources: string[],
-): string {
+function scopeSignature(map: Record<string, ScopeConfig>, resources: string[]): string {
   return resources
     .map((resource) => {
       const config = map[resource]
@@ -111,11 +108,11 @@ function scopeSignature(
     .join('|')
 }
 
-export default function RolePermissionsModal({
+export default function RolePermissionsPanel({
   role,
   onCancel,
   onSaved,
-}: RolePermissionsModalProps) {
+}: RolePermissionsPanelProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
@@ -137,7 +134,7 @@ export default function RolePermissionsModal({
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
 
-  // 打开时并行拉取全部权限、角色已分配权限、角色已有数据范围
+  // 进入子页面时并行拉取全部权限、角色已分配权限、角色已有数据范围
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -366,82 +363,96 @@ export default function RolePermissionsModal({
   ]
 
   return (
-    <Modal
-      open
-      title={`${t('adminRoles.assignPermsTitle')}：${role.name}（${role.code}）`}
-      width={960}
-      okText={t('adminRoles.save')}
-      cancelText={t('approval.cancel')}
-      confirmLoading={saving}
-      okButtonProps={{ disabled: loading || loadError !== null || !dirty }}
-      onCancel={onCancel}
-      onOk={() => void submit()}
-      destroyOnHidden
-    >
-      <Alert
-        type="info"
-        showIcon
-        icon={<SafetyCertificateOutlined />}
-        title={t('adminRoles.assignHint')}
-        style={{ marginBottom: 12 }}
-      />
-
-      {loadError ? (
-        <ErrorState message={loadError} />
-      ) : (
-        <>
-          <div className="approval-toolbar" style={{ marginBottom: 12 }}>
-            <Input
-              allowClear
-              className="admin-search"
-              prefix={<SearchOutlined />}
-              value={searchInput}
-              placeholder={t('adminRoles.permSearchInAssign')}
-              onChange={(event) => setSearchInput(event.target.value)}
-            />
-            <span className="rbac-search-count">
-              {t('common.total')} {visiblePerms.length} {t('common.items')}
-            </span>
-          </div>
-          {/* 已分配权限常驻展示：搜索过滤只影响下方列表，不会让已分配的权限「消失」 */}
-          {selectedPerms.length > 0 && (
-            <div className="rbac-assigned">
-              <span className="rbac-assigned-label">
-                {t('adminRoles.assignedPerms', { n: selectedPerms.length })}
-              </span>
-              <div className="rbac-assigned-tags">
-                {selectedPerms.map((item) => (
-                  <Tag
-                    key={item.id}
-                    color="geekblue"
-                    closable
-                    onClose={() => unselectPerm(item.id)}
-                  >
-                    {item.code}
-                  </Tag>
-                ))}
-              </div>
-            </div>
-          )}
-          <Table<PermInfo>
-            rowKey="id"
-            size="small"
-            loading={loading}
-            columns={columns}
-            dataSource={visiblePerms}
-            locale={{ emptyText: t('common.noData') }}
-            pagination={false}
-            scroll={{ y: 320 }}
-            rowSelection={{
-              selectedRowKeys: selected,
-              // 搜索过滤会改变 dataSource，开启后已选但被过滤掉的行不会被 antd 丢弃，
-              // 否则覆盖式保存会把它们当作「已取消」而从角色上移除（数据丢失）
-              preserveSelectedRowKeys: true,
-              onChange: (keys) => setSelected(keys.map(Number)),
-            }}
+    <div className="student-view">
+      <section className="panel-card">
+        <header className="panel-card-header">
+          <h3 className="panel-card-title">
+            {`${t('adminRoles.assignPermsTitle')}：${role.name}（${role.code}）`}
+          </h3>
+          <Button icon={<ArrowLeftOutlined />} onClick={onCancel}>
+            {t('adminRoles.backToRoles')}
+          </Button>
+        </header>
+        <div className="panel-card-body">
+          <Alert
+            type="info"
+            showIcon
+            icon={<SafetyCertificateOutlined />}
+            message={t('adminRoles.assignHint')}
+            style={{ marginBottom: 12 }}
           />
-        </>
-      )}
-    </Modal>
+
+          {loadError ? (
+            <ErrorState message={loadError} />
+          ) : (
+            <>
+              <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+                <Input
+                  allowClear
+                  className="admin-search"
+                  prefix={<SearchOutlined />}
+                  value={searchInput}
+                  placeholder={t('adminRoles.permSearchInAssign')}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                />
+                <span className="rbac-search-count">
+                  {t('common.total')} {visiblePerms.length} {t('common.items')}
+                </span>
+              </div>
+              {/* 已分配权限常驻展示：搜索过滤只影响下方列表，不会让已分配的权限「消失」 */}
+              {selectedPerms.length > 0 && (
+                <div className="rbac-assigned">
+                  <span className="rbac-assigned-label">
+                    {t('adminRoles.assignedPerms', { n: selectedPerms.length })}
+                  </span>
+                  <div className="rbac-assigned-tags">
+                    {selectedPerms.map((item) => (
+                      <Tag
+                        key={item.id}
+                        color="geekblue"
+                        closable
+                        onClose={() => unselectPerm(item.id)}
+                      >
+                        {item.code}
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Table<PermInfo>
+                rowKey="id"
+                size="small"
+                loading={loading}
+                columns={columns}
+                dataSource={visiblePerms}
+                locale={{ emptyText: t('common.noData') }}
+                pagination={false}
+                scroll={{ y: 460 }}
+                rowSelection={{
+                  selectedRowKeys: selected,
+                  // 搜索过滤会改变 dataSource，开启后已选但被过滤掉的行不会被 antd 丢弃，
+                  // 否则覆盖式保存会把它们当作「已取消」而从角色上移除（数据丢失）
+                  preserveSelectedRowKeys: true,
+                  onChange: (keys) => setSelected(keys.map(Number)),
+                }}
+              />
+
+              {/* 子页面底部操作区：取消返回列表，保存提交权限与数据范围 */}
+              <div className="approval-toolbar" style={{ marginTop: 16, justifyContent: 'flex-end' }}>
+                <Button onClick={onCancel}>{t('approval.cancel')}</Button>
+                <Button
+                  type="primary"
+                  loading={saving}
+                  disabled={loading || loadError !== null || !dirty}
+                  onClick={() => void submit()}
+                >
+                  {t('adminRoles.save')}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+    </div>
   )
 }

@@ -35,7 +35,7 @@ import type {
 } from '../../api/types/rbac'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
-import RolePermissionsModal from '../../components/RolePermissionsModal'
+import RolePermissionsPanel from '../../components/RolePermissionsPanel'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
@@ -104,7 +104,7 @@ export default function RolesAdminView() {
   const [permSaving, setPermSaving] = useState(false)
   const [permForm] = Form.useForm<PermFormValues>()
 
-  // 角色-权限分配（合并数据范围配置，弹窗内容与状态由 RolePermissionsModal 自行管理）
+  // 角色-权限分配：以页面内子页面展示（不弹窗），内容与状态由 RolePermissionsPanel 自行管理
   const [assignRole, setAssignRole] = useState<RoleInfo | null>(null)
 
   const reportError = useErrorFeedback()
@@ -389,6 +389,17 @@ export default function RolesAdminView() {
     [t, locale, actingId],
   )
 
+  // 分配权限时整页切换为该角色的权限子页面，返回后恢复角色/权限列表
+  if (assignRole) {
+    return (
+      <RolePermissionsPanel
+        role={assignRole}
+        onCancel={() => setAssignRole(null)}
+        onSaved={() => setRoleReload((r) => ({ seq: r.seq + 1, force: false }))}
+      />
+    )
+  }
+
   return (
     <div className="student-view">
       <section className="panel-card">
@@ -579,15 +590,6 @@ export default function RolesAdminView() {
           </Form.Item>
         </Form>
       </Modal>
-
-      {/* 角色-权限分配（合并数据范围配置） */}
-      {assignRole && (
-        <RolePermissionsModal
-          role={assignRole}
-          onCancel={() => setAssignRole(null)}
-          onSaved={() => setRoleReload((r) => ({ seq: r.seq + 1, force: false }))}
-        />
-      )}
     </div>
   )
 }

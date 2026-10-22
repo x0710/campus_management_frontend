@@ -131,7 +131,7 @@ export const PORTALS: PortalDef[] = [
   {
     // 党委学校端门户：总览（党员总数接真实接口，平均分/排名为虚拟数据）；
     // 组织管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
-    // 岗位管理复用管理端「岗位管理」页面，审批管理接入党建活动加分审批接口，均接真实接口
+    // 岗位管理复用管理端「岗位管理」页面，审批模板管理复用领导端「审批模板管理」页面，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
     gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
@@ -268,32 +268,96 @@ export function getPortalKeysByRoleCodes(roleCodes: string[]): PortalKey[] {
   return PORTALS.filter((portal) => allowedPortals.has(portal.key)).map((portal) => portal.key)
 }
 
-/** 无角色信息时默认进入的门户端：登录后查询不到可匹配角色时，默认进入学生端 */
-export const DEFAULT_PORTAL_KEY: PortalKey = 'student'
+/** 角色信息最小字段：门户可访问性判定只需角色 code 与名称（必填） */
+export interface PortalRole {
+  code: string
+  name: string
+}
 
-/** 党员端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+/** 默认门户：所有人登录后默认进入党员端（支部书记 / 书记按角色另行分流） */
+export const DEFAULT_PORTAL_KEY: PortalKey = 'party'
+
+/** 党员端门户 key：默认门户，全部登录用户可访问 */
 export const PARTY_PORTAL_KEY: PortalKey = 'party'
 
-/** 党委支部端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+/** 党委支部端门户 key：仅支部书记角色可访问 */
 export const BRANCH_PORTAL_KEY: PortalKey = 'branch'
 
-/** 党委学院端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+/** 党委学院端门户 key：仅书记（学院书记）角色可访问 */
 export const ACADEMY_PORTAL_KEY: PortalKey = 'academy'
 
-/** 党委学校端门户 key：后端暂无对应角色，暂对全部登录用户开放（门户菜单中置顶展示） */
+/** 党委学校端门户 key：仅学校书记角色可访问 */
 export const SCHOOL_PORTAL_KEY: PortalKey = 'school'
 
 /**
- * 根据角色代码获取当前用户可访问的门户，无匹配角色时回退为学生端。
- * 与「登录后无角色信息默认进入学生端」保持一致，供登录跳转与顶栏门户菜单共用，
- * 避免出现「已进入学生端、但门户菜单却提示无可用工作端」的不一致。
- * 党员端（party）、党委支部端（branch）、党委学院端（academy）、党委学校端（school）
- * 门户无后端角色，暂无条件置于列表首位，供全部登录用户预览。
- * @param roleCodes 当前用户的角色 code 列表（必填）
- * @returns 非空的 PortalKey 数组（必返回）；无匹配角色时返回 [DEFAULT_PORTAL_KEY]
+ * 角色名称 / 编码关键字匹配（名称与编码任一命中即可）。
+ * @param role 角色信息（必填）
+ * @param nameKeywords 角色名称需同时包含的中文关键字（必填，可为空数组）
+ * @param codeKeywords 角色编码需同时包含的英文关键字（必填，小写，可为空数组）
+ * @returns 是否命中
  */
-export function getAccessiblePortalKeys(roleCodes: string[]): PortalKey[] {
-  const keys = getPortalKeysByRoleCodes(roleCodes)
-  const base = keys.length > 0 ? keys : [DEFAULT_PORTAL_KEY]
-  return [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ACADEMY_PORTAL_KEY, SCHOOL_PORTAL_KEY, ...base]
+function roleMatches(role: PortalRole, nameKeywords: string[], codeKeywords: string[]): boolean {
+  const nameHit =
+    nameKeywords.length > 0 && nameKeywords.every((keyword) => role.name.includes(keyword))
+  const code = role.code.trim().toLowerCase()
+  const codeHit =
+    codeKeywords.length > 0 && codeKeywords.every((keyword) => code.includes(keyword))
+  return nameHit || codeHit
+}
+
+/** 支部书记：名称含「支部」「书记」，或编码同时含 branch / secretary */
+function isBranchSecretary(role: PortalRole): boolean {
+  return roleMatches(role, ['支部', '书记'], ['branch', 'secretar'])
+}
+
+/** 学校书记：名称含「学校」「书记」，或编码同时含 school / secretary */
+function isSchoolSecretary(role: PortalRole): boolean {
+  return roleMatches(role, ['学校', '书记'], ['school', 'secretar'])
+}
+
+/** 学院书记：名称含「书记」（排除支部 / 学校书记），或编码为 academy / college secretary */
+function isAcademySecretary(role: PortalRole): boolean {
+  if (isBranchSecretary(role) || isSchoolSecretary(role)) return false
+  if (role.name.includes('书记')) return true
+  const code = role.code.trim().toLowerCase()
+  return (code.includes('academy') || code.includes('college')) && code.includes('secretar')
+}
+
+/**
+ * 登录后默认门户：支部书记 → 党委支部端；书记 → 党委学院端；其余 → 党员端。
+ * 多个角色同时命中时按支部书记、学院书记、学校书记的顺序优先。
+ * @param roles 当前用户的角色列表（必填）
+ * @returns 默认进入的 PortalKey（必返回；无匹配角色时为党员端）
+ */
+export function resolveDefaultPortalKey(roles: PortalRole[]): PortalKey {
+  if (roles.some(isBranchSecretary)) return BRANCH_PORTAL_KEY
+  if (roles.some(isAcademySecretary)) return ACADEMY_PORTAL_KEY
+  if (roles.some(isSchoolSecretary)) return SCHOOL_PORTAL_KEY
+  return DEFAULT_PORTAL_KEY
+}
+
+/**
+ * 根据角色获取当前用户可访问的全部门户：
+ *   党员端：全部登录用户；
+ *   党委支部端：仅支部书记；
+ *   党委学院端：仅书记；
+ *   党委学校端：仅学校书记；
+ *   其余门户（学生 / 教师 / 领导 / 管理）仍按原有角色 code 映射。
+ * 返回顺序为党员端 / 支部端 / 学院端 / 学校端在前，其余按 PORTALS 定义顺序。
+ * @param roles 当前用户的角色列表（必填）
+ * @returns 非空的 PortalKey 数组（必返回；至少包含党员端）
+ */
+export function getAccessiblePortalKeys(roles: PortalRole[]): PortalKey[] {
+  const allowed = new Set<PortalKey>([PARTY_PORTAL_KEY, ...getPortalKeysByRoleCodes(roles.map((role) => role.code))])
+  if (roles.some(isBranchSecretary)) allowed.add(BRANCH_PORTAL_KEY)
+  if (roles.some(isAcademySecretary)) allowed.add(ACADEMY_PORTAL_KEY)
+  if (roles.some(isSchoolSecretary)) allowed.add(SCHOOL_PORTAL_KEY)
+
+  const partyKeys = [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ACADEMY_PORTAL_KEY, SCHOOL_PORTAL_KEY].filter(
+    (key) => allowed.has(key),
+  )
+  const restKeys = PORTALS.filter((portal) => allowed.has(portal.key) && !partyKeys.includes(portal.key)).map(
+    (portal) => portal.key,
+  )
+  return [...partyKeys, ...restKeys]
 }

@@ -178,7 +178,7 @@ const messages = {
       school_m1: '总览',
       school_m2: '组织管理',
       school_m3: '系统权限管理',
-      school_m4: '审批管理',
+      school_m4: '审批模板管理',
       school_m5: '岗位管理',
     },
     menu: {
@@ -772,6 +772,7 @@ const messages = {
       permSearchPlaceholder: '搜索权限编码或名称',
       assignPerms: '分配权限',
       assignPermsTitle: '角色权限分配',
+      backToRoles: '返回角色列表',
       assignHint:
         '勾选要分配给该角色的权限，并在同行选择该权限所属资源的数据范围；保存后将同时覆盖原有权限与数据范围配置（「自定义」范围需填写逗号分隔的组织 ID）。',
       permSearchInAssign: '搜索权限编码或名称（如 coll 可模糊匹配 college.read）',
@@ -1476,7 +1477,7 @@ const messages = {
       school_m1: 'Overview',
       school_m2: 'Organizations',
       school_m3: 'System Permissions',
-      school_m4: 'Approval Management',
+      school_m4: 'Approval Templates',
       school_m5: 'Positions Management',
     },
     menu: {
@@ -2077,6 +2078,7 @@ const messages = {
       permSearchPlaceholder: 'Search permission code or name',
       assignPerms: 'Permissions',
       assignPermsTitle: 'Role permissions',
+      backToRoles: 'Back to roles',
       assignHint:
         'Select the permissions to assign and choose a data scope for each permission resource on the same row. Saving overwrites both the permissions and the data-scope configuration ("Custom" requires comma-separated organization IDs).',
       permSearchInAssign: 'Search permission code or name (e.g. coll matches college.read)',

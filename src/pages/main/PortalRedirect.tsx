@@ -1,7 +1,7 @@
 /**
  * 登录后的门户解析页：
- * 获取当前登录用户的角色列表，按角色映射到对应门户，并以 replace 方式跳转到 /portal/:portalKey。
- * - 无角色信息（查不到可匹配的角色）时默认进入学生端（DEFAULT_PORTAL_KEY）；
+ * 获取当前登录用户的角色列表，按角色分流并以 replace 方式跳转到 /portal/:portalKey：
+ * - 支部书记 → 党委支部端；书记 → 党委学院端；其余（含无角色信息）→ 党员端（DEFAULT_PORTAL_KEY）；
  * - 角色信息获取失败（后端未启动、网络不通、登录态失效等）时不显示空白错误页，
  *   而是清空会话缓存与登录态并回到登录页，同时通过路由 state 携带失败原因（含状态码）在登录页提示。
  * 加载过程中显示 Spin。
@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router'
 import { getMyRoles } from '../../api/auth'
 import { invalidate } from '../../api/cache'
 import { extractErrorReason } from '../../api/common'
-import { DEFAULT_PORTAL_KEY, getPortalKeyByRoleCodes } from '../../config/portals'
+import { resolveDefaultPortalKey } from '../../config/portals'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 
@@ -32,9 +32,8 @@ export default function PortalRedirect() {
     getMyRoles()
       .then((roles) => {
         if (cancelled) return
-        // 无角色信息时默认进入学生端，保证登录后一定有一个可用工作端
-        const portalKey =
-          getPortalKeyByRoleCodes(roles.map((role) => role.code)) ?? DEFAULT_PORTAL_KEY
+        // 按角色分流：支部书记 → 支部端；书记 → 学院端；其余默认党员端
+        const portalKey = resolveDefaultPortalKey(roles)
         navigate(`/portal/${portalKey}`, { replace: true })
       })
       .catch((err) => {

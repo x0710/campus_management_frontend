@@ -3,7 +3,8 @@
  *
  * 已接入真实接口：
  *   全校党员（人）  经 composables/usePortalOrg 定位当前用户所属「学校」组织（组织树根节点，深度 0）→
- *                   GET /api/organizations/{id}/members 取分页 total（只需总数，page_size=1）
+ *                   composables/useOrgMemberTotal 递归汇总学校及全部下级组织成员数
+ *                   （GET /api/organizations/{id}/members 的 total 只含直接成员，故需累加下级组织）
  *
  * 平均分与各二级党委排名后端暂无对应接口，仍为模拟数据，故本页保留模拟数据提示。
  */
@@ -11,8 +12,8 @@ import { Alert } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { extractErrorReason } from '../../api/common'
-import { queryOrgMembers } from '../../api/organizations'
 import ErrorState from '../../components/ErrorState'
+import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { SCHOOL_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
@@ -42,8 +43,7 @@ export default function SchoolOverviewView() {
   const load = useCallback(async () => {
     try {
       const { orgId } = await resolvePortalOrg(SCHOOL_ANCESTOR_DEPTHS)
-      const memberPage = orgId === null ? null : await queryOrgMembers(orgId, { page: 1, page_size: 1 })
-      setMembers(memberPage?.total ?? 0)
+      setMembers(orgId === null ? 0 : await countOrgMemberTotal(orgId))
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {

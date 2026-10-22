@@ -106,8 +106,8 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'school:school_m2': SchoolOrgAdminView,
   // 党委学校端「系统权限管理」：与管理端「角色权限」复用同一页面（接真实 RBAC 接口）
   'school:school_m3': RolesAdminView,
-  // 党委学校端「审批管理」：党建活动加分审批
-  'school:school_m4': PartyScoreApprovalView,
+  // 党委学校端「审批模板管理」：复用领导端「审批模板管理」页面（接真实审批模板接口）
+  'school:school_m4': ApprovalTemplateManageView,
   // 党委学校端「岗位管理」：复用管理端「岗位管理」页面（接真实职位接口）
   'school:school_m5': PositionsAdminView,
   'student:student_m1': ScheduleView,

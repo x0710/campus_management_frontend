@@ -87,8 +87,8 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     getMyRoles()
       .then((roles) => {
         if (cancelled) return
-        // 无角色信息时与学生端默认入口保持一致（回退学生端）
-        setPortalKeys(getAccessiblePortalKeys(roles.map((role) => role.code)))
+        // 按角色过滤门户：党员端始终可选，支部端 / 学院端 / 学校端仅对应书记角色可见
+        setPortalKeys(getAccessiblePortalKeys(roles))
       })
       .catch(() => {
         // 角色仅用于门户切换菜单；查询失败时保持空列表，不打断顶栏展示
@@ -153,7 +153,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const refreshPortalKeys = async () => {
     try {
       const roles = await getMyRoles(true)
-      setPortalKeys(getAccessiblePortalKeys(roles.map((role) => role.code)))
+      setPortalKeys(getAccessiblePortalKeys(roles))
     } catch {
       // 刷新失败时保留原菜单，不打断用户操作
     }
