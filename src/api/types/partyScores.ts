@@ -4,7 +4,7 @@
  * 对应后端 tag「party-score」的 /api/party-scores 系列接口：
  *   GET   /api/party-scores                                  分页查询加分申请
  *   POST  /api/party-scores                                  创建加分申请
- *   GET   /api/party-scores/{id}                             加分申请详情
+ *   GET   /api/party-scores/{id}                             加分申请详情（含附件下载地址 file_urls）
  *   GET   /api/party-scores/approvals                        当前审批人已处理的审批步骤列表
  *   PUT   /api/party-scores/approvals/{id}/approve|reject|transfer  审批通过/驳回/转交
  * （接口契约以 Swagger 为准；模型名对应 api.json: PartyScore* / ApprovalInstanceStep）
@@ -33,6 +33,14 @@ export interface PartyScore {
   created_at: string
   /** 更新时间（RFC3339） */
   updated_at: string
+  /** 附件下载地址列表（详情接口返回；列表项可能不含） */
+  file_urls?: string[]
+}
+
+/** GET /api/party-scores/{id} 加分申请详情（api.json: PartyScoreDetail） */
+export interface PartyScoreDetail extends PartyScore {
+  /** 附件下载地址列表（后端已签发地址，可直接打开下载） */
+  file_urls: string[]
 }
 
 /**
@@ -52,10 +60,13 @@ export interface PartyScoreQuery extends PageQuery {
 export interface PartyScoreCreateRequest {
   /** 审批模板 ID（必填） */
   template_id: number
-  /** 申请用户 ID（必填） */
-  user_id: number
   /** 申请加分（必填，int64） */
   requested_score: number
+  /**
+   * 附件文件 ID 列表（必填，无附件时传空数组）。
+   * 需先调用 POST /api/files 上传文件，再把返回的 id 填入此字段，实现申请与附件匹配。
+   */
+  files: number[]
 }
 
 /** POST /api/party-scores 创建成功响应（api.json: PartyScoreCreateResponse） */

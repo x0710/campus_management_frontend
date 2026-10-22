@@ -79,20 +79,25 @@ interface ActionFormValues {
 /**
  * 按审批实例 ID 批量反查加分申请。
  * @param instanceIds 审批实例 ID 数组（可为空；内部去重）
+ * @param force 是否强制绕过缓存重新请求（用于手动刷新，默认 false）
  * @returns Promise<Map<number, PartyScore | null>> instance_id -> 加分申请（查不到或失败为 null）
  */
 async function fetchPartyScoreMap(
   instanceIds: number[],
+  force?: boolean,
 ): Promise<Map<number, PartyScore | null>> {
   const unique = [...new Set(instanceIds)]
   const entries = await Promise.all(
     unique.map(async (id) => {
       try {
-        const res = await queryPartyScores({
-          approval_instance_id: id,
-          page: 1,
-          page_size: 1,
-        })
+        const res = await queryPartyScores(
+          {
+            approval_instance_id: id,
+            page: 1,
+            page_size: 1,
+          },
+          force,
+        )
         return [id, res.data[0] ?? null] as const
       } catch {
         return [id, null] as const
@@ -148,7 +153,10 @@ export default function PartyScoreApprovalView() {
           },
           force,
         )
-        const scoreMap = await fetchPartyScoreMap(steps.map((step) => step.instance_id))
+        const scoreMap = await fetchPartyScoreMap(
+          steps.map((step) => step.instance_id),
+          force,
+        )
         setRows(
           steps.map((step) => ({
             step,
@@ -171,6 +179,38 @@ export default function PartyScoreApprovalView() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /**
+   * 打开审批详情。
+   * 审批步骤只带审批实例 ID：行上已有加分明细时直接用申请 ID 调详情接口；
+   * 若行上没有明细（多为加载时缓存了旧空结果），点击瞬间绕过缓存强制反查一次，
+   * 拿到申请 ID 后再由详情弹窗请求 GET /api/party-scores/{id}，避免弹窗空白且不发请求。
+   * @param row 审批行（必填）
+   */
+  const openDetail = async (row: ApprovalRow) => {
+    if (row.score) {
+      setDetailRow(row)
+      return
+    }
+    try {
+      const res = await queryPartyScores(
+        { approval_instance_id: row.step.instance_id, page: 1, page_size: 1 },
+        true,
+      )
+      const score = res.data[0] ?? null
+      if (!score) {
+        message.warning(t('partyScoreApproval.emptyScore'))
+        return
+      }
+      const nextRow = { ...row, score }
+      setRows((prev) =>
+        prev.map((item) => (item.step.id === row.step.id ? nextRow : item)),
+      )
+      setDetailRow(nextRow)
+    } catch (err) {
+      reportError(err)
+    }
+  }
 
   const statusOptions = useMemo(
     () =>
@@ -336,6 +376,10 @@ export default function PartyScoreApprovalView() {
         dataIndex: ['step', 'status'],
         key: 'status',
         width: 110,
+        filters: statusOptions.map(({ value, label }) => ({ text: label, value })),
+        filteredValue: statusFilter,
+        filterMultiple: true,
+        onFilter: (value, row) => row.step.status === value,
         render: (status: ApprovalStepStatus) => (
           <Tag color={PARTY_SCORE_APPROVAL_STATUS_COLOR[status]}>
             {t(`partyScoreApproval.status_${status}`)}
@@ -425,7 +469,7 @@ export default function PartyScoreApprovalView() {
         },
       },
     ],
-    [t, locale, userNames, openAction],
+    [t, locale, userNames, openAction, statusFilter, statusOptions],
   )
 
   // 审批步骤接口为裸数组，无 total：满页时预估可能还有下一页，用于展示分页与总页数
@@ -472,10 +516,24 @@ export default function PartyScoreApprovalView() {
               scroll={{ x: 1220 }}
               locale={{ emptyText: t('common.noData') }}
               onRow={(row) => ({
-                onClick: () => setDetailRow(row),
+                onClick: () => void openDetail(row),
                 title: t('partyScoreApproval.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
+              /**
+               * 表头状态筛选与工具栏多选共用 statusFilter：
+               * 仅在筛选值变化时回到第 1 页，避免翻页时被重置。
+               */
+              onChange={(_, filters) => {
+                const next = (filters.status ?? []) as ApprovalStepStatus[]
+                const same =
+                  next.length === statusFilter.length &&
+                  next.every((status) => statusFilter.includes(status))
+                if (!same) {
+                  setPage(1)
+                  setStatusFilter(next)
+                }
+              }}
               pagination={{
                 current: page,
                 pageSize: PARTY_SCORE_APPROVAL_PAGE_SIZE,
@@ -580,7 +638,26 @@ export default function PartyScoreApprovalView() {
 
       <PartyScoreDetailModal
         open={detailRow !== null}
-        approvalInstanceId={detailRow?.step.instance_id ?? null}
+        scoreId={detailRow?.score?.id ?? null}
+        actionable={detailRow !== null && isPartyScoreStepActionable(detailRow.step.status)}
+        onApprove={() => {
+          if (!detailRow) return
+          const row = detailRow
+          setDetailRow(null)
+          openAction('approve', row)
+        }}
+        onReject={() => {
+          if (!detailRow) return
+          const row = detailRow
+          setDetailRow(null)
+          openAction('reject', row)
+        }}
+        onTransfer={() => {
+          if (!detailRow) return
+          const row = detailRow
+          setDetailRow(null)
+          openAction('transfer', row)
+        }}
         onClose={() => setDetailRow(null)}
       />
     </div>

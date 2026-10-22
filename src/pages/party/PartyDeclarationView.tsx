@@ -2,11 +2,14 @@
  * 党员端「成绩申报」：申报表单 + 我的申报记录。
  *
  * 对接后端党建活动加分接口（/api/party-scores，见 api/partyScores.ts）：
- *   POST /api/party-scores                 提交加分申请（template_id + user_id + requested_score）
+ *   POST /api/files          上传凭证附件，返回文件 ID
+ *   POST /api/party-scores   提交加分申请（template_id + requested_score + files 附件 ID 列表；申请人由后端按登录身份确定）
+ *   GET  /api/party-scores/{id}             查询加分申请详情（含 file_urls 附件下载地址）
  *   GET  /api/party-scores?user_id=..       查询本人申报记录（分页；user_id 需显式传入，接口不会自动限定当前用户）
  * 「申报类型」取自审批模板 GET /api/approvals/templates（business_type='party'，见 config/partyDeclaration.ts）。
  *
- * 后端加分接口不提供申报时段 / 事由 / 佐证材料 / 撤回 / 删除，故页面不再展示这些字段与操作。
+ * 附件：先上传文件拿 ID，再随创建请求的 files 字段提交，实现申请与附件匹配；
+ * 后端加分接口不提供申报时段 / 事由 / 撤回 / 删除，故页面不展示这些字段与操作。
  * 按代码要求 4，接口细节只写在注释里，不进入页面文案。
  */
 import { ReloadOutlined } from '@ant-design/icons'
@@ -25,12 +28,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { queryApprovalTemplates } from '../../api/approvalmodel'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import { createPartyScore, queryPartyScores } from '../../api/partyScores'
+import { createPartyScore, getPartyScore, queryPartyScores } from '../../api/partyScores'
 import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import type { PaginatedResponse } from '../../api/types/common'
 import type { PartyScore } from '../../api/types/partyScores'
+import AttachmentLinks from '../../components/AttachmentLinks'
+import AttachmentUploader from '../../components/AttachmentUploader'
 import ErrorState from '../../components/ErrorState'
 import {
+  PARTY_DECLARATION_MAX_FILES,
   PARTY_DECLARATION_PAGE_SIZE,
   PARTY_TEMPLATE_BUSINESS_TYPE,
 } from '../../config/partyDeclaration'
@@ -46,6 +52,8 @@ interface DeclarationFormValues {
   template_id: number
   /** 申请加分（int64，正数加分、负数减分） */
   requested_score: number
+  /** 附件文件 ID 列表（由 AttachmentUploader 上传 /api/files 后回填） */
+  files?: number[]
 }
 
 /** 党员端：成绩申报（表单 + 本人申报记录） */
@@ -57,10 +65,14 @@ export default function PartyDeclarationView() {
   const [form] = Form.useForm<DeclarationFormValues>()
 
   const [submitting, setSubmitting] = useState(false)
-  /** 当前登录用户 ID（作为申报的 user_id；就绪前不拉取列表，避免取到他人数据） */
+  /** 当前登录用户 ID（用于按 user_id 过滤本人记录；就绪前不拉取列表，避免取到他人数据） */
   const [myUid, setMyUid] = useState<number | null>(null)
-  /** 点击记录行打开的申报详情（直接使用列表行数据展示，无需再次请求详情接口） */
+  /** 点击记录行打开的申报详情（先展示列表行数据，再用详情接口补充附件地址） */
   const [detail, setDetail] = useState<PartyScore | null>(null)
+  /** 详情接口加载状态（附件下载地址 file_urls 来自详情接口） */
+  const [detailLoading, setDetailLoading] = useState(false)
+  /** 详情接口错误文案（含状态码） */
+  const [detailError, setDetailError] = useState<string | null>(null)
   /** 申报类型可选模板（审批模板，business_type='party'） */
   const [templates, setTemplates] = useState<ApprovalTemplate[]>([])
   const [templatesError, setTemplatesError] = useState<string | null>(null)
@@ -185,6 +197,34 @@ export default function PartyDeclarationView() {
     [t, locale, templateNameById],
   )
 
+  /**
+   * 打开申报详情：先用列表行数据即时展示，再请求详情接口补充附件下载地址（file_urls）。
+   * @param record 列表行数据（必填）
+   */
+  const openDetail = useCallback(
+    async (record: PartyScore) => {
+      setDetail(record)
+      setDetailLoading(true)
+      setDetailError(null)
+      try {
+        // 详情包含附件下载地址，打开时绕过缓存重新请求，避免展示旧数据导致看不到附件
+        setDetail(await getPartyScore(record.id, true))
+      } catch (err) {
+        setDetailError(extractErrorReason(err, t))
+      } finally {
+        setDetailLoading(false)
+      }
+    },
+    [t],
+  )
+
+  /** 关闭申报详情并清理加载 / 错误状态 */
+  const closeDetail = () => {
+    setDetail(null)
+    setDetailError(null)
+    setDetailLoading(false)
+  }
+
   /** 提交加分申请：成功后重置表单并刷新本人申报记录（代码要求 13） */
   const onFinish = async (values: DeclarationFormValues) => {
     if (myUid === null) return
@@ -192,8 +232,9 @@ export default function PartyDeclarationView() {
     try {
       await createPartyScore({
         template_id: values.template_id,
-        user_id: myUid,
         requested_score: values.requested_score,
+        // files 为必填字段：无附件时传空数组，申请人由后端按登录身份确定
+        files: values.files ?? [],
       })
       message.success(t('partyDeclaration.createSuccess'))
       form.resetFields()
@@ -247,6 +288,14 @@ export default function PartyDeclarationView() {
                 <InputNumber style={{ width: 180 }} precision={0} step={1} />
               </Form.Item>
 
+              <Form.Item
+                name="files"
+                label={t('partyDeclaration.fieldFiles')}
+                extra={t('partyDeclaration.filesHint')}
+              >
+                <AttachmentUploader maxCount={PARTY_DECLARATION_MAX_FILES} />
+              </Form.Item>
+
               <Form.Item className="leave-submit-item">
                 <Button type="primary" htmlType="submit" loading={submitting}>
                   {t('partyDeclaration.submit')}
@@ -275,7 +324,7 @@ export default function PartyDeclarationView() {
               dataSource={data}
               scroll={{ x: 760 }}
               onRow={(record) => ({
-                onClick: () => setDetail(record),
+                onClick: () => void openDetail(record),
                 title: t('partyDeclaration.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
@@ -303,8 +352,8 @@ export default function PartyDeclarationView() {
       <Modal
         open={detail !== null}
         title={t('partyDeclaration.detailTitle')}
-        onCancel={() => setDetail(null)}
-        footer={<Button onClick={() => setDetail(null)}>{t('partyDeclaration.close')}</Button>}
+        onCancel={closeDetail}
+        footer={<Button onClick={closeDetail}>{t('partyDeclaration.close')}</Button>}
       >
         {detail ? (
           <Descriptions column={1} size="small" bordered>
@@ -326,6 +375,18 @@ export default function PartyDeclarationView() {
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colUpdatedAt')}>
               {formatDateTime(detail.updated_at, locale)}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('partyDeclaration.fieldFiles')}>
+              {detailLoading ? (
+                t('common.loading')
+              ) : detailError ? (
+                <ErrorState message={detailError} onRetry={() => void openDetail(detail)} />
+              ) : (
+                <AttachmentLinks
+                  urls={detail.file_urls}
+                  emptyText={t('leaveDetail.noAttachment')}
+                />
+              )}
             </Descriptions.Item>
           </Descriptions>
         ) : null}

@@ -8,7 +8,7 @@ import type { UploadedFileResponse } from './types/file'
 /**
  * POST /api/files 上传一个或多个文件。
  * 使用 multipart/form-data，字段名统一为 file；返回每个文件的 id 与访问地址，
- * 返回的 id 可直接填入请假附件的 attachment_id 列表。
+ * 返回的 id 可直接填入业务接口的附件 ID 列表（如党建加分的 files 字段、请假的 attachment_id 列表）。
  * 权限：需要 file.create。
  *
  * @param files 待上传的文件列表（必填，File[] 或 FileList，至少 1 个）

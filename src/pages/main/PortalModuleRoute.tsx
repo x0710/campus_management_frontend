@@ -108,6 +108,8 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'school:school_m3': RolesAdminView,
   // 党委学校端「审批管理」：党建活动加分审批
   'school:school_m4': PartyScoreApprovalView,
+  // 党委学校端「岗位管理」：复用管理端「岗位管理」页面（接真实职位接口）
+  'school:school_m5': PositionsAdminView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

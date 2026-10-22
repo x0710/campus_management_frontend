@@ -12,5 +12,8 @@ export const PARTY_TEMPLATE_BUSINESS_TYPE = 'party'
 /** 申报记录每页条数（代码要求 12：表格单页最多 100 行） */
 export const PARTY_DECLARATION_PAGE_SIZE = 100
 
+/** 单次申报最多可上传的附件数量 */
+export const PARTY_DECLARATION_MAX_FILES = 10
+
 /** 党员端首页「近期记录」展示条数（取最近的若干条成绩申报） */
 export const PARTY_RECENT_RECORD_LIMIT = 5

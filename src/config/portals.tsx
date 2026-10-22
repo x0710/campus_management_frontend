@@ -19,6 +19,7 @@ import {
   FormOutlined,
   HeartOutlined,
   HomeOutlined,
+  IdcardOutlined,
   LineChartOutlined,
   NotificationOutlined,
   ProfileOutlined,
@@ -130,7 +131,7 @@ export const PORTALS: PortalDef[] = [
   {
     // 党委学校端门户：总览（党员总数接真实接口，平均分/排名为虚拟数据）；
     // 组织管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
-    // 审批管理接入党建活动加分审批接口，均接真实接口
+    // 岗位管理复用管理端「岗位管理」页面，审批管理接入党建活动加分审批接口，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
     gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
@@ -140,6 +141,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
       { key: 'school_m4', status: 'ready', icon: <AuditOutlined /> },
+      { key: 'school_m5', status: 'ready', icon: <IdcardOutlined /> },
     ],
   },
   {

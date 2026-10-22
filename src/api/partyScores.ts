@@ -29,6 +29,7 @@ import type {
   PartyScoreApprovalQuery,
   PartyScoreCreateRequest,
   PartyScoreCreateResponse,
+  PartyScoreDetail,
   PartyScoreQuery,
   PartyScoreRejectRequest,
   PartyScoreTransferRequest,
@@ -75,18 +76,20 @@ export function queryPartyScores(params: PartyScoreQuery = {}, force?: boolean) 
 
 /**
  * GET /api/party-scores/{id} 获取加分申请详情（会话缓存）。
+ * 详情返回 file_urls（附件下载地址列表），可直接用于附件下载。
  * @param id 加分申请 ID（必填）
  * @param force 是否强制绕过缓存重新请求（用于手动刷新），默认 false
- * @returns Promise<PartyScore> 加分申请详情
+ * @returns Promise<PartyScoreDetail> 加分申请详情（含 file_urls）
  */
 export function getPartyScore(id: number, force?: boolean) {
-  return cachedGet<PartyScore>(`/party-scores/${id}`, undefined, { force })
+  return cachedGet<PartyScoreDetail>(`/party-scores/${id}`, undefined, { force })
 }
 
 /**
  * POST /api/party-scores 创建党建活动加分申请。
  * 201 返回新建申请 ID 与审批实例 ID；400 表示参数错误，403 表示无权访问，错误信息由调用方展示。
- * @param data 创建请求体（template_id/user_id/requested_score，均必填）
+ * 如需上传附件：先调用 api/file.ts 的 uploadFiles 上传文件，再把返回的文件 ID 列表填入 files 字段（必填，无附件传空数组）。
+ * @param data 创建请求体（template_id/requested_score/files 必填；申请人由后端按登录身份确定）
  * @returns Promise<PartyScoreCreateResponse> 新建申请 ID 与审批实例 ID
  */
 export function createPartyScore(data: PartyScoreCreateRequest) {
