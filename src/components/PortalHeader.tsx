@@ -5,6 +5,7 @@ import {
   KeyOutlined,
   LogoutOutlined,
   MoonOutlined,
+  QuestionCircleOutlined,
   SafetyCertificateOutlined,
   SunOutlined,
   UserOutlined,
@@ -240,6 +241,16 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       </div>
 
       <div className="header-right">
+        <Tooltip title={t('common.reportIssueHint')}>
+          <Button
+            type="primary"
+            className="feedback-nav-btn"
+            icon={<QuestionCircleOutlined />}
+            onClick={() => navigate(`/portal/${currentPortalKey ?? 'student'}/feedback`)}
+          >
+            {t('common.reportIssue')}
+          </Button>
+        </Tooltip>
         <Tooltip title={theme === 'dark' ? 'Light' : 'Dark'}>
           <Button
             type="text"

@@ -24,6 +24,7 @@ const GradesView = lazy(() => import('../student/GradesView'))
 const CounselingBookingView = lazy(() => import('../student/CounselingBookingView'))
 const SecondClassCreditsView = lazy(() => import('../student/SecondClassCreditsView'))
 const ViolationQueryView = lazy(() => import('../student/ViolationQueryView'))
+const FeedbackView = lazy(() => import('../student/FeedbackView'))
 const LeaveApprovalView = lazy(() => import('../teacher/LeaveApprovalView'))
 const StudentScoresView = lazy(() => import('../teacher/StudentScoresView'))
 const ClassManageView = lazy(() => import('../teacher/ClassManageView'))
@@ -119,6 +120,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'student:student_m7': SecondClassCreditsView,
   'student:student_m8': SchoolCalendarView,
   'student:student_m9': ViolationQueryView,
+  'student:student_m10': FeedbackView,
   'teacher:teacher_m2': LeaveApprovalView,
   'teacher:teacher_m3': ClassManageView,
   'teacher:teacher_m5': StudentScoresView,

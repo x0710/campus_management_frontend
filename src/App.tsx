@@ -14,6 +14,7 @@ import PortalWorkspace from './pages/main/PortalWorkspace'
 import { useAuthStore } from './store/auth'
 
 const AnnouncementDetailPage = lazy(() => import('./pages/main/AnnouncementDetailPage'))
+const FeedbackView = lazy(() => import('./pages/student/FeedbackView'))
 const AnnouncementEditorPage = lazy(() => import('./pages/leader/AnnouncementEditorPage'))
 const MemberDetailPage = lazy(() => import('./pages/leader/MemberDetailPage'))
 
@@ -56,6 +57,8 @@ export default function App() {
           <Route index element={<PortalModuleRoute />} />
           {/* /portal/:portalKey/:moduleKey：渲染具体模块视图 */}
           <Route path=":moduleKey" element={<PortalModuleRoute />} />
+          {/* 顶栏全局入口：问题上报（独立于门户模块列表，所有已登录用户可进入） */}
+          <Route path="feedback" element={<FeedbackView />} />
           {/* 公告新建（必须先于 :id 声明，避免 /announcements/new 被当作 id="new" 匹配） */}
           <Route path="announcements/new" element={<AnnouncementEditorPage />} />
           {/* 公告编辑：带 id，走 GET/PATCH /api/announcements/{id} */}

@@ -21,6 +21,7 @@ import {
   HomeOutlined,
   IdcardOutlined,
   LineChartOutlined,
+  MessageOutlined,
   NotificationOutlined,
   ProfileOutlined,
   ReadOutlined,
@@ -159,6 +160,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'student_m7', status: 'preview', icon: <StarOutlined /> },
       { key: 'student_m8', status: 'ready', icon: <CalendarOutlined /> },
       { key: 'student_m9', status: 'ready', icon: <WarningOutlined /> },
+      { key: 'student_m10', status: 'ready', icon: <MessageOutlined /> },
     ],
   },
   {
