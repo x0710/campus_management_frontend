@@ -113,7 +113,7 @@ export default function SecondClassCreditsView() {
   )
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('credits.title')}</h3>

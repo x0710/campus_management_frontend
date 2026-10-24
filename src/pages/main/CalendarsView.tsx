@@ -59,7 +59,9 @@ export default function CalendarsView() {
   )
 
   return (
-    <section className="panel-card">
+    // 数据展示页固定布局：标题/刷新固定，仅校历列表在卡片体内滚动（代码要求 23）
+    <div className="data-page-view">
+      <section className="panel-card">
       <header className="panel-card-header">
         <h3 className="panel-card-title">{t('calendar.title')}</h3>
         <Button icon={<ReloadOutlined />} onClick={refresh}>
@@ -93,6 +95,7 @@ export default function CalendarsView() {
           />
         )}
       </div>
-    </section>
+      </section>
+    </div>
   )
 }

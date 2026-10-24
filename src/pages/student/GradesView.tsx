@@ -252,7 +252,7 @@ export default function GradesView() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / STUDENT_SCORE_PAGE_SIZE))
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
      
 
       <section className="panel-card">

@@ -53,6 +53,7 @@ import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import MemberSearchNav from '../../components/MemberSearchNav'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useMemberSearch } from '../../composables/useMemberSearch'
@@ -537,7 +538,9 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
       </section>
 
       <section className="panel-card org-members-card">
-        <header className="panel-card-header">
+        {/* 表头固定：标题 + 操作按钮在第一行，搜索框在第二行；
+            表格在卡片体内独立滚动，下滑时标题与搜索框始终可见 */}
+        <header className="panel-card-header org-member-header">
           <div className="org-members-title">
             {/* 左侧组织树收起/展开 */}
             <Tooltip
@@ -605,9 +608,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
               </Popconfirm>
             </div>
           )}
-        </header>
-        <div className="panel-card-body">
-          {/* 成员 ID 搜索（添加成员入口已移至表头，避免与搜索按钮混淆） */}
+          {/* 成员 ID 搜索（固定在表头内，随卡片表头始终可见，不随表格滚动） */}
           <div className="org-member-actions">
             <PersonSearchBox
               width={320}
@@ -616,7 +617,20 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
               onSearch={search.run}
               loading={search.searching}
             />
+            {/* 姓名模糊匹配到多人时：紧邻搜索框展示匹配总数 + 上一个 / 下一个，不遮挡成员表 */}
+            <MemberSearchNav
+              visible={search.resultVisible}
+              total={search.resultTotal}
+              index={search.matchIndex}
+              loading={search.searching}
+              canPrev={search.hasPrev}
+              canNext={search.hasNext}
+              onPrev={search.showPrev}
+              onNext={search.showNext}
+            />
           </div>
+        </header>
+        <div className="panel-card-body">
           {!selectedOrg ? (
             <Alert type="info" showIcon title={t('adminOrg.selectHint')} />
           ) : (

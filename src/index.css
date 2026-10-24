@@ -1027,6 +1027,101 @@ h3 {
   height: auto;
 }
 
+/*
+ * 数据展示页固定布局（代码要求 23，与组织架构页一致，各门户通用）：
+ * 页面撑满工作区高度，卡片表头（标题 / 筛选 / 操作）固定不动，
+ * 仅卡片体（数据区）内部滚动，下滑时标题、搜索与按钮始终可见。
+ */
+.data-page-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  /* 用确定的视口高度而非 100%：工作区父链高度由 flex 决定时百分比可能退化为 auto，
+     导致卡片按内容撑高、表格被 overflow:hidden 裁掉且滚动条不出现 */
+  height: calc(100vh - 104px);
+  min-height: 0;
+  max-height: calc(100vh - 104px);
+}
+
+.data-page-view > .panel-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-page-view > .panel-card > .panel-card-header {
+  flex: none;
+}
+
+.data-page-view > .panel-card > .panel-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 卡片体内再分「固定工具条 + 可滚动数据区」时使用：避免卡片体本身再出现滚动条 */
+.data-page-view > .panel-card > .panel-card-body.data-page-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 带标签页的数据页：Tabs 撑满卡片体剩余高度，标签栏与筛选工具条固定，仅表格区域滚动 */
+.fill-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill-tabs .ant-tabs-nav {
+  flex: none;
+  margin-bottom: 12px;
+}
+
+/*
+ * antd 6 的 Tabs 结构为：.ant-tabs-nav + .ant-tabs-body-holder > .ant-tabs-body > .ant-tabs-content(-active)
+ * （旧版是 content-holder / tabpane，写旧类名不会生效，导致 Tab 内容按内容撑高、表格被裁切且无法滚动）
+ */
+.fill-tabs .ant-tabs-body-holder {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fill-tabs .ant-tabs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  width: 100%;
+}
+
+.fill-tabs .ant-tabs-content-active {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+}
+
+/* 页内固定工具条（搜索 / 新建按钮等） */
+.page-fixed-toolbar {
+  flex: none;
+  margin-bottom: 12px;
+}
+
+/* 可滚动数据区：表格（含分页）在此区域内滚动，工具条与底部操作保持不动 */
+.data-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 /* 组织树收起后：隐藏左侧组织树卡片，成员表自动占满整行 */
 .admin-org-view.is-tree-collapsed .org-tree-card {
   display: none;
@@ -1047,12 +1142,44 @@ h3 {
   gap: 8px;
 }
 
-/* 管理端/学校端组织成员表上方的操作行：按 ID 搜索 + 添加成员入口 */
+/*
+ * 姓名搜索结果条：紧邻搜索框展示「共匹配 N 人 · 第 X 人」+ 上一个/下一个，
+ * 内联展示不遮挡成员表，定位命中成员时仍可查看当前组织的其他人。
+ */
+.member-search-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.member-search-nav-count {
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+/*
+ * 管理端/学校端成员卡片表头：第一行「标题 + 操作按钮」，第二行「搜索框」。
+ * 表头本身固定（.admin-org-view .panel-card-header 为 flex: none），表格在卡片体内
+ * 独立滚动，因此下滑时组织标题与搜索框始终可见，不会跟着表格一起滚走。
+ */
+.org-member-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 搜索行横跨整行，不再预留底部间距（已由表头 gap 控制） */
+.org-member-header > .org-member-actions {
+  grid-column: 1 / -1;
+}
+
+/* 管理端/学校端组织成员搜索行：按学号/姓名搜索 + 结果条 */
 .org-member-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 

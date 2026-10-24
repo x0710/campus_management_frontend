@@ -65,7 +65,9 @@ export default function LeavesView() {
   )
 
   return (
-    <section className="panel-card">
+    // 数据展示页固定布局：标题/刷新固定，仅请假列表在卡片体内滚动（代码要求 23）
+    <div className="data-page-view">
+      <section className="panel-card">
       <header className="panel-card-header">
         <h3 className="panel-card-title">{t('leave.title')}</h3>
         <Button icon={<ReloadOutlined />} onClick={refresh}>
@@ -99,6 +101,7 @@ export default function LeavesView() {
           />
         )}
       </div>
-    </section>
+      </section>
+    </div>
   )
 }

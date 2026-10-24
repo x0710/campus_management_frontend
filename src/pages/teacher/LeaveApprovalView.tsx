@@ -226,7 +226,7 @@ export default function LeaveApprovalView() {
   const total = (page - 1) * PAGE_SIZE + rows.length + (rows.length === PAGE_SIZE ? 1 : 0)
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       
 
       <section className="panel-card">

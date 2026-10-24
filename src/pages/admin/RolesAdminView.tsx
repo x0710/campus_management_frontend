@@ -401,13 +401,15 @@ export default function RolesAdminView() {
   }
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminRoles.title')}</h3>
         </header>
-        <div className="panel-card-body">
+        {/* 卡片体固定：Tabs 标签与筛选工具条不动，仅下方表格区域滚动（代码要求 23） */}
+        <div className="panel-card-body data-page-body">
           <Tabs
+            className="fill-tabs"
             defaultActiveKey="roles"
             items={[
               {
@@ -415,7 +417,7 @@ export default function RolesAdminView() {
                 label: t('adminRoles.tabRoles'),
                 children: (
                   <>
-                    <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+                    <div className="approval-toolbar page-fixed-toolbar">
                       <Input.Search
                         allowClear
                         className="admin-search"
@@ -437,32 +439,34 @@ export default function RolesAdminView() {
                         {t('adminRoles.newRole')}
                       </Button>
                     </div>
-                    {rolesError ? (
-                      <ErrorState
-                        message={rolesError}
-                        onRetry={() =>
-                          setRoleReload((r) => ({ seq: r.seq + 1, force: true }))
-                        }
-                      />
-                    ) : (
-                      <Table<RoleInfo>
-                        rowKey="id"
-                        loading={rolesLoading}
-                        columns={roleColumns}
-                        dataSource={roles}
-                        locale={{ emptyText: t('common.noData') }}
-                        pagination={{
-                          current: rolePage,
-                          pageSize: PAGE_SIZE,
-                          total: roleTotal,
-                          showSizeChanger: false,
-                          showQuickJumper: true,
-                          showTotal: (n: number) =>
-                            `${t('common.total')} ${n} ${t('common.items')}`,
-                          onChange: (p: number) => setRolePage(p),
-                        }}
-                      />
-                    )}
+                    <div className="data-scroll">
+                      {rolesError ? (
+                        <ErrorState
+                          message={rolesError}
+                          onRetry={() =>
+                            setRoleReload((r) => ({ seq: r.seq + 1, force: true }))
+                          }
+                        />
+                      ) : (
+                        <Table<RoleInfo>
+                          rowKey="id"
+                          loading={rolesLoading}
+                          columns={roleColumns}
+                          dataSource={roles}
+                          locale={{ emptyText: t('common.noData') }}
+                          pagination={{
+                            current: rolePage,
+                            pageSize: PAGE_SIZE,
+                            total: roleTotal,
+                            showSizeChanger: false,
+                            showQuickJumper: true,
+                            showTotal: (n: number) =>
+                              `${t('common.total')} ${n} ${t('common.items')}`,
+                            onChange: (p: number) => setRolePage(p),
+                          }}
+                        />
+                      )}
+                    </div>
                   </>
                 ),
               },
@@ -471,7 +475,7 @@ export default function RolesAdminView() {
                 label: t('adminRoles.tabPerms'),
                 children: (
                   <>
-                    <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+                    <div className="approval-toolbar page-fixed-toolbar">
                       <Input.Search
                         allowClear
                         className="admin-search"
@@ -493,32 +497,34 @@ export default function RolesAdminView() {
                         {t('adminRoles.newPerm')}
                       </Button>
                     </div>
-                    {permsError ? (
-                      <ErrorState
-                        message={permsError}
-                        onRetry={() =>
-                          setPermReload((r) => ({ seq: r.seq + 1, force: true }))
-                        }
-                      />
-                    ) : (
-                      <Table<PermInfo>
-                        rowKey="id"
-                        loading={permsLoading}
-                        columns={permColumns}
-                        dataSource={perms}
-                        locale={{ emptyText: t('common.noData') }}
-                        pagination={{
-                          current: permPage,
-                          pageSize: PAGE_SIZE,
-                          total: permTotal,
-                          showSizeChanger: false,
-                          showQuickJumper: true,
-                          showTotal: (n: number) =>
-                            `${t('common.total')} ${n} ${t('common.items')}`,
-                          onChange: (p: number) => setPermPage(p),
-                        }}
-                      />
-                    )}
+                    <div className="data-scroll">
+                      {permsError ? (
+                        <ErrorState
+                          message={permsError}
+                          onRetry={() =>
+                            setPermReload((r) => ({ seq: r.seq + 1, force: true }))
+                          }
+                        />
+                      ) : (
+                        <Table<PermInfo>
+                          rowKey="id"
+                          loading={permsLoading}
+                          columns={permColumns}
+                          dataSource={perms}
+                          locale={{ emptyText: t('common.noData') }}
+                          pagination={{
+                            current: permPage,
+                            pageSize: PAGE_SIZE,
+                            total: permTotal,
+                            showSizeChanger: false,
+                            showQuickJumper: true,
+                            showTotal: (n: number) =>
+                              `${t('common.total')} ${n} ${t('common.items')}`,
+                            onChange: (p: number) => setPermPage(p),
+                          }}
+                        />
+                      )}
+                    </div>
                   </>
                 ),
               },

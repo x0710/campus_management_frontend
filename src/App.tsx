@@ -7,6 +7,7 @@
 
 import { lazy } from 'react'
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
+import ForcePasswordChangeModal from './components/ForcePasswordChangeModal'
 import LoginPage from './pages/LoginPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalRedirect from './pages/main/PortalRedirect'
@@ -36,7 +37,10 @@ function RequireAuth() {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      {/* 首次登录强制改密：根级常驻，只要登录态要求改密就覆盖全站且不可关闭 */}
+      <ForcePasswordChangeModal />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
 
       {/* 受保护路由：统一由 RequireAuth 守卫 */}
@@ -74,5 +78,6 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </>
   )
 }

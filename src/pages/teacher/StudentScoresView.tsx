@@ -430,7 +430,7 @@ export default function StudentScoresView() {
   const loading = uidLoading || studentsLoading
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
      
 
       <section className="panel-card">

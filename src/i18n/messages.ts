@@ -1102,6 +1102,9 @@ const messages = {
       searchMemberNameNotFound: '未在当前组织范围内找到姓名为「{name}」的成员',
       searchMemberHit: '已定位学号 {uid}，所在组织：{org}',
       searchMemberHitByName: '已定位「{name}」（学号 {uid}），所在组织：{org}',
+      searchResultCount: '共匹配 {total} 人 · 第 {current} 人',
+      searchResultPrev: '上一个',
+      searchResultNext: '下一个',
     },
     teacherClass: {
       scopeHint: '仅展示您所在组织的全部人员，点击任意一行可查看该成员的成绩、请假与违规信息',
@@ -1255,10 +1258,10 @@ const messages = {
       fieldName: '姓名',
       fieldPhone: '手机号',
       fieldGender: '性别',
-      fieldMemberNo: '团员编号',
+      fieldMemberNo: '党员编号',
       fieldBranch: '所属支部',
       fieldPoliticalStatus: '政治面貌',
-      fieldJoinDate: '入团时间',
+      fieldJoinDate: '入党时间',
       fieldEmail: '邮箱',
       valuePhone: '138****8888',
       valueGender: '男',
@@ -1339,6 +1342,10 @@ const messages = {
       confirmRequired: '请再次输入新密码',
       mismatch: '两次输入的新密码不一致',
       success: '密码重置成功',
+      forceTitle: '首次登录 · 修改密码',
+      forceHint: '检测到您是首次登录，为保障账户安全，请先修改初始密码后再使用系统。',
+      forceSubmit: '修改密码并进入',
+      forceSuccess: '密码修改成功，欢迎使用',
     },
   },
 
@@ -2408,6 +2415,9 @@ const messages = {
       searchMemberNameNotFound: 'No member named "{name}" found in the current organization scope',
       searchMemberHit: 'Located student ID {uid} in {org}',
       searchMemberHitByName: 'Located "{name}" (student ID {uid}) in {org}',
+      searchResultCount: '{total} matches · #{current}',
+      searchResultPrev: 'Previous',
+      searchResultNext: 'Next',
     },
     teacherClass: {
       scopeHint:
@@ -2683,6 +2693,11 @@ const messages = {
       confirmRequired: 'Please re-enter the new password',
       mismatch: 'The two passwords do not match',
       success: 'Password reset successfully',
+      forceTitle: 'First login · Change password',
+      forceHint:
+        'This is your first login. To keep your account secure, please change the initial password before continuing.',
+      forceSubmit: 'Change password and continue',
+      forceSuccess: 'Password changed successfully. Welcome!',
     },
   },
 } satisfies Record<Locale, unknown>

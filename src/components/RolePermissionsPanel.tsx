@@ -363,7 +363,7 @@ export default function RolePermissionsPanel({
   ]
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">
@@ -373,7 +373,8 @@ export default function RolePermissionsPanel({
             {t('adminRoles.backToRoles')}
           </Button>
         </header>
-        <div className="panel-card-body">
+        {/* 卡片体固定：提示、搜索与底部保存按钮不动，仅权限表格区域滚动（代码要求 23） */}
+        <div className="panel-card-body data-page-body">
           <Alert
             type="info"
             showIcon
@@ -419,23 +420,24 @@ export default function RolePermissionsPanel({
                   </div>
                 </div>
               )}
-              <Table<PermInfo>
-                rowKey="id"
-                size="small"
-                loading={loading}
-                columns={columns}
-                dataSource={visiblePerms}
-                locale={{ emptyText: t('common.noData') }}
-                pagination={false}
-                scroll={{ y: 460 }}
-                rowSelection={{
-                  selectedRowKeys: selected,
-                  // 搜索过滤会改变 dataSource，开启后已选但被过滤掉的行不会被 antd 丢弃，
-                  // 否则覆盖式保存会把它们当作「已取消」而从角色上移除（数据丢失）
-                  preserveSelectedRowKeys: true,
-                  onChange: (keys) => setSelected(keys.map(Number)),
-                }}
-              />
+              <div className="data-scroll">
+                <Table<PermInfo>
+                  rowKey="id"
+                  size="small"
+                  loading={loading}
+                  columns={columns}
+                  dataSource={visiblePerms}
+                  locale={{ emptyText: t('common.noData') }}
+                  pagination={false}
+                  rowSelection={{
+                    selectedRowKeys: selected,
+                    // 搜索过滤会改变 dataSource，开启后已选但被过滤掉的行不会被 antd 丢弃，
+                    // 否则覆盖式保存会把它们当作「已取消」而从角色上移除（数据丢失）
+                    preserveSelectedRowKeys: true,
+                    onChange: (keys) => setSelected(keys.map(Number)),
+                  }}
+                />
+              </div>
 
               {/* 子页面底部操作区：取消返回列表，保存提交权限与数据范围 */}
               <div className="approval-toolbar" style={{ marginTop: 16, justifyContent: 'flex-end' }}>

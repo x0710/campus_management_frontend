@@ -538,7 +538,7 @@ export default function UsersAdminView() {
   )
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminUsers.title')}</h3>

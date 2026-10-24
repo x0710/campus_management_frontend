@@ -125,7 +125,8 @@ export default function PartyProfileView() {
   ]
 
   return (
-    <div className="party-view">
+    // 数据展示页固定布局：仅卡片体内的各 Tab 数据区滚动（代码要求 23）
+    <div className="data-page-view">
       <section className="panel-card">
         <div className="panel-card-body">
           <Alert

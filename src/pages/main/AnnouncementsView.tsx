@@ -347,7 +347,9 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   )
 
   return (
-    <section className="panel-card" style={{ width: '100%' }}>
+    // 数据展示页固定布局：标题/刷新固定，仅公告列表在卡片体内滚动（代码要求 23）
+    <div className="data-page-view">
+      <section className="panel-card" style={{ width: '100%' }}>
       <header className="panel-card-header">
         <h3 className="panel-card-title">
           {t(manage ? 'announcement.manageTitle' : 'announcement.title')}
@@ -389,6 +391,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
           />
         )}
       </div>
-    </section>
+      </section>
+    </div>
   )
 }

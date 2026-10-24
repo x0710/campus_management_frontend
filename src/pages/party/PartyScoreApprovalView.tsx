@@ -481,7 +481,7 @@ export default function PartyScoreApprovalView() {
   const actionScore = action?.row.score ?? null
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('partyScoreApproval.title')}</h3>

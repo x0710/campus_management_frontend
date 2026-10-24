@@ -296,7 +296,9 @@ export default function MemberDetailPage() {
   }, [user, t])
 
   return (
-    <section className="panel-card" style={{ width: '100%' }}>
+    // 数据展示页固定布局：成员标题/返回固定，仅各 Tab 数据区在卡片体内滚动（代码要求 23）
+    <div className="data-page-view">
+      <section className="panel-card" style={{ width: '100%' }}>
       <header className="panel-card-header">
         <h3 className="panel-card-title">
           {t('memberDetail.title')} · {user?.name ?? `#${userId}`}
@@ -396,7 +398,8 @@ export default function MemberDetailPage() {
           <Skeleton active paragraph={{ rows: 6 }} />
         )}
       </Modal>
-    </section>
+      </section>
+    </div>
   )
 }
 

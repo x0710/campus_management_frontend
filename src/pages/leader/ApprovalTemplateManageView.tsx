@@ -239,7 +239,7 @@ export default function ApprovalTemplateManageView() {
   )
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('approvalTemplate.title')}</h3>

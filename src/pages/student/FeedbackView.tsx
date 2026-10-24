@@ -215,7 +215,7 @@ export default function FeedbackView() {
   )
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('feedback.title')}</h3>

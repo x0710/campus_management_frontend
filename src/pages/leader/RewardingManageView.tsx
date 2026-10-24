@@ -335,7 +335,7 @@ export default function RewardingManageView() {
   )
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('rewarding.title')}</h3>
@@ -364,15 +364,19 @@ export default function RewardingManageView() {
             </Button>
           </div>
         </header>
-        <div className="panel-card-body">
-          <RewardingFilterBar onApply={applyFilters} />
+        {/* 筛选条固定在卡片体内顶部，仅表格区域滚动（代码要求 23） */}
+        <div className="panel-card-body data-page-body">
+          <div className="page-fixed-toolbar">
+            <RewardingFilterBar onApply={applyFilters} />
+          </div>
 
-          {error ? (
-            <ErrorState
-              message={error}
-              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-            />
-          ) : (
+          <div className="data-scroll">
+            {error ? (
+              <ErrorState
+                message={error}
+                onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+              />
+            ) : (
             <Table<RewardingDto>
               rowKey="id"
               loading={loading}
@@ -397,8 +401,9 @@ export default function RewardingManageView() {
                 showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
                 onChange: (p: number) => setPage(p),
               }}
-            />
-          )}
+              />
+            )}
+          </div>
         </div>
       </section>
 

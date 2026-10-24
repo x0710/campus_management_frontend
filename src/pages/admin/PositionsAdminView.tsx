@@ -251,13 +251,14 @@ export default function PositionsAdminView() {
   )
 
   return (
-    <div className="student-view">
+    <div className="data-page-view">
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminPositions.title')}</h3>
         </header>
-        <div className="panel-card-body">
-          <div className="approval-toolbar" style={{ marginBottom: 12 }}>
+        {/* 搜索/刷新/新建固定在卡片体内顶部，仅表格区域滚动（代码要求 23） */}
+        <div className="panel-card-body data-page-body">
+          <div className="approval-toolbar page-fixed-toolbar">
             <Input.Search
               allowClear
               className="admin-search"
@@ -282,13 +283,14 @@ export default function PositionsAdminView() {
             </Tooltip>
           </div>
 
-          {error ? (
-            <ErrorState
-              message={error}
-              onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
-            />
-          ) : (
-            <Table<PositionDetail>
+          <div className="data-scroll">
+            {error ? (
+              <ErrorState
+                message={error}
+                onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+              />
+            ) : (
+              <Table<PositionDetail>
               rowKey="code"
               loading={loading}
               columns={columns}
@@ -312,8 +314,9 @@ export default function PositionsAdminView() {
                 showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
                 onChange: (p: number) => setPage(p),
               }}
-            />
-          )}
+              />
+            )}
+          </div>
         </div>
       </section>
 
