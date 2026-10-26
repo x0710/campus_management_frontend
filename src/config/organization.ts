@@ -44,3 +44,20 @@ export const MEMBER_SEARCH_MAX_PAGES = 10
  * 设上限避免候选过多时请求过多（解析走会话缓存，重复搜索不再发起请求）。
  */
 export const MEMBER_NAME_SEARCH_LIMIT = 20
+
+/**
+ * 「只看匹配人员」模式一次性拉取候选用户的分页大小。
+ * 与逐个定位不同，该模式需要把匹配人员汇总成一张表，因此用 100（成员表每页上限）
+ * 分页拉取候选用户，再批量解析任职组织后筛出展示范围内的人员。
+ */
+export const MEMBER_MATCH_ONLY_PAGE_SIZE = 100
+
+/**
+ * 「只看匹配人员」模式最多拉取的候选页数（100 人/页，即最多 500 人）。
+ * 姓名模糊匹配可能命中很多人，设上限避免一次切换模式发起过多请求；
+ * 超出部分不再加载，搜索结果条仍展示后端返回的匹配总数。
+ */
+export const MEMBER_MATCH_ONLY_MAX_PAGES = 5
+
+/** 数据表格每页最大行数（代码要求 12：表格每页最多 100 行） */
+export const MEMBER_TABLE_PAGE_SIZE = 100

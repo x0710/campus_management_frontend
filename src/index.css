@@ -1140,6 +1140,8 @@ h3 {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 增加了「查看方式」切换后，窄屏下允许换行，避免搜索行溢出 */
+  flex-wrap: wrap;
 }
 
 /*
@@ -1156,6 +1158,15 @@ h3 {
 .member-search-nav-count {
   font-size: 12px;
   color: var(--ink-secondary);
+}
+
+/*
+ * 「单独查看匹配人员 / 在组织里面查看匹配人员」切换按钮：
+ * 放在搜索行最右侧，与结果条拉开距离；窄屏换行时仍靠右对齐。
+ */
+.member-search-mode-toggle {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 /*
@@ -1318,19 +1329,40 @@ h3 {
   gap: 6px;
 }
 
+/*
+ * 窄屏（分屏 / 窗口很窄）改为上下堆叠：组织树在上、成员表在下。
+ *
+ * 注意不能再用百分比限高（原 max-height: 45% 会失效）：
+ * .admin-org-view 的高度实际来自 max-height（父链上的 height: 100% 已退化为 auto），
+ * 百分比 max-height 会被当作 none 忽略，于是组织树按内容撑到上千像素，
+ * 成员卡片又被 flex-shrink 压成一条缝，结果只能看到并滚动组织树。
+ *
+ * 因此这里给父容器一个确定的视口高度，组织树用视口单位限高（超出在卡内滚动），
+ * 成员卡片拿剩余高度：两块卡片始终同时可见，各自在卡内滚动。
+ */
 @media (max-width: 1100px) {
-  /* 窄屏改为上下堆叠：组织树卡片限高（超出则在卡内滚动），成员卡片占满其余高度 */
   .admin-org-view {
     flex-direction: column;
+    height: calc(100vh - 104px);
+    max-height: calc(100vh - 104px);
   }
   .org-tree-card {
     width: 100%;
+    /* 内容不足时按内容高度展示，超出时最多占约四成视口高（树在卡内滚动）。
+       不参与收缩（flex: none）：成员表数据多时其内容高度很大，
+       若允许收缩，组织树会被按比例压缩到几乎不可见。 */
     flex: none;
-    max-height: 45%;
+    max-height: 38vh;
   }
   .org-members-card {
     flex: 1 1 auto;
     min-height: 0;
+  }
+  /* 上方还有提示条的复用页（老师端班级管理）：同样给出确定高度，
+     使内部「组织树 + 成员表」能按剩余空间分配高度 */
+  .org-explorer-page {
+    height: calc(100vh - 104px);
+    max-height: calc(100vh - 104px);
   }
   .user-post-row {
     grid-template-columns: 1fr 1fr;
@@ -2598,9 +2630,70 @@ h3 {
   gap: 16px;
 }
 
-/* 我的：占位内容（年度评价报告 / 操作指南 / 关于井大大先锋） */
+/* 我的：占位内容（年度评价报告 / 关于井大大先锋） */
 .party-placeholder {
   padding: 32px 0;
+}
+
+/* 我的：审批指南（审批模板列表 + 展开后的审批流程） */
+.party-guide-hint {
+  margin-bottom: 16px;
+}
+
+.party-guide-title {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.party-guide-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+.party-guide-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+/* 审批指南：流程步骤统一样式
+   antd 6 的步骤描述类名为 ant-steps-item-content（不再是 -description），
+   且不同 status 下标题/描述/图标配色不同，这里统一覆盖为同一种深色样式 */
+.party-guide .ant-steps-item-title {
+  color: var(--ink) !important;
+  font-weight: 600 !important;
+}
+
+.party-guide .ant-steps-item-subtitle,
+.party-guide .ant-steps-item-content {
+  color: var(--ink) !important;
+  opacity: 0.75;
+}
+
+/* 所有步骤序号统一为中性底色 + 深色数字，不再区分「当前步 / 等待步」 */
+.party-guide .ant-steps-item .ant-steps-item-icon {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-color: transparent !important;
+  /* antd 6 把序号颜色挂在 .ant-steps-item-icon 上（active / process 分别是白色 / 主色），
+     这里连同内部序号一起强制为同一深色 */
+  color: var(--ink) !important;
+}
+
+:root[data-theme='dark'] .party-guide .ant-steps-item .ant-steps-item-icon {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.party-guide .ant-steps-item .ant-steps-item-icon .ant-steps-icon,
+.party-guide .ant-steps-item .ant-steps-item-icon .ant-steps-item-icon-number {
+  color: var(--ink) !important;
 }
 
 /* 我的：消息通知 */

@@ -53,6 +53,8 @@ import { queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import MatchedMembersTable from '../../components/MatchedMembersTable'
+import MemberSearchModeToggle from '../../components/MemberSearchModeToggle'
 import MemberSearchNav from '../../components/MemberSearchNav'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
@@ -280,6 +282,9 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   const positionNames = usePositionNames()
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
+    // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
+    // （false：不要按当前命中人员重新定位，否则会覆盖用户刚选中的组织）
+    if (search.matchOnly) search.toggleMatchOnly(false)
     setSelectedId(uiKey, keys.length ? Number(keys[0]) : null)
   }
 
@@ -559,12 +564,15 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
               />
             </Tooltip>
             <h3 className="panel-card-title">
-              {selectedOrg
-                ? `${selectedOrg.name}（${selectedOrg.code}）`
-                : t('adminOrg.detailTitle')}
+              {search.matchOnly
+                ? t('orgExplorer.matchOnlyTitle')
+                : selectedOrg
+                  ? `${selectedOrg.name}（${selectedOrg.code}）`
+                  : t('adminOrg.detailTitle')}
             </h3>
           </div>
-          {selectedOrg && (
+          {/* 「单独查看匹配人员」模式下表格不再属于某个组织，隐藏组织维度的操作按钮 */}
+          {selectedOrg && !search.matchOnly && (
             <div className="approval-toolbar">
               {/* 添加成员与搜索框分处表头/表体，避免被误认成搜索按钮 */}
               <Button
@@ -628,10 +636,23 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
               onPrev={search.showPrev}
               onNext={search.showNext}
             />
+            {/* 右对齐：切换「单独查看匹配人员 / 在组织里面查看匹配人员」 */}
+            <MemberSearchModeToggle
+              matchOnly={search.matchOnly}
+              visible={search.matches.length > 0}
+              onToggle={search.toggleMatchOnly}
+            />
           </div>
         </header>
         <div className="panel-card-body">
-          {!selectedOrg ? (
+          {search.matchOnly ? (
+            <MatchedMembersTable
+              rows={search.matches}
+              hitUid={search.hitUid}
+              loading={search.searching || search.matchesLoading}
+              onOpenMember={openMemberDetail}
+            />
+          ) : !selectedOrg ? (
             <Alert type="info" showIcon title={t('adminOrg.selectHint')} />
           ) : (
             <>

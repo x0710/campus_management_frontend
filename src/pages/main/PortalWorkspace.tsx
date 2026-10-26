@@ -37,20 +37,26 @@ export default function PortalWorkspace() {
   const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed)
   const setSidebarCollapsed = useSettingsStore((s) => s.setSidebarCollapsed)
 
+  // 侧栏只展示未隐藏的模块；hiddenFromMenu 的模块（如党员端「我的」）仍可通过路由访问
   const readyModules = useMemo(
-    () => (portal ? portal.modules.filter((m) => m.status === 'ready') : []),
+    () => (portal ? portal.modules.filter((m) => m.status === 'ready' && !m.hiddenFromMenu) : []),
     [portal],
   )
   const previewModules = useMemo(
-    () => (portal ? portal.modules.filter((m) => m.status === 'preview') : []),
+    () =>
+      portal ? portal.modules.filter((m) => m.status === 'preview' && !m.hiddenFromMenu) : [],
     [portal],
   )
   const pendingModules = useMemo(
-    () => (portal ? portal.modules.filter((m) => m.status === 'pending-api') : []),
+    () =>
+      portal
+        ? portal.modules.filter((m) => m.status === 'pending-api' && !m.hiddenFromMenu)
+        : [],
     [portal],
   )
   const plannedModules = useMemo(
-    () => (portal ? portal.modules.filter((m) => m.status === 'planned') : []),
+    () =>
+      portal ? portal.modules.filter((m) => m.status === 'planned' && !m.hiddenFromMenu) : [],
     [portal],
   )
 

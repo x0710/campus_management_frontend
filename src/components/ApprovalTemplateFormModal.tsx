@@ -1,6 +1,8 @@
 /**
  * 审批模板表单弹窗（可复用组件）：一个弹窗承载「新增 / 编辑 / 查看详情」三种模式。
  * - create：空表单（默认值填充，不使用业务数据），提交 POST /api/approvals/templates；
+ *          后端要求创建时必传 organization_id（模板归属组织），故表单提供「所属组织」选择，
+ *          可选范围为当前用户任职组织，并默认选中当前门户对应层级组织；
  * - edit  ：打开时用 GET /api/approvals/templates/{id} 拉取详情回填，提交 PATCH /api/approvals/templates/{id}；
  * - view  ：只读展示模板信息，并内嵌「审批步骤」表格，可对步骤做增 / 改 / 删
  *          （POST/PATCH/DELETE /api/approvals/templates/{template_id}/steps[/{step_id}]）；
@@ -27,16 +29,20 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router'
 import {
   createApprovalTemplate,
   deleteApprovalTemplateStep,
   getApprovalTemplateDetail,
   updateApprovalTemplate,
 } from '../api/approvalmodel'
+import { getCurrentUser } from '../api/auth'
+import { listUserOrganizations } from '../api/organizations'
 import type { ApprovalStep, ApprovalTemplateDetail } from '../api/types/approvalmodel'
 import { queryPositions } from '../api/positions'
 import { extractErrorReason } from '../api/common'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
+import { resolvePortalOrg } from '../composables/usePortalOrg'
 import ApprovalTemplateStepModal, {
   type ApprovalTemplateStepMode,
 } from './ApprovalTemplateStepModal'
@@ -51,6 +57,11 @@ import {
   getBusinessTypeColor,
   getBusinessTypeLabel,
 } from '../config/approvalTemplate'
+import {
+  ACADEMY_ANCESTOR_DEPTHS,
+  BRANCH_ANCESTOR_DEPTHS,
+  SCHOOL_ANCESTOR_DEPTHS,
+} from '../config/organization'
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
@@ -59,8 +70,19 @@ import ErrorState from './ErrorState'
 /** 弹窗模式：新增 / 编辑 / 只读查看 */
 export type ApprovalTemplateFormMode = 'create' | 'edit' | 'view'
 
+/**
+ * 各门户「当前组织」的判定深度（复用 config/organization 的层级常量）。
+ * 领导端等未配置深度的门户回退为「第一个任职组织」作为默认所属组织。
+ */
+const PORTAL_ORG_DEPTHS: Partial<Record<string, readonly number[]>> = {
+  school: SCHOOL_ANCESTOR_DEPTHS,
+  academy: ACADEMY_ANCESTOR_DEPTHS,
+  branch: BRANCH_ANCESTOR_DEPTHS,
+}
+
 /** 模板表单字段（business_type_custom 仅在选中「其他」时使用） */
 interface TemplateFormValues {
+  organization_id?: number
   code?: string
   name: string
   business_type: string
@@ -98,6 +120,7 @@ export default function ApprovalTemplateFormModal({
   const t = useT()
   const { message } = AntdApp.useApp()
   const locale = useSettingsStore((s) => s.locale)
+  const { portalKey } = useParams<{ portalKey?: string }>()
 
   const [form] = Form.useForm<TemplateFormValues>()
   const [detail, setDetail] = useState<ApprovalTemplateDetail | null>(null)
@@ -111,6 +134,9 @@ export default function ApprovalTemplateFormModal({
     { value: string; label: string }[]
   >([])
   const [positionsLoading, setPositionsLoading] = useState(false)
+  // 所属组织下拉选项：仅当前用户任职组织（后端要求模板组织在该用户任职组织链内）
+  const [orgOptions, setOrgOptions] = useState<{ value: number; label: string }[]>([])
+  const [orgsLoading, setOrgsLoading] = useState(false)
   const [stepModal, setStepModal] = useState<{
     mode: ApprovalTemplateStepMode
     step?: ApprovalStep
@@ -208,6 +234,51 @@ export default function ApprovalTemplateFormModal({
     [positionOptions],
   )
 
+  /**
+   * 创建模式下加载「所属组织」选项（当前用户任职组织，走会话缓存），
+   * 并默认选中当前门户对应层级组织；学校/学院层级判定失败时回退第一个任职组织。
+   */
+  useEffect(() => {
+    if (!open || mode !== 'create') return
+    const cancelledRef = { cancelled: false }
+    setOrgsLoading(true)
+    void (async () => {
+      try {
+        const me = await getCurrentUser()
+        const mine = await listUserOrganizations(me.uid)
+        if (cancelledRef.cancelled) return
+        const options = mine.map((o) => ({
+          value: o.organization_id,
+          label: o.organization_name,
+        }))
+        setOrgOptions(options)
+        if (options.length === 0) return
+
+        let defaultId = options[0].value
+        const depths = portalKey ? PORTAL_ORG_DEPTHS[portalKey] : undefined
+        if (depths) {
+          try {
+            const { orgId } = await resolvePortalOrg(depths)
+            if (orgId && options.some((o) => o.value === orgId)) defaultId = orgId
+          } catch {
+            // 层级判定失败不影响创建，保留第一个任职组织作为默认值
+          }
+        }
+        if (cancelledRef.cancelled) return
+        form.setFieldValue('organization_id', defaultId)
+      } catch (err) {
+        if (cancelledRef.cancelled) return
+        setOrgOptions([])
+        reportError(err)
+      } finally {
+        if (!cancelledRef.cancelled) setOrgsLoading(false)
+      }
+    })()
+    return () => {
+      cancelledRef.cancelled = true
+    }
+  }, [open, mode, portalKey, form, reportError])
+
   /** 步骤变更后强制刷新详情（绕过缓存） */
   const refreshDetail = useCallback(async () => {
     setStepsLoading(true)
@@ -237,6 +308,8 @@ export default function ApprovalTemplateFormModal({
         message.success(t('approvalTemplate.updateSuccess'))
       } else {
         await createApprovalTemplate({
+          // 后端创建接口要求必传所属组织 ID（该校验由表单必填规则保证）
+          organization_id: values.organization_id as number,
           code: (values.code ?? '').trim(),
           name: values.name.trim(),
           business_type: businessType,
@@ -459,6 +532,24 @@ export default function ApprovalTemplateFormModal({
           )
         ) : (
           <Form form={form} layout="vertical">
+            {!isEdit && (
+              <Form.Item
+                name="organization_id"
+                label={t('approvalTemplate.fieldOrganization')}
+                rules={[
+                  { required: true, message: t('approvalTemplate.organizationRequired') },
+                ]}
+                extra={t('approvalTemplate.fieldOrganizationHint')}
+              >
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  loading={orgsLoading}
+                  placeholder={t('approvalTemplate.fieldOrganizationPlaceholder')}
+                  options={orgOptions}
+                />
+              </Form.Item>
+            )}
             <Form.Item
               name="code"
               label={t('approvalTemplate.fieldCode')}

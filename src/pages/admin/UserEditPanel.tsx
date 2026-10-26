@@ -11,6 +11,7 @@ import {
   Select,
   Table,
   Tag,
+  Tooltip,
   TreeSelect,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -32,6 +33,7 @@ import { assignUserRoles, queryUserRoleRelations } from '../../api/rbac'
 import { getUser, updateUser } from '../../api/users'
 import type { UserDetail, Gender } from '../../api/types/users'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { usePositionNames } from '../../composables/usePositionNames'
 import { useT } from '../../i18n'
 
 interface ProfileFormValues {
@@ -53,7 +55,7 @@ interface Props {
   onChanged: () => void
   /**
    * 只展示指定区块（成员详情页把「资料 / 系统角色 / 组织任职」拆成三个独立编辑入口，
-   * 避免一个弹窗同时编辑多个部分）；不传则三个区块全部展示（管理端用户管理弹窗沿用）。
+   * 避免一个弹窗同时编辑多个部分）；不传则三个区块全部展示（兼容整页编辑场景）。
    */
   section?: EditSection
 }
@@ -86,6 +88,8 @@ export default function UserEditPanel({
   const [orgBusy, setOrgBusy] = useState<string | null>(null)
 
   const reportError = useErrorFeedback()
+  // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，未命中回退编码）
+  const positionNames = usePositionNames()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -229,7 +233,12 @@ export default function UserEditPanel({
         dataIndex: 'position',
         key: 'position',
         width: 150,
-        render: (v: string) => <Tag color="blue">{v}</Tag>,
+        // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
+        render: (v: string) => (
+          <Tooltip title={v}>
+            <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
+          </Tooltip>
+        ),
       },
       {
         title: t('adminOrg.colWorkplace'),
@@ -256,7 +265,7 @@ export default function UserEditPanel({
         ),
       },
     ],
-    [t, orgBusy],
+    [t, orgBusy, positionNames],
   )
 
   if (loading || !detail) {

@@ -29,7 +29,7 @@ import { invalidate } from '../api/cache'
 import { changeMyPassword, getCurrentUser, getMyRoles } from '../api/auth'
 import { getMyProfile } from '../api/users'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
-import { getAccessiblePortalKeys, getPortal, PORTALS, type PortalKey } from '../config/portals'
+import { getAccessiblePortalKeys, getPortal, PORTAL_PROFILE_MODULE_KEYS, PORTALS, type PortalKey } from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
@@ -121,8 +121,16 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     }))
   }, [t])
 
+  /** 当前门户的「我的」模块：存在时在头像菜单中提供入口 */
+  const profileModuleKey = currentPortalKey ? PORTAL_PROFILE_MODULE_KEYS[currentPortalKey] : undefined
+  const profilePath =
+    currentPortalKey && profileModuleKey
+      ? `/portal/${currentPortalKey}/${profileModuleKey}`
+      : undefined
+
   /**
-   * 右上角用户菜单：先展示「门户选择」一项，点击该项后再展开本次角色可访问的门户列表，
+   * 右上角用户菜单：先展示「我的」（党员端 / 支部端 / 学院端）与「门户选择」，
+   * 「门户选择」点击后再展开本次角色可访问的门户列表，
    * 避免点击头像就直接跳出一串门户（子菜单展开方式设为 click，见下方 Dropdown）。
    */
   const userMenuItems = useMemo<MenuProps['items']>(() => {
@@ -131,7 +139,20 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       icon: getPortal(portalKey)?.icon,
       label: t(`portal.${portalKey}_name`),
     }))
+    // 「我的」不再占用侧栏入口，改从头像菜单进入
+    const myProfileItems: NonNullable<MenuProps['items']> =
+      profileModuleKey
+        ? [
+            {
+              key: 'my-profile',
+              icon: <UserOutlined />,
+              label: t(`portal.${profileModuleKey}`),
+            },
+            { type: 'divider' },
+          ]
+        : []
     return [
+      ...myProfileItems,
       {
         key: 'portal-select',
         icon: <AppstoreOutlined />,
@@ -148,7 +169,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
         label: t('password.menuLabel'),
       },
     ]
-  }, [portalKeys, t])
+  }, [portalKeys, t, profileModuleKey])
 
   /** 下拉展开时强制刷新角色，避免后端角色变更后仍显示旧菜单 */
   const refreshPortalKeys = async () => {
@@ -283,8 +304,17 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             items: userMenuItems,
             /* 子菜单（门户选择）改为点击展开，而不是悬停即展开 */
             triggerSubMenuAction: 'click',
-            selectedKeys: currentPortalKey ? [`portal:${currentPortalKey}`] : [],
+            selectedKeys:
+              profilePath && location.pathname === profilePath
+                ? ['my-profile']
+                : currentPortalKey
+                  ? [`portal:${currentPortalKey}`]
+                  : [],
             onClick: ({ key }: { key: string }) => {
+              if (key === 'my-profile') {
+                if (profilePath) navigate(profilePath)
+                return
+              }
               if (key === 'reset-password') {
                 openResetPassword()
                 return

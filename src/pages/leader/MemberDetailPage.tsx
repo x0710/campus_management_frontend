@@ -3,11 +3,11 @@
  * 管理端「组织架构」与党委学校端「组织管理」共用，渲染在 PortalWorkspace 布局壳内）。
  *
  * 入口与来源：?from=<moduleKey>（leader_m3 / teacher_m3 / branch_m5 / academy_m5 /
- * admin_m3 / school_m2），决定「返回」目标与侧栏高亮；
+ * admin_m1 / admin_m3 / school_m2），决定「返回」目标与侧栏高亮；
  * 来自只读来源（见 MEMBER_DETAIL_READONLY_FROM_MODULES，如老师端）时隐藏成绩/违规编辑入口，
  * 仅提供查询；来自具备用户管理权限的来源（见 MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES，
- * 管理端 admin_m3 / 党委学校端 school_m2）时在「基本信息」页额外提供「编辑成员信息」入口，
- * 复用 admin/UserEditPanel 修改资料、角色与组织任职。
+ * 管理端用户与账户 admin_m1 / 管理端组织架构 admin_m3 / 党委学校端 school_m2）时
+ * 在「基本信息」页额外提供「编辑成员信息」入口，复用 admin/UserEditPanel 修改资料、角色与组织任职。
  *
  * 六个 Tab（党委支部端 / 学院端 / 学校端的组织管理只保留前三个，
  * 见 MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES）：
@@ -109,6 +109,7 @@ import type {
 } from '../../api/types/violations'
 import { useCourseDetails } from '../../composables/useCourseNames'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { usePositionNames } from '../../composables/usePositionNames'
 import {
   EXAM_TYPE_COLOR,
   EXAM_TYPE_ORDER,
@@ -368,8 +369,8 @@ export default function MemberDetailPage() {
         )}
       </div>
 
-      {/* 成员信息编辑（仅管理端 / 党委学校端等具备用户管理权限的来源）：复用 admin/UserEditPanel，
-          资料 / 系统角色 / 组织任职三个区块各自独立入口，一个弹窗只编辑一个部分 */}
+      {/* 成员信息编辑（管理端用户与账户 / 组织架构、党委学校端等具备用户管理权限的来源）：
+          复用 admin/UserEditPanel，资料 / 系统角色 / 组织任职三个区块各自独立入口，一个弹窗只编辑一个部分 */}
       <Modal
         open={editSection !== null}
         title={
@@ -427,6 +428,8 @@ function BasicInfoPanel({
   const [orgs, setOrgs] = useState<OrgItem[]>([])
   const [extrasLoading, setExtrasLoading] = useState(false)
   const [extrasError, setExtrasError] = useState<string | null>(null)
+  // 职位详情接口不可用时的兜底映射：编码 → 名称（未命中仍显示编码）
+  const positionNames = usePositionNames()
 
   /** 并行加载角色关联与组织任职；单个角色/职位详情失败不影响整体 */
   const loadExtras = useCallback(async () => {
@@ -618,7 +621,9 @@ function BasicInfoPanel({
                           ) : null}
                         </Space>
                       ) : uo.position ? (
-                        <Tag color="default">{uo.position}</Tag>
+                        <Tag color="default">
+                          {positionNames.get(uo.position) ?? uo.position}
+                        </Tag>
                       ) : (
                         t('profile.noData')
                       ),

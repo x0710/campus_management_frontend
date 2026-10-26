@@ -24,6 +24,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import {
   createUsers,
   deleteUser,
@@ -36,7 +37,7 @@ import type {
   UserInfo,
   UserStatus,
 } from '../../api/types/users'
-import { queryRoles, queryUserRoles } from '../../api/rbac'
+import { queryUserRoles } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
 import { listAllOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
@@ -47,10 +48,10 @@ import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { isUidTerm } from '../../utils/personSearch'
-import UserEditPanel from './UserEditPanel'
 
 /** 用户列表每页条数（代码要求 12：表格每页最多 100 行） */
 const PAGE_SIZE = 100
@@ -76,10 +77,12 @@ interface ParsedUser {
   error?: string
 }
 
-/** 管理端：用户与账户（列表/新建/编辑资料与角色与组织任职/重置密码/删除） */
+/** 管理端：用户与账户（列表/新建/详细（详情页内编辑）/重置密码/删除） */
 export default function UsersAdminView() {
   const t = useT()
   const { message, modal } = AntdApp.useApp()
+  const navigate = useNavigate()
+  const { portalKey } = useParams<{ portalKey: string }>()
 
   const [rows, setRows] = useState<UserInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -99,7 +102,7 @@ export default function UsersAdminView() {
   })
 
   const [roleMap, setRoleMap] = useState<Map<number, RoleInfo[]>>(new Map())
-  const [roles, setRoles] = useState<RoleInfo[]>([])
+  // 组织 / 职位选项：仅用于新建用户弹窗（编辑入口已移到成员详情页，见 MemberDetailPage）
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
   const [positions, setPositions] = useState<PositionDetail[]>([])
   const [myUid, setMyUid] = useState<number | null>(null)
@@ -107,12 +110,21 @@ export default function UsersAdminView() {
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
   const pageUids = useMemo(() => rows.map((u) => u.uid), [rows])
   const userOrgs = useUserOrganizations(pageUids)
+  // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，未命中回退编码）
+  const positionNames = usePositionNames()
+
+  // 点击行进入成员详情页（与组织架构共用同一页面，?from=admin_m1 让侧栏保持高亮本模块）
+  const openDetail = useCallback(
+    (uid: number) => {
+      navigate(`/portal/${portalKey}/organization-members/${uid}?from=admin_m1`)
+    },
+    [navigate, portalKey],
+  )
 
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createForm] = Form.useForm<CreateFormValues>()
 
-  const [editUid, setEditUid] = useState<number | null>(null)
   const [resetResult, setResetResult] = useState<string | null>(null)
   // 重置密码弹窗：可指定新密码（留空则由后端生成随机密码）
   const [resetUid, setResetUid] = useState<number | null>(null)
@@ -128,18 +140,16 @@ export default function UsersAdminView() {
 
   const reportError = useErrorFeedback()
 
-  // 基础数据：角色、组织、职位、当前 uid
+  // 基础数据：组织、职位（新建弹窗下拉用）与当前 uid
   useEffect(() => {
     void (async () => {
       try {
-        const [me, roleRes, orgList, posRes] = await Promise.all([
+        const [me, orgList, posRes] = await Promise.all([
           getCurrentUser(),
-          queryRoles({ page: 1, page_size: 100 }),
           listAllOrganizations(),
           queryPositions({ page: 1, page_size: 100 }),
         ])
         setMyUid(me.uid)
-        setRoles(roleRes.data)
         setOrganizations(orgList)
         setPositions(posRes.data)
       } catch {
@@ -493,7 +503,7 @@ export default function UsersAdminView() {
                   key={`${o.organization_id}-${o.position}`}
                   title={`${o.organization_name} / ${o.position}${o.workplace ? ' / ' + o.workplace : ''}`}
                 >
-                  {o.organization_name}·{o.position}
+                  {o.organization_name}·{positionNames.get(o.position) ?? o.position}
                 </Tag>
               ))}
             </span>
@@ -506,8 +516,9 @@ export default function UsersAdminView() {
         width: 230,
         render: (_, record) => (
           <div className="approval-actions">
-            <Button type="link" size="small" onClick={() => setEditUid(record.uid)}>
-              {t('adminUsers.edit')}
+            {/* 「详细」进入成员详情页：资料 / 系统角色 / 组织任职的编辑入口都在详情页内（与组织架构一致） */}
+            <Button type="link" size="small" onClick={() => openDetail(record.uid)}>
+              {t('memberDetail.detail')}
             </Button>
             <Button
               type="link"
@@ -534,7 +545,16 @@ export default function UsersAdminView() {
         ),
       },
     ],
-    [t, roleMap, userOrgs, actingUid, myUid, openResetPassword],
+    [
+      t,
+      roleMap,
+      userOrgs,
+      positionNames,
+      actingUid,
+      myUid,
+      openResetPassword,
+      openDetail,
+    ],
   )
 
   return (
@@ -590,6 +610,15 @@ export default function UsersAdminView() {
               columns={columns}
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
+              // 点击行任意位置进入成员详情页（按钮区域不触发，避免与详细/重置/删除冲突）
+              onRow={(record: UserInfo) => ({
+                onClick: (e: React.MouseEvent) => {
+                  if ((e.target as HTMLElement).closest('button')) return
+                  openDetail(record.uid)
+                },
+                title: t('memberDetail.rowClickHint'),
+                style: { cursor: 'pointer' },
+              })}
               pagination={{
                 current: page,
                 pageSize: PAGE_SIZE,
@@ -705,27 +734,6 @@ export default function UsersAdminView() {
             )}
           </Form.List>
         </Form>
-      </Modal>
-
-      <Modal
-        open={editUid !== null}
-        title={editUid !== null ? `${t('adminUsers.edit')} #${editUid}` : ''}
-        width={760}
-        footer={null}
-        onCancel={() => setEditUid(null)}
-        destroyOnHidden
-      >
-        {editUid !== null && (
-          <UserEditPanel
-            uid={editUid}
-            roles={roles}
-            organizations={organizations}
-            positions={positions}
-            onChanged={() =>
-              setReload((r) => ({ seq: r.seq + 1, force: false }))
-            }
-          />
-        )}
       </Modal>
 
       <Modal

@@ -15,6 +15,7 @@ import type { PageQuery } from './common'
 
 /** 审批模板列表条目（GET /api/approvals/templates 数组元素）
  * @property id 模板 ID（必填）
+ * @property organization_id 模板所属组织 ID（必填；后端按组织隔离模板）
  * @property code 模板编码（全局唯一，必填）
  * @property name 模板名称（必填）
  * @property business_type 业务类型（必填，后端为自由字符串）
@@ -25,6 +26,7 @@ import type { PageQuery } from './common'
  */
 export interface ApprovalTemplate {
   id: number
+  organization_id: number
   code: string
   name: string
   business_type: string
@@ -61,6 +63,8 @@ export interface ApprovalStep {
  */
 export interface ApprovalTemplateDetail {
   id: number
+  /** 模板所属组织 ID（后端按组织隔离模板） */
+  organization_id: number
   code: string
   name: string
   business_type: string
@@ -77,15 +81,18 @@ export interface ApprovalTemplateDetail {
  * @property page_size 每页条数，最大 100（可选，默认 20）
  * @property keyword 按名称或编码模糊搜索（可选）
  * @property business_type 按业务类型精确筛选（可选，后端仅支持单值）
+ * @property organization_id 按所属组织 ID 精确筛选（可选）
  * @property enabled 按启用状态筛选（可选）
  */
 export interface ApprovalTemplateQuery extends PageQuery {
   keyword?: string
   business_type?: string
+  organization_id?: number
   enabled?: boolean
 }
 
 /** 创建审批模板请求体（POST /api/approvals/templates）
+ * @property organization_id 模板所属组织 ID（必填；后端要求该组织在当前用户任职组织链内）
  * @property code 模板编码（必填，全局唯一）
  * @property name 模板名称（必填）
  * @property business_type 业务类型（必填）
@@ -94,6 +101,7 @@ export interface ApprovalTemplateQuery extends PageQuery {
  * @property steps 初始步骤列表（可选，与模板同事务写入）
  */
 export interface ApprovalTemplateCreate {
+  organization_id: number
   code: string
   name: string
   business_type: string

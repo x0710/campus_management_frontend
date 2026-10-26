@@ -67,6 +67,11 @@ export interface PortalModule {
   status: ModuleStatus
   /** 菜单图标（@ant-design/icons），侧栏展开/收起态均使用 */
   icon: ReactNode
+  /**
+   * 不在侧栏菜单中展示（模块仍可通过路由访问）。
+   * 用于「我的」这类改由顶栏头像菜单进入的页面。
+   */
+  hiddenFromMenu?: boolean
 }
 
 export interface PortalDef {
@@ -93,7 +98,8 @@ export const PORTALS: PortalDef[] = [
       { key: 'party_m1', status: 'ready', icon: <HomeOutlined /> },
       { key: 'party_m2', status: 'ready', icon: <FormOutlined /> },
       { key: 'party_m3', status: 'preview', icon: <RiseOutlined /> },
-      { key: 'party_m4', status: 'preview', icon: <UserOutlined /> },
+      // 我的：不再占用侧栏入口，改由顶栏头像菜单进入
+      { key: 'party_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
     ],
   },
   {
@@ -109,7 +115,8 @@ export const PORTALS: PortalDef[] = [
     modules: [
       { key: 'branch_m1', status: 'preview', icon: <LineChartOutlined /> },
       { key: 'branch_m3', status: 'ready', icon: <AuditOutlined /> },
-      { key: 'branch_m4', status: 'preview', icon: <UserOutlined /> },
+      // 我的：不再占用侧栏入口，改由顶栏头像菜单进入
+      { key: 'branch_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
       { key: 'branch_m5', status: 'ready', icon: <ApartmentOutlined /> },
     ],
   },
@@ -125,8 +132,10 @@ export const PORTALS: PortalDef[] = [
       { key: 'academy_m1', status: 'preview', icon: <HomeOutlined /> },
       { key: 'academy_m2', status: 'preview', icon: <ProfileOutlined /> },
       { key: 'academy_m3', status: 'ready', icon: <AuditOutlined /> },
-      { key: 'academy_m4', status: 'preview', icon: <UserOutlined /> },
+      // 我的：不再占用侧栏入口，改由顶栏头像菜单进入
+      { key: 'academy_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
       { key: 'academy_m5', status: 'ready', icon: <ApartmentOutlined /> },
+      { key: 'academy_m6', status: 'ready', icon: <AuditOutlined /> },
     ],
   },
   {
@@ -141,7 +150,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'school_m1', status: 'preview', icon: <LineChartOutlined /> },
       { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
-      { key: 'school_m4', status: 'ready', icon: <AuditOutlined /> },
+      
       { key: 'school_m5', status: 'ready', icon: <IdcardOutlined /> },
     ],
   },
@@ -290,6 +299,15 @@ export const ACADEMY_PORTAL_KEY: PortalKey = 'academy'
 
 /** 党委学校端门户 key：仅学校书记角色可访问 */
 export const SCHOOL_PORTAL_KEY: PortalKey = 'school'
+
+/**
+ * 各门户「我的」模块 key：该模块不在侧栏展示（hiddenFromMenu），统一由顶栏头像菜单进入。
+ */
+export const PORTAL_PROFILE_MODULE_KEYS: Partial<Record<PortalKey, string>> = {
+  [PARTY_PORTAL_KEY]: 'party_m4',
+  [BRANCH_PORTAL_KEY]: 'branch_m4',
+  [ACADEMY_PORTAL_KEY]: 'academy_m4',
+}
 
 /**
  * 角色名称 / 编码关键字匹配（名称与编码任一命中即可）。

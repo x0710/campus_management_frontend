@@ -102,13 +102,13 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'academy:academy_m4': PartyProfileView,
   // 党委学院端「学院支部管理」：与支部端同一支部判定逻辑（所属支部 + 下级组织成员）
   'academy:academy_m5': AcademyBranchManageModule,
+  // 党委学院端「审批模板管理」：复用领导端「审批模板管理」页面（接真实审批模板接口）
+  'academy:academy_m6': ApprovalTemplateManageView,
   'school:school_m1': SchoolOverviewView,
   // 党委学校端「组织管理」：复用管理端「组织架构」页面（接真实组织/成员接口）
   'school:school_m2': SchoolOrgAdminView,
   // 党委学校端「系统权限管理」：与管理端「角色权限」复用同一页面（接真实 RBAC 接口）
   'school:school_m3': RolesAdminView,
-  // 党委学校端「审批模板管理」：复用领导端「审批模板管理」页面（接真实审批模板接口）
-  'school:school_m4': ApprovalTemplateManageView,
   // 党委学校端「岗位管理」：复用管理端「岗位管理」页面（接真实职位接口）
   'school:school_m5': PositionsAdminView,
   'student:student_m1': ScheduleView,

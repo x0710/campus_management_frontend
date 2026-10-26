@@ -38,6 +38,8 @@ import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
 import { useUiStateStore } from '../store/uiState'
 import ErrorState from './ErrorState'
+import MatchedMembersTable from './MatchedMembersTable'
+import MemberSearchModeToggle from './MemberSearchModeToggle'
 import MemberSearchNav from './MemberSearchNav'
 import PersonSearchBox from './PersonSearchBox'
 
@@ -365,9 +367,12 @@ export default function OrgMembersExplorer({
                       setOrgTreeExpanded(fromModuleKey, keys.map((k) => Number(k)))
                     }}
                     selectedKeys={selectedId !== null ? [selectedId] : []}
-                    onSelect={(keys: React.Key[]) =>
+                    onSelect={(keys: React.Key[]) => {
+                      // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
+                      // （false：不要按当前命中人员重新定位，否则会覆盖用户刚选中的组织）
+                      if (search.matchOnly) search.toggleMatchOnly(false)
                       setSelectedId(fromModuleKey, keys.length ? Number(keys[0]) : null)
-                    }
+                    }}
                     showLine
                     blockNode
                   />
@@ -401,11 +406,13 @@ export default function OrgMembersExplorer({
               </Tooltip>
             )}
             <h3 className="panel-card-title">
-              {selectedOrg
-                ? selectedOrg.code && selectedOrg.code !== selectedOrg.name
-                  ? `${selectedOrg.name}（${selectedOrg.code}）`
-                  : selectedOrg.name
-                : t('memberDetail.memberListTitle')}
+              {search.matchOnly
+                ? t('orgExplorer.matchOnlyTitle')
+                : selectedOrg
+                  ? selectedOrg.code && selectedOrg.code !== selectedOrg.name
+                    ? `${selectedOrg.name}（${selectedOrg.code}）`
+                    : selectedOrg.name
+                  : t('memberDetail.memberListTitle')}
             </h3>
           </div>
           <div className="org-members-actions">
@@ -427,7 +434,13 @@ export default function OrgMembersExplorer({
               onPrev={search.showPrev}
               onNext={search.showNext}
             />
-            {selectedOrg && (
+            {/* 右对齐：切换「单独查看匹配人员 / 在组织里面查看匹配人员」 */}
+            <MemberSearchModeToggle
+              matchOnly={search.matchOnly}
+              visible={search.matches.length > 0}
+              onToggle={search.toggleMatchOnly}
+            />
+            {selectedOrg && !search.matchOnly && (
               <Tooltip title={t('memberDetail.refreshMembersHint')}>
                 <Button
                   icon={<ReloadOutlined />}
@@ -438,9 +451,17 @@ export default function OrgMembersExplorer({
           </div>
         </header>
         <div className="panel-card-body">
-          {/* 组织树隐藏（showOrgTree=false）或已收起（treeCollapsed）时，组织加载错误不会在
-              左侧树卡片中展示，需在成员卡片体兜底提示，避免报错被静默吞掉（代码要求 3） */}
-          {orgsError && (!showOrgTree || treeCollapsed) ? (
+          {/* 单独查看匹配人员：只展示匹配出来的用户，不再依赖当前组织 */}
+          {search.matchOnly ? (
+            <MatchedMembersTable
+              rows={search.matches}
+              hitUid={search.hitUid}
+              loading={search.searching || search.matchesLoading}
+              onOpenMember={openMember}
+            />
+          ) : /* 组织树隐藏（showOrgTree=false）或已收起（treeCollapsed）时，组织加载错误不会在
+                左侧树卡片中展示，需在成员卡片体兜底提示，避免报错被静默吞掉（代码要求 3） */
+          orgsError && (!showOrgTree || treeCollapsed) ? (
             <ErrorState message={orgsError} onRetry={() => onReloadOrgs(true)} />
           ) : !orgsLoading && orgs.length === 0 ? (
             <Alert type="info" showIcon title={t('orgExplorer.emptyOrgs')} />
