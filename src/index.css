@@ -970,6 +970,100 @@ h3 {
   font-size: 13px;
 }
 
+/*
+ * 党建活动加分审批详情页：
+ * 审批内容与操作表单同屏展示——宽屏左右分栏，窄屏（含分屏）上下堆叠。
+ * 页面本身随工作区整体滚动，避免表单被卡片内部滚动裁掉。
+ */
+.party-approval-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.party-approval-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.party-approval-detail-title {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.party-approval-detail-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.party-approval-detail-layout {
+  display: grid;
+  /* 右栏适当加宽，保证审批意见有足够的书写宽度；与左栏保持同一行高 */
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 540px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* 左右卡片等高：卡片体撑满剩余高度，右栏操作按钮贴底展示 */
+.party-approval-detail-layout > .panel-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.party-approval-detail-layout > .panel-card > .panel-card-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@media (max-width: 1100px) {
+  .party-approval-detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 左栏审批内容分区：基础信息 / 审批流转 / 附件材料 */
+.party-approval-section + .party-approval-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.party-approval-section-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* 右栏审批表单：撑满卡片高度，操作按钮紧随审批意见展示 */
+.party-approval-action-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+.party-approval-comment-item textarea {
+  min-height: 200px;
+  resize: vertical;
+}
+
+/* 右栏操作按钮：取消 / 驳回 / 确认通过统一右对齐 */
+.party-approval-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* 管理端：组织架构（左侧组织树卡片 + 右侧成员卡片，各自独立滚动，撑满工作区高度） */
 .admin-org-view {
   display: flex;

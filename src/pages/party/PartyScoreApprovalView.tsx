@@ -1,64 +1,47 @@
 /**
- * 党建活动加分审核（党委支部端 / 党委学院端 / 党委学校端共用页面）。
+ * 党建活动加分审核（党委支部端 / 党委学院端共用页面）。
  *
  * 数据源：
  *   GET /api/approvals                     按显式 approver_id（当前登录用户）取审批步骤
  *   GET /api/party-scores                 按 approval_instance_id 精确反查，判定步骤是否属于加分业务
- *     （后端 GET /api/party-scores/approvals 与 /api/party-scores/{id} 路由冲突，不能直接调用）
- *   PUT /api/party-scores/approvals/{id}/approve   通过
- *   PUT /api/party-scores/approvals/{id}/reject    驳回
- *   PUT /api/party-scores/approvals/{id}/transfer  转交
- *   GET /api/users                         转交对象搜索
+ *     （后端 GET /api/party-scores/approvals 只返回已处理步骤，不能用于待办列表）
+ *   GET /api/users                         批量解析申请人真实姓名（useUserNames）
+ *   PUT /api/party-scores/approvals/{id}/approve|reject|transfer  在审批详情页处理
  *
- * 审批步骤后端不返回申请人/申请分数等业务字段，因此前端按实例 ID 反查加分申请；
- * 判定归属时必须按实例精确查询，不能改成「拉全部加分申请再取交集」——
+ * 点击行或操作列统一跳转到审批详情页（/portal/:portalKey/party-score-approvals/:stepId）：
+ *   - 行点击：打开详情页查看审批内容；
+ *   - 操作列「通过 / 驳回 / 转交」：打开详情页并自动选中对应操作，
+ *     让审批内容与待填写表单在同一页面同屏展示；
+ *   - 审批通过前必须填写「核定分数」，详情页已按后端最新契约设为必填并提交字符串分数。
+ * 判定步骤归属时必须按实例精确查询，不能改成「拉全部加分申请再取交集」——
  * 后者会受调用者数据范围与分页影响，导致别人的申请被静默过滤掉。
  * 所有 GET 均走会话缓存，写操作后自动失效缓存并刷新表格。
  */
 import { ReloadOutlined } from '@ant-design/icons'
-import {
-  App as AntdApp,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Table,
-  Tag,
-  Tooltip,
-} from 'antd'
+import { Button, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import {
-  approvePartyScore,
-  queryPartyScoreApprovals,
-  queryPartyScores,
-  rejectPartyScore,
-  transferPartyScore,
-} from '../../api/partyScores'
+import { queryPartyScoreApprovals, queryPartyScores } from '../../api/partyScores'
 import type {
   ApprovalInstanceStep,
   ApprovalStepStatus,
 } from '../../api/types/approvals'
 import type { PartyScore } from '../../api/types/partyScores'
-import { queryUsers } from '../../api/users'
 import ErrorState from '../../components/ErrorState'
-import PartyScoreDetailModal from '../../components/PartyScoreDetailModal'
 import {
   isPartyScoreStepActionable,
   PARTY_SCORE_APPROVAL_PAGE_SIZE,
   PARTY_SCORE_APPROVAL_STATUS_COLOR,
-  PARTY_SCORE_TRANSFER_USER_PAGE_SIZE,
 } from '../../config/partyScoreApproval'
-import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useUserNames } from '../../composables/useUserNames'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
+import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 
 /** 审批动作类型：通过 / 驳回 / 转交 */
 type ApprovalAction = 'approve' | 'reject' | 'transfer'
@@ -67,13 +50,6 @@ type ApprovalAction = 'approve' | 'reject' | 'transfer'
 interface ApprovalRow {
   step: ApprovalInstanceStep
   score: PartyScore | null
-}
-
-/** 审批弹窗表单值（comment 必填；reviewed_score、transfer_to 按动作类型按需填写） */
-interface ActionFormValues {
-  comment: string
-  reviewed_score?: number | null
-  transfer_to?: number
 }
 
 /**
@@ -109,32 +85,23 @@ async function fetchPartyScoreMap(
 
 /**
  * 党建活动加分审核页。
- * 党委支部端、党委学院端、党委学校端的「审核管理 / 审批管理」共用本组件。
+ * 党委支部端、党委学院端的「审核管理」共用本组件。
  */
 export default function PartyScoreApprovalView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
-  const { message } = AntdApp.useApp()
-  const reportError = useErrorFeedback()
+  const navigate = useNavigate()
+  const { portalKey, moduleKey } = useParams<{
+    portalKey: string
+    moduleKey: string
+  }>()
 
-  const [myUid, setMyUid] = useState<number | null>(null)
   const [rows, setRows] = useState<ApprovalRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   /** 状态多选筛选：空数组表示全部 */
   const [statusFilter, setStatusFilter] = useState<ApprovalStepStatus[]>([])
-  const [submitting, setSubmitting] = useState(false)
-  const [action, setAction] = useState<{
-    kind: ApprovalAction
-    row: ApprovalRow
-  } | null>(null)
-  const [detailRow, setDetailRow] = useState<ApprovalRow | null>(null)
-  const [actionForm] = Form.useForm<ActionFormValues>()
-
-  /** 转交对象搜索选项与加载态 */
-  const [transferUsers, setTransferUsers] = useState<{ value: number; label: string }[]>([])
-  const [searchingUsers, setSearchingUsers] = useState(false)
 
   const load = useCallback(
     async (force = false) => {
@@ -144,7 +111,6 @@ export default function PartyScoreApprovalView() {
         // 先拿当前用户，再显式带 approver_id 查询：不依赖后端「缺省按本人待办」的隐式行为，
         // 也保证缓存键包含审批人，避免不同账号之间串用缓存
         const me = await getCurrentUser()
-        setMyUid(me.uid)
         const steps = await queryPartyScoreApprovals(
           {
             approver_id: me.uid,
@@ -181,36 +147,40 @@ export default function PartyScoreApprovalView() {
   }, [load])
 
   /**
-   * 打开审批详情。
-   * 审批步骤只带审批实例 ID：行上已有加分明细时直接用申请 ID 调详情接口；
-   * 若行上没有明细（多为加载时缓存了旧空结果），点击瞬间绕过缓存强制反查一次，
-   * 拿到申请 ID 后再由详情弹窗请求 GET /api/party-scores/{id}，避免弹窗空白且不发请求。
-   * @param row 审批行（必填）
+   * 审批详情页地址。
+   * @param stepId 审批步骤 ID（必填）
+   * @param action 需要预选的审批动作（可选；不传时详情页展示操作选择）
+   * @returns 带来源模块与动作参数的详情页地址；缺少门户信息时返回 null
    */
-  const openDetail = async (row: ApprovalRow) => {
-    if (row.score) {
-      setDetailRow(row)
-      return
-    }
-    try {
-      const res = await queryPartyScores(
-        { approval_instance_id: row.step.instance_id, page: 1, page_size: 1 },
-        true,
-      )
-      const score = res.data[0] ?? null
-      if (!score) {
-        message.warning(t('partyScoreApproval.emptyScore'))
-        return
-      }
-      const nextRow = { ...row, score }
-      setRows((prev) =>
-        prev.map((item) => (item.step.id === row.step.id ? nextRow : item)),
-      )
-      setDetailRow(nextRow)
-    } catch (err) {
-      reportError(err)
-    }
-  }
+  const buildDetailPath = useCallback(
+    (stepId: number, action?: ApprovalAction): string | null => {
+      if (!portalKey) return null
+      const params = new URLSearchParams()
+      if (moduleKey) params.set('from', moduleKey)
+      if (action) params.set('action', action)
+      const query = params.toString()
+      return `/portal/${portalKey}/party-score-approvals/${stepId}${query ? `?${query}` : ''}`
+    },
+    [portalKey, moduleKey],
+  )
+
+  /** 打开审批详情页（整行点击） */
+  const openDetail = useCallback(
+    (row: ApprovalRow) => {
+      const path = buildDetailPath(row.step.id)
+      if (path) navigate(path)
+    },
+    [buildDetailPath, navigate],
+  )
+
+  /** 打开审批详情页并预选审批动作（操作列按钮） */
+  const openAction = useCallback(
+    (kind: ApprovalAction, row: ApprovalRow) => {
+      const path = buildDetailPath(row.step.id, kind)
+      if (path) navigate(path)
+    },
+    [buildDetailPath, navigate],
+  )
 
   const statusOptions = useMemo(
     () =>
@@ -238,89 +208,6 @@ export default function PartyScoreApprovalView() {
   )
   const userNames = useUserNames(applicantIds)
 
-  /** 打开审批弹窗（按动作类型重置表单与转交对象选项） */
-  const openAction = useCallback(
-    (kind: ApprovalAction, row: ApprovalRow) => {
-      setAction({ kind, row })
-      actionForm.resetFields()
-      setTransferUsers([])
-      if (kind === 'approve') {
-        actionForm.setFieldsValue({ reviewed_score: null })
-      }
-    },
-    [actionForm],
-  )
-
-  /** 搜索可转交的审批人（按姓名或学号关键字） */
-  const searchTransferUsers = useCallback(
-    async (raw: string) => {
-      const keyword = raw.trim()
-      setSearchingUsers(true)
-      try {
-        if (!keyword) {
-          setTransferUsers([])
-          return
-        }
-        const res = await queryUsers({
-          keyword,
-          page: 1,
-          page_size: PARTY_SCORE_TRANSFER_USER_PAGE_SIZE,
-        })
-        setTransferUsers(
-          res.data
-            .filter((user) => user.uid !== myUid)
-            .map((user) => ({
-              value: user.uid,
-              label: user.name ? `${user.name}（${user.uid}）` : String(user.uid),
-            })),
-        )
-      } catch (err) {
-        reportError(err)
-        setTransferUsers([])
-      } finally {
-        setSearchingUsers(false)
-      }
-    },
-    [myUid, reportError],
-  )
-
-  /** 提交审批动作 */
-  const submitAction = async () => {
-    if (!action) return
-    const values = await actionForm.validateFields()
-    const comment = values.comment.trim()
-    setSubmitting(true)
-    try {
-      if (action.kind === 'approve') {
-        await approvePartyScore(action.row.step.id, {
-          comment,
-          reviewed_score: values.reviewed_score ?? null,
-        })
-        message.success(t('partyScoreApproval.approveSuccess'))
-      } else if (action.kind === 'reject') {
-        await rejectPartyScore(action.row.step.id, { comment })
-        message.success(t('partyScoreApproval.rejectSuccess'))
-      } else {
-        if (!values.transfer_to) {
-          message.error(t('partyScoreApproval.transferTargetRequired'))
-          return
-        }
-        await transferPartyScore(action.row.step.id, {
-          transfer_to: values.transfer_to,
-          comment,
-        })
-        message.success(t('partyScoreApproval.transferSuccess'))
-      }
-      setAction(null)
-      actionForm.resetFields()
-      void load()
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   const columns = useMemo<ColumnsType<ApprovalRow>>(
     () => [
       {
@@ -337,7 +224,15 @@ export default function PartyScoreApprovalView() {
         width: 130,
         render: (_, row) => {
           if (!row.score) return '—'
-          return userNames.get(row.score.user_id) ?? row.score.user_id
+          const name = userNames.get(row.score.user_id)
+          // 姓名批量查询尚未返回时展示加载态；查询失败（如无 user.read 权限）回退用户 ID
+          if (name === undefined) return t('common.loading')
+          if (name) return name
+          return (
+            <Tooltip title={t('partyScoreApproval.applicantNameFallback')}>
+              <span>{row.score.user_id}</span>
+            </Tooltip>
+          )
         },
       },
       {
@@ -350,8 +245,12 @@ export default function PartyScoreApprovalView() {
           const score = row.score?.requested_score
           if (score === undefined) return '—'
           return (
-            <span className={score < 0 ? 'party-score-minus' : 'party-score-plus'}>
-              {score > 0 ? `+${score}` : score}
+            <span
+              className={
+                isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'
+              }
+            >
+              {formatPartyScore(score)}
             </span>
           )
         },
@@ -362,7 +261,7 @@ export default function PartyScoreApprovalView() {
         key: 'approvedScore',
         width: 110,
         align: 'center',
-        render: (_, row) => (row.score?.approved_score ?? '—'),
+        render: (_, row) => formatPartyScore(row.score?.approved_score),
       },
       {
         title: t('partyScoreApproval.colStepOrder'),
@@ -478,8 +377,6 @@ export default function PartyScoreApprovalView() {
     rows.length +
     (rows.length === PARTY_SCORE_APPROVAL_PAGE_SIZE ? 1 : 0)
 
-  const actionScore = action?.row.score ?? null
-
   return (
     <div className="data-page-view">
       <section className="panel-card">
@@ -516,7 +413,7 @@ export default function PartyScoreApprovalView() {
               scroll={{ x: 1220 }}
               locale={{ emptyText: t('common.noData') }}
               onRow={(row) => ({
-                onClick: () => void openDetail(row),
+                onClick: () => openDetail(row),
                 title: t('partyScoreApproval.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
@@ -550,116 +447,6 @@ export default function PartyScoreApprovalView() {
           )}
         </div>
       </section>
-
-      {/* 审批动作弹窗 */}
-      <Modal
-        open={action !== null}
-        title={
-          action?.kind === 'approve'
-            ? t('partyScoreApproval.approveTitle')
-            : action?.kind === 'reject'
-              ? t('partyScoreApproval.rejectTitle')
-              : t('partyScoreApproval.transferTitle')
-        }
-        okText={
-          action?.kind === 'approve'
-            ? t('partyScoreApproval.confirmApprove')
-            : action?.kind === 'reject'
-              ? t('partyScoreApproval.confirmReject')
-              : t('partyScoreApproval.confirmTransfer')
-        }
-        okButtonProps={{
-          danger: action?.kind === 'reject',
-          type: action?.kind === 'approve' ? 'primary' : 'default',
-          loading: submitting,
-        }}
-        cancelText={t('common.cancel')}
-        onCancel={() => setAction(null)}
-        onOk={() => void submitAction()}
-        destroyOnHidden
-      >
-        {action && (
-          <div className="approval-modal-meta">
-            {t('partyScoreApproval.metaInstance')}：{action.row.step.instance_id} ·{' '}
-            {t('partyScoreApproval.stepOrderValue', {
-              n: String(action.row.step.step_order),
-            })}
-            {actionScore && (
-              <>
-                {' · '}
-                {t('partyScoreApproval.colRequestedScore')}：
-                {actionScore.requested_score > 0
-                  ? `+${actionScore.requested_score}`
-                  : actionScore.requested_score}
-              </>
-            )}
-          </div>
-        )}
-        <Form form={actionForm} layout="vertical">
-          {action?.kind === 'approve' && (
-            <Form.Item
-              name="reviewed_score"
-              label={t('partyScoreApproval.reviewedScoreLabel')}
-            >
-              <InputNumber
-                style={{ width: '100%' }}
-                min={-9999}
-                max={9999}
-                placeholder={t('partyScoreApproval.reviewedScorePlaceholder')}
-              />
-            </Form.Item>
-          )}
-          {action?.kind === 'transfer' && (
-            <Form.Item
-              name="transfer_to"
-              label={t('partyScoreApproval.transferTargetLabel')}
-              rules={[{ required: true, message: t('partyScoreApproval.transferTargetRequired') }]}
-            >
-              <Select
-                showSearch
-                filterOption={false}
-                loading={searchingUsers}
-                placeholder={t('partyScoreApproval.transferTargetPlaceholder')}
-                options={transferUsers}
-                onSearch={(value) => void searchTransferUsers(value)}
-                notFoundContent={searchingUsers ? t('partyScoreApproval.searchingUsers') : null}
-              />
-            </Form.Item>
-          )}
-          <Form.Item
-            name="comment"
-            label={t('partyScoreApproval.commentLabel')}
-            rules={[{ required: true, message: t('partyScoreApproval.commentRequired') }]}
-          >
-            <Input.TextArea rows={3} maxLength={200} showCount />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <PartyScoreDetailModal
-        open={detailRow !== null}
-        scoreId={detailRow?.score?.id ?? null}
-        actionable={detailRow !== null && isPartyScoreStepActionable(detailRow.step.status)}
-        onApprove={() => {
-          if (!detailRow) return
-          const row = detailRow
-          setDetailRow(null)
-          openAction('approve', row)
-        }}
-        onReject={() => {
-          if (!detailRow) return
-          const row = detailRow
-          setDetailRow(null)
-          openAction('reject', row)
-        }}
-        onTransfer={() => {
-          if (!detailRow) return
-          const row = detailRow
-          setDetailRow(null)
-          openAction('transfer', row)
-        }}
-        onClose={() => setDetailRow(null)}
-      />
     </div>
   )
 }

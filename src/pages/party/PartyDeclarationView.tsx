@@ -45,13 +45,14 @@ import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
+import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 
 /** 申报表单字段 */
 interface DeclarationFormValues {
   /** 申报类型（审批模板 ID，提交为加分申请的 template_id） */
   template_id: number
-  /** 申请加分（int64，正数加分、负数减分） */
-  requested_score: number
+  /** 申请加分（DecimalText 字符串，正数加分、负数减分） */
+  requested_score: string
   /** 附件文件 ID 列表（由 AttachmentUploader 上传 /api/files 后回填） */
   files?: number[]
 }
@@ -165,9 +166,9 @@ export default function PartyDeclarationView() {
         width: 120,
         align: 'center',
         // 正数加分（绿色）、负数减分（红色），与「我的成绩记录」保持同一配色
-        render: (score: number) => (
-          <span className={score < 0 ? 'party-score-minus' : 'party-score-plus'}>
-            {score > 0 ? `+${score}` : score}
+        render: (score: string) => (
+          <span className={isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'}>
+            {formatPartyScore(score)}
           </span>
         ),
       },
@@ -177,12 +178,12 @@ export default function PartyDeclarationView() {
         key: 'approved_score',
         width: 120,
         align: 'center',
-        render: (score: number | null) =>
+        render: (score: string | null) =>
           score === null || score === undefined ? (
             '—'
           ) : (
-            <span className={score < 0 ? 'party-score-minus' : 'party-score-plus'}>
-              {score > 0 ? `+${score}` : score}
+            <span className={isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'}>
+              {formatPartyScore(score)}
             </span>
           ),
       },
@@ -285,7 +286,8 @@ export default function PartyDeclarationView() {
                 label={t('partyDeclaration.fieldScore')}
                 rules={[{ required: true, message: t('partyDeclaration.scoreRequired') }]}
               >
-                <InputNumber style={{ width: 180 }} precision={0} step={1} />
+                {/* 后端分数为 DecimalText（字符串），用 stringMode 采集并原样提交 */}
+                <InputNumber style={{ width: 180 }} stringMode step="1" />
               </Form.Item>
 
               <Form.Item
@@ -362,10 +364,10 @@ export default function PartyDeclarationView() {
               {templateNameById.get(detail.template_id) ?? detail.template_id}
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colScore')}>
-              {detail.requested_score}
+              {formatPartyScore(detail.requested_score)}
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colApproved')}>
-              {detail.approved_score ?? '—'}
+              {formatPartyScore(detail.approved_score)}
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.detailInstance')}>
               {detail.approval_instance_id}

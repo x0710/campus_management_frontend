@@ -5,7 +5,7 @@
  *   GET    /api/party-scores                                        分页查询加分申请
  *   POST   /api/party-scores                                        创建加分申请
  *   GET    /api/party-scores/{id}                                   加分申请详情
- *   PUT    /api/party-scores/approvals/{id}/approve                 审批通过
+ *   PUT    /api/party-scores/approvals/{id}/approve                 审批通过（必须提交核定分数）
  *   PUT    /api/party-scores/approvals/{id}/reject                  审批驳回
  *   PUT    /api/party-scores/approvals/{id}/transfer                审批转交
  *
@@ -183,7 +183,7 @@ export async function queryPartyScoreApprovals(
  * PUT /api/party-scores/approvals/{id}/approve 审批通过，成功返回 200 无 body。
  * 403 表示无权访问，错误信息由调用方展示。
  * @param id 审批步骤 ID（必填）
- * @param data 审批通过请求体（comment 必填，reviewed_score 可选）
+ * @param data 审批通过请求体（comment、reviewed_score 均必填；reviewed_score 为 DecimalText 字符串）
  * @returns Promise<void>
  */
 export function approvePartyScore(id: number, data: PartyScoreApproveRequest): Promise<void> {

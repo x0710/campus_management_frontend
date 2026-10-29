@@ -15,6 +15,9 @@ import PortalWorkspace from './pages/main/PortalWorkspace'
 import { useAuthStore } from './store/auth'
 
 const AnnouncementDetailPage = lazy(() => import('./pages/main/AnnouncementDetailPage'))
+const PartyScoreApprovalDetailPage = lazy(
+  () => import('./pages/party/PartyScoreApprovalDetailPage'),
+)
 const FeedbackView = lazy(() => import('./pages/student/FeedbackView'))
 const AnnouncementEditorPage = lazy(() => import('./pages/leader/AnnouncementEditorPage'))
 const MemberDetailPage = lazy(() => import('./pages/leader/MemberDetailPage'))
@@ -69,6 +72,12 @@ export default function App() {
           <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
           {/* /portal/:portalKey/announcements/:id：公告详情，沿用同一界面壳与侧栏 */}
           <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
+          {/* 党建活动加分审批详情：点击审核列表整行或操作列进入，
+              沿用同一界面壳与侧栏（?from=<moduleKey>&action=<动作>） */}
+          <Route
+            path="party-score-approvals/:stepId"
+            element={<PartyScoreApprovalDetailPage />}
+          />
           {/* 成员详情：领导端组织概览/老师端班级管理/党委各端支部管理/管理端组织架构/
               学校端组织管理点击成员进入，沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route path="organization-members/:uid" element={<MemberDetailPage />} />

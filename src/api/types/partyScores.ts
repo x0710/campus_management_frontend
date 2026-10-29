@@ -9,7 +9,9 @@
  *   PUT   /api/party-scores/approvals/{id}/approve|reject|transfer  审批通过/驳回/转交
  * （接口契约以 Swagger 为准；模型名对应 api.json: PartyScore* / ApprovalInstanceStep）
  *
- * 说明：i64 字段在 JSON 中序列化为数字，前端统一用 number 承接；DateTime 统一用字符串（RFC3339）。
+ * 说明：i64 字段在 JSON 中序列化为数字，前端统一用 number 承接；
+ * 分数为后端 DecimalText（JSON 字符串，如 "5" / "-2.5"），前端统一用 string 承接并原样透传，
+ * 避免浮点精度丢失；DateTime 统一用字符串（RFC3339）。
  * 供 api/partyScores.ts 的请求函数与党建端各视图复用。
  */
 import type { ApprovalStepStatus } from './approvals'
@@ -23,10 +25,10 @@ export interface PartyScore {
   template_id: number
   /** 申请人用户 ID */
   user_id: number
-  /** 申请加分（int64，可正可负） */
-  requested_score: number
-  /** 审批核定分数；未审批通过时为 null */
-  approved_score: number | null
+  /** 申请加分（DecimalText 字符串，可正可负，如 "5" / "-2.5"） */
+  requested_score: string
+  /** 审批核定分数（DecimalText 字符串）；未审批通过时为 null */
+  approved_score: string | null
   /** 关联的审批实例 ID */
   approval_instance_id: number
   /** 创建时间（RFC3339） */
@@ -60,8 +62,8 @@ export interface PartyScoreQuery extends PageQuery {
 export interface PartyScoreCreateRequest {
   /** 审批模板 ID（必填） */
   template_id: number
-  /** 申请加分（必填，int64） */
-  requested_score: number
+  /** 申请加分（必填，DecimalText 字符串，可正可负） */
+  requested_score: string
   /**
    * 附件文件 ID 列表（必填，无附件时传空数组）。
    * 需先调用 POST /api/files 上传文件，再把返回的 id 填入此字段，实现申请与附件匹配。
@@ -96,8 +98,12 @@ export interface PartyScoreApprovalQuery extends PageQuery {
 export interface PartyScoreApproveRequest {
   /** 审批意见（必填） */
   comment: string
-  /** 审批核定分数，用于留痕并作为最终审批分数（可选，缺省为 null） */
-  reviewed_score?: number | null
+  /**
+   * 审批核定分数（必填，DecimalText 字符串）。
+   * 后端已改为必填：审批通过前必须填写，用于留痕并作为最终审批分数；
+   * 前端用 InputNumber 的 stringMode 采集字符串，避免浮点精度丢失。
+   */
+  reviewed_score: string
 }
 
 /** PUT /api/party-scores/approvals/{id}/reject 审批驳回请求体 */

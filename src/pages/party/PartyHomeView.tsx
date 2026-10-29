@@ -28,17 +28,13 @@ import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
+import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 
 /** 近期记录日期标签：月.日（数值型，各语言下通用；时间非法时返回占位符） */
 function formatRecordDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
   return `${date.getMonth() + 1}.${date.getDate()}`
-}
-
-/** 分数展示：正数带 + 号，负数保持原样 */
-function formatScore(score: number): string {
-  return score > 0 ? `+${score}` : String(score)
 }
 
 export default function PartyHomeView() {
@@ -185,9 +181,7 @@ export default function PartyHomeView() {
                     </div>
                     <div>
                       {t('partyDeclaration.colApproved')}:{' '}
-                      {record.approved_score === null
-                        ? '—'
-                        : formatScore(record.approved_score)}
+                      {formatPartyScore(record.approved_score)}
                     </div>
                     <div>
                       {t('partyDeclaration.colCreatedAt')}:{' '}
@@ -205,12 +199,12 @@ export default function PartyHomeView() {
                   </span>
                   <span
                     className={
-                      record.requested_score < 0
+                      isNegativePartyScore(record.requested_score)
                         ? 'party-record-delta party-score-minus'
                         : 'party-record-delta'
                     }
                   >
-                    {formatScore(record.requested_score)}
+                    {formatPartyScore(record.requested_score)}
                   </span>
                 </li>
               </Tooltip>

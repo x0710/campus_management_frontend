@@ -65,11 +65,14 @@ export async function createApprovalTemplate(
 
 /**
  * GET /api/approvals/templates/{id} 获取审批模板详情（含步骤列表）
- * @param id 模板 ID（必填）
+ * @param id 模板 ID（必填，必须为正数；无效时直接拒绝，避免请求 templates/undefined）
  * @param force 是否绕过会话缓存（可选，默认 false）
  * @returns Promise<ApprovalTemplateDetail> 模板详情（必返回）
  */
 export function getApprovalTemplateDetail(id: number, force?: boolean) {
+  if (!Number.isFinite(id) || id <= 0) {
+    return Promise.reject(new Error('审批模板 ID 无效'))
+  }
   return cachedGet<ApprovalTemplateDetail>(
     `/approvals/templates/${id}`,
     undefined,
