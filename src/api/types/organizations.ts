@@ -36,6 +36,14 @@ export interface UserOrganization extends OrganizationMember {
   organization_name: string
 }
 
+/** 组织成员数量统计项（GET /organizations/{org_id}/member-counts 返回单个对象；recursive=true 时 member_count 含全部下级组织） */
+export interface OrganizationMemberCountItem {
+  /** 组织 ID */
+  organization_id: number
+  /** 该组织去重后的成员数量（非负） */
+  member_count: number
+}
+
 /** 组织树链路节点（GET /organizations/{id}/tree 返回项；链路顺序为「根 → 查询组织」） */
 export interface OrganizationTreeNode {
   id: number

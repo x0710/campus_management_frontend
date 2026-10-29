@@ -18,6 +18,9 @@ export const PARTY_DECLARATION_MAX_FILES = 10
 /** 党员端首页「近期记录」展示条数（取最近的若干条成绩申报） */
 export const PARTY_RECENT_RECORD_LIMIT = 5
 
+/** 「我的-消息通知」单页条数（代码要求 12：单页最多 100 条） */
+export const PARTY_NOTICE_PAGE_SIZE = 10
+
 /** 先锋指数基础分（总分在该基础上自动累加） */
 export const PARTY_SCORE_BASE = 70
 

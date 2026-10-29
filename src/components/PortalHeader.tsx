@@ -33,6 +33,7 @@ import { getAccessiblePortalKeys, getPortal, PORTAL_PROFILE_MODULE_KEYS, PORTALS
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
+import PortalNoticeBell from './PortalNoticeBell'
 
 interface PortalHeaderProps {
   /** 左侧自定义内容（如返回按钮、面包屑） */
@@ -280,6 +281,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             onClick={toggleTheme}
           />
         </Tooltip>
+        <PortalNoticeBell />
 
         <Dropdown
           trigger={['click']}

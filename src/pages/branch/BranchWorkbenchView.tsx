@@ -3,7 +3,8 @@
  *
  * 已接入真实接口：
  *   党员总数（人）  经 composables/usePortalOrg 定位当前用户所属支部 →
- *                   GET /api/organizations/{id}/members 取分页 total（只需总数，page_size=1）
+ *                   GET /api/organizations/{id}/member-counts?recursive=true
+ *                   按组织统计成员数（含全部下级组织，前端相加得总数）
  *   待审核申报（条） 前端用 GET /api/party-scores + /api/approvals 合成党建加分审批步骤，
  *                   按 status=waiting / pending 各取一页后合计条数；
  *                   底层接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
@@ -18,8 +19,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { queryPartyScoreApprovals } from '../../api/partyScores'
 import { extractErrorReason } from '../../api/common'
-import { queryOrgMembers } from '../../api/organizations'
 import ErrorState from '../../components/ErrorState'
+import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
@@ -53,14 +54,14 @@ export default function BranchWorkbenchView() {
   const load = useCallback(async () => {
     try {
       const { orgId } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
-      const [memberPage, waitingSteps, pendingSteps] = await Promise.all([
+      const [memberTotal, waitingSteps, pendingSteps] = await Promise.all([
         orgId === null
-          ? Promise.resolve(null)
-          : queryOrgMembers(orgId, { page: 1, page_size: 1 }),
+          ? Promise.resolve(0)
+          : countOrgMemberTotal(orgId),
         queryPartyScoreApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
         queryPartyScoreApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
       ])
-      setMembers(memberPage?.total ?? 0)
+      setMembers(memberTotal)
       setTodoApprove(waitingSteps.length + pendingSteps.length)
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示

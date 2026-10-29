@@ -1,13 +1,15 @@
 import { BellOutlined, UserOutlined } from '@ant-design/icons'
-import { Alert, Avatar, Button, Card, Collapse, Descriptions, Empty, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
+import { Alert, Avatar, Button, Card, Collapse, Descriptions, Empty, Pagination, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getApprovalTemplateDetail, mockApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
 import { getMyRoles } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
+import { markNoticeRead, queryNotices } from '../../api/notices'
 import { listUserOrganizations } from '../../api/organizations'
 import { getMyProfile } from '../../api/users'
 import type { ApprovalStep, ApprovalTemplate, MockApprovalApprover } from '../../api/types/approvalmodel'
+import type { Notice } from '../../api/types/notices'
 import type { UserOrganization } from '../../api/types/organizations'
 import type { UserRoleInfo } from '../../api/types/rbac'
 import type { UserDetail } from '../../api/types/users'
@@ -19,6 +21,8 @@ import {
   getBusinessTypeColor,
   getBusinessTypeLabel,
 } from '../../config/approvalTemplate'
+import { NOTICE_CATEGORY_LABEL_KEYS } from '../../config/notices'
+import { PARTY_NOTICE_PAGE_SIZE } from '../../config/partyDeclaration'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
@@ -32,31 +36,9 @@ import { formatDateTime } from '../../utils/datetime'
  * 「我的档案」按学生端个人信息页展示真实基本资料（GET /api/users/me），
  * 并保留党员编号 / 所属支部 / 政治面貌 / 入党时间等党员端扩展信息。
  * 党员编号 / 政治面貌 / 入党时间后端暂无接口，暂以预览值展示；所属支部取真实任职组织。
- * 其余档案字段与成绩记录仍为【模拟数据预览】。
  * 我的成绩记录：复用总成绩概览（PartyScoreSummary）与成绩记录表格（PartyScoreRecords）。
+ * 消息通知：分页展示站内通知（GET /api/notices），点击未读项标记已读。
  */
-
-/** 消息通知（模拟数据；字段对应 i18n 文案 key） */
-const MOCK_NOTIFICATIONS: { id: string; titleKey: string; timeKey: string; bodyKey: string }[] = [
-  {
-    id: 'n1',
-    titleKey: 'partyProfile.notif_1_title',
-    timeKey: 'partyProfile.notif_1_time',
-    bodyKey: 'partyProfile.notif_1_body',
-  },
-  {
-    id: 'n2',
-    titleKey: 'partyProfile.notif_2_title',
-    timeKey: 'partyProfile.notif_2_time',
-    bodyKey: 'partyProfile.notif_2_body',
-  },
-  {
-    id: 'n3',
-    titleKey: 'partyProfile.notif_3_title',
-    timeKey: 'partyProfile.notif_3_time',
-    bodyKey: 'partyProfile.notif_3_body',
-  },
-]
 
 /** 我的档案：基本信息 + 党员端扩展信息 */
 function ProfileDescriptions() {
@@ -476,32 +458,118 @@ function ApprovalGuide() {
   )
 }
 
-/** 消息通知列表 */
+/** 消息通知列表：分页展示站内通知，点击未读项标记已读 */
 function NotificationsList() {
   const t = useT()
+  const locale = useSettingsStore((s) => s.locale)
+  const [notices, setNotices] = useState<Notice[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadSeq, setReloadSeq] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    queryNotices({ page, page_size: PARTY_NOTICE_PAGE_SIZE })
+      .then((res) => {
+        if (cancelled) return
+        setNotices(res.data)
+        setTotal(res.total)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        // 401 由 http 拦截器统一处理登录态，此处不重复提示
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+          setError(extractErrorReason(err, t))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [page, reloadSeq, t])
+
+  /** 重新加载（事件回调内可安全重置加载态） */
+  const retry = () => {
+    setError(null)
+    setLoading(true)
+    setReloadSeq((prev) => prev + 1)
+  }
+
+  /** 点击未读通知标记已读，并本地同步列表 */
+  const handleRead = async (notice: Notice) => {
+    if (notice.is_read) return
+    try {
+      await markNoticeRead(notice.id)
+      setNotices((prev) =>
+        prev.map((item) => (item.id === notice.id ? { ...item, is_read: true } : item)),
+      )
+    } catch {
+      // 标记失败保持现状，下次加载时与后端对齐
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="party-placeholder">
+        <Spin />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={retry} />
+  }
+
+  if (notices.length === 0) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('notice.empty')} />
+  }
+
   return (
-    <>
-      <Alert
-        type="warning"
-        showIcon
-        title={t('partyProfile.mockHint')}
-        style={{ marginBottom: 12 }}
-      />
+    <div>
       <ul className="party-notif-list">
-        {MOCK_NOTIFICATIONS.map((item) => (
-          <li key={item.id} className="party-notif-item">
+        {notices.map((item) => (
+          <li
+            key={item.id}
+            className={
+              item.is_read ? 'party-notif-item' : 'party-notif-item party-notif-item-unread'
+            }
+            title={item.is_read ? undefined : t('notice.readHint')}
+            onClick={() => void handleRead(item)}
+          >
             <div className="party-notif-head">
               <span className="party-notif-title">
                 <BellOutlined className="party-notif-icon" />
-                {t(item.titleKey)}
+                <Tag color="blue">{t(NOTICE_CATEGORY_LABEL_KEYS[item.category])}</Tag>
               </span>
-              <span className="party-notif-time">{t(item.timeKey)}</span>
+              <span className="party-notif-time">
+                {formatDateTime(item.created_at, locale)}
+                {!item.is_read ? <span className="party-notif-unread-dot" /> : null}
+              </span>
             </div>
-            <div className="party-notif-body">{t(item.bodyKey)}</div>
+            <div className="party-notif-body">{item.content}</div>
           </li>
         ))}
       </ul>
-    </>
+      <div className="party-notif-pagination">
+        <Pagination
+          current={page}
+          pageSize={PARTY_NOTICE_PAGE_SIZE}
+          total={total}
+          showSizeChanger={false}
+          showQuickJumper
+          showTotal={(n: number) =>
+            `${t('common.total')} ${n} ${t('common.items')} · ${t('common.totalPages', {
+              n: Math.max(1, Math.ceil(n / PARTY_NOTICE_PAGE_SIZE)),
+            })}`
+          }
+          onChange={setPage}
+        />
+      </div>
+    </div>
   )
 }
 

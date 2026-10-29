@@ -5,6 +5,7 @@ import type { PaginatedResponse } from './types/common'
 import type {
   OrganizationInfo,
   OrganizationMember,
+  OrganizationMemberCountItem,
   OrganizationMemberInput,
   OrganizationMemberQuery,
   OrganizationQuery,
@@ -88,6 +89,27 @@ export async function queryOrgMembers(
     params as Record<string, unknown>,
     { force },
   )
+}
+
+/**
+ * GET /api/organizations/{org_id}/member-counts 按组织统计成员数量。
+ * 后端返回单个统计对象 { organization_id, member_count }；member_count 为去重后的成员人数，
+ * recursive=true 时包含所有下级组织。计数会随成员变更实时变化，故不走会话缓存。
+ * 为兼容后端可能返回数组的形态，这里统一归一化为数组返回。
+ * @param orgId 组织 ID（必填，路径参数）
+ * @param recursive 是否递归统计子组织成员（可选；默认仅统计当前组织）
+ * @returns Promise<OrganizationMemberCountItem[]> 组织成员统计项数组（恒为数组，通常仅一项）
+ */
+export async function queryOrganizationMemberCounts(
+  orgId: number,
+  recursive?: boolean,
+): Promise<OrganizationMemberCountItem[]> {
+  const res = await http.get<OrganizationMemberCountItem[] | OrganizationMemberCountItem | null>(
+    `/organizations/${orgId}/member-counts`,
+    recursive === undefined ? undefined : { params: { recursive } },
+  )
+  if (!res.data) return []
+  return Array.isArray(res.data) ? res.data : [res.data]
 }
 
 /** POST /api/organizations/{id}/members 添加成员，返回新成员记录 */

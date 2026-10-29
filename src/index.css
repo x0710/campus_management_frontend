@@ -430,6 +430,76 @@ h3 {
   white-space: nowrap;
 }
 
+/* 顶栏消息通知弹层：固定宽度、列表超长滚动，亮色/夜间均用主题变量 */
+.notice-popover {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.notice-popover-title {
+  font-weight: 600;
+  color: var(--ink);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.notice-popover-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  color: var(--ink-secondary);
+}
+
+.notice-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notice-item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.notice-item-content {
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notice-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.notice-item-time {
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.notice-item-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.notice-item-unread {
+  cursor: pointer;
+}
+
+.notice-item-unread .notice-item-content {
+  font-weight: 600;
+}
+
 /* ============ 门户选择主页 ============ */
 
 .portal-page {
@@ -2825,8 +2895,14 @@ h3 {
 .party-notif-item {
   padding: 14px 20px;
   border-radius: 10px;
-  background: var(--card-bg);
+  /* 与所在页签的白底区分开，避免通知“融进”背景板 */
+  background: var(--editor-bg);
   border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .party-notif-head {
@@ -2860,6 +2936,42 @@ h3 {
   font-size: 14px;
   line-height: 1.7;
   color: var(--ink-secondary);
+}
+
+.party-notif-item-unread {
+  cursor: pointer;
+  /* 未读通知增加品牌色底与左侧强调条，和已读通知形成明显区分 */
+  background: linear-gradient(90deg, rgba(47, 84, 235, 0.12), rgba(47, 84, 235, 0.04));
+  border-color: rgba(47, 84, 235, 0.3);
+  border-left: 3px solid var(--brand);
+}
+
+.party-notif-item-unread:hover,
+.party-notif-item:hover {
+  border-color: var(--brand-light);
+  box-shadow: 0 2px 8px rgba(47, 84, 235, 0.12);
+}
+
+.party-notif-item-unread .party-notif-body {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* 消息通知分页：固定在右侧 */
+.party-notif-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.party-notif-unread-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  vertical-align: 1px;
 }
 
 /* 党委支部端：本支部概况 */

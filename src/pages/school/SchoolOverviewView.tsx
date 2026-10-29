@@ -3,8 +3,8 @@
  *
  * 已接入真实接口：
  *   全校党员（人）  经 composables/usePortalOrg 定位当前用户所属「学校」组织（组织树根节点，深度 0）→
- *                   composables/useOrgMemberTotal 递归汇总学校及全部下级组织成员数
- *                   （GET /api/organizations/{id}/members 的 total 只含直接成员，故需累加下级组织）
+ *                   GET /api/organizations/{id}/member-counts?recursive=true
+ *                   按组织统计成员数（含全部下级组织，前端相加得总数）
  *
  * 平均分与各二级党委排名后端暂无对应接口，仍为模拟数据，故本页保留模拟数据提示。
  */
