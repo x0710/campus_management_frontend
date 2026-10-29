@@ -10,9 +10,13 @@
  * - 保存：先 PUT permissions 覆盖权限，再 PUT data-scopes 覆盖数据范围
  *   （仅提交已勾选权限对应的资源），成功后回调 onSaved（代码要求 13）。
  */
-import { ArrowLeftOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons'
 import {
-  Alert,
+  ArrowLeftOutlined,
+  DownOutlined,
+  SearchOutlined,
+  UpOutlined,
+} from '@ant-design/icons'
+import {
   App as AntdApp,
   Button,
   Input,
@@ -133,6 +137,9 @@ export default function RolePermissionsPanel({
   /** 搜索框即时输入值与防抖后的关键词 */
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
+
+  /** 「已分配权限」区域是否收起（默认展开，收起后仅保留标题与数量） */
+  const [assignedCollapsed, setAssignedCollapsed] = useState(false)
 
   // 进入子页面时并行拉取全部权限、角色已分配权限、角色已有数据范围
   useEffect(() => {
@@ -373,16 +380,8 @@ export default function RolePermissionsPanel({
             {t('adminRoles.backToRoles')}
           </Button>
         </header>
-        {/* 卡片体固定：提示、搜索与底部保存按钮不动，仅权限表格区域滚动（代码要求 23） */}
+        {/* 卡片体固定：搜索与底部保存按钮不动，仅权限表格区域滚动（代码要求 23） */}
         <div className="panel-card-body data-page-body">
-          <Alert
-            type="info"
-            showIcon
-            icon={<SafetyCertificateOutlined />}
-            message={t('adminRoles.assignHint')}
-            style={{ marginBottom: 12 }}
-          />
-
           {loadError ? (
             <ErrorState message={loadError} />
           ) : (
@@ -402,22 +401,41 @@ export default function RolePermissionsPanel({
               </div>
               {/* 已分配权限常驻展示：搜索过滤只影响下方列表，不会让已分配的权限「消失」 */}
               {selectedPerms.length > 0 && (
-                <div className="rbac-assigned">
-                  <span className="rbac-assigned-label">
-                    {t('adminRoles.assignedPerms', { n: selectedPerms.length })}
-                  </span>
-                  <div className="rbac-assigned-tags">
-                    {selectedPerms.map((item) => (
-                      <Tag
-                        key={item.id}
-                        color="geekblue"
-                        closable
-                        onClose={() => unselectPerm(item.id)}
-                      >
-                        {item.code}
-                      </Tag>
-                    ))}
+                <div
+                  className={`rbac-assigned${assignedCollapsed ? ' is-collapsed' : ''}`}
+                >
+                  <div className="rbac-assigned-head">
+                    <span className="rbac-assigned-label">
+                      {t('adminRoles.assignedPerms', { n: selectedPerms.length })}
+                    </span>
+                    <Button
+                      type="link"
+                      size="small"
+                      className="rbac-assigned-toggle"
+                      icon={assignedCollapsed ? <DownOutlined /> : <UpOutlined />}
+                      onClick={() => setAssignedCollapsed((prev) => !prev)}
+                    >
+                      {t(
+                        assignedCollapsed
+                          ? 'adminRoles.expandAssigned'
+                          : 'adminRoles.collapseAssigned',
+                      )}
+                    </Button>
                   </div>
+                  {!assignedCollapsed && (
+                    <div className="rbac-assigned-tags">
+                      {selectedPerms.map((item) => (
+                        <Tag
+                          key={item.id}
+                          color="geekblue"
+                          closable
+                          onClose={() => unselectPerm(item.id)}
+                        >
+                          {item.code}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="data-scroll">

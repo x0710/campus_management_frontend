@@ -14,8 +14,8 @@
  *   - 审批模板 ID 必须取自加分申请详情（列表项可能不返回 template_id），
  *     并用有效 ID 请求 GET /api/approvals/templates/{id} 解析模板名称，
  *     取不到名称时回退展示模板 ID，不编造名称，也不发送 templates/undefined；
- *   - 审批通过前必须填写「核定分数」：后端已把 reviewed_score 设为必填，
- *     前端用 InputNumber 的 stringMode 采集 DecimalText 字符串后提交。
+ *   - 审批通过前必须填写「核定分数」：后端 reviewed_score 为必填 DecimalText，
+ *     前端用 stringMode InputNumber 采集并以字符串提交，避免小数精度丢失。
  *
  * 数据源：
  *   GET /api/approvals                       分页查找 URL 中的审批步骤（无单步骤详情接口）
@@ -80,7 +80,7 @@ type ApprovalAction = 'approve' | 'reject' | 'transfer'
  */
 type ActionMode = 'approve' | 'transfer'
 
-/** 审批操作表单值（核定分数为 DecimalText 字符串；转交对象按动作类型按需填写） */
+/** 审批操作表单值（核定分数为 Decimal 字符串；转交对象按动作类型按需填写） */
 interface ActionFormValues {
   comment: string
   reviewed_score?: string
@@ -199,6 +199,8 @@ function PartyScoreApprovalDetail() {
         // 详情接口补充附件下载地址与模板 ID；失败时仍展示列表字段（附件区为空）
         let loadedScore: PartyScoreDetail = {
           ...summary,
+          // 列表摘要可能不带 template_id；详情请求失败时用 0 表示未知，避免伪造有效模板
+          template_id: summary.template_id ?? 0,
           file_urls: summary.file_urls ?? [],
         }
         try {
@@ -250,7 +252,7 @@ function PartyScoreApprovalDetail() {
   const requestedScore = score?.requested_score
   useEffect(() => {
     if (actionMode === 'approve' && requestedScore !== undefined) {
-      actionForm.setFieldValue('reviewed_score', requestedScore)
+      actionForm.setFieldValue('reviewed_score', String(requestedScore))
     }
   }, [actionForm, actionMode, requestedScore])
 
@@ -344,14 +346,13 @@ function PartyScoreApprovalDetail() {
     try {
       if (kind === 'approve') {
         const reviewed = values.reviewed_score
-        if (reviewed === undefined || reviewed === null || String(reviewed).trim() === '') {
+        if (reviewed === undefined || reviewed === null) {
           message.error(t('partyScoreApproval.reviewedScoreRequired'))
           return
         }
         await approvePartyScore(step.id, {
           comment,
-          // DecimalText 以字符串提交，避免浮点精度丢失
-          reviewed_score: String(reviewed),
+          reviewed_score: reviewed,
         })
         message.success(t('partyScoreApproval.approveSuccess'))
       } else if (kind === 'reject') {
@@ -569,9 +570,7 @@ function PartyScoreApprovalDetail() {
                       <InputNumber
                         style={{ width: '100%' }}
                         stringMode
-                        step="0.5"
-                        min={String(-9999)}
-                        max={String(9999)}
+                        step="0.01"
                         placeholder={t('partyScoreApproval.reviewedScorePlaceholder')}
                       />
                     </Form.Item>

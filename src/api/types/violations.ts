@@ -42,6 +42,26 @@ export interface ViolationQuery extends PageQuery {
   end_date?: string
 }
 
+/** 创建违规记录请求体（api.json: ViolationCreateRequest） */
+export interface ViolationCreateRequest {
+  /** 学生 ID（对应 users.id） */
+  user_id: number
+  category: string
+  title: string
+  description?: string
+  /** RFC3339 */
+  occurred_at: string
+  location?: string
+  severity: ViolationSeverity
+  /** 附件文件 ID */
+  attachment?: number
+}
+
+/** 创建违规记录成功响应（api.json: ViolationCreatedResponse） */
+export interface ViolationCreatedResponse {
+  id: number
+}
+
 /** 违规更新请求体（api.json: ViolationUpdateRequest，所有字段可选，省略即保留原值） */
 export interface ViolationUpdateRequest {
   category?: string

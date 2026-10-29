@@ -9,6 +9,7 @@ import type {
   AnnouncementDetail,
   AnnouncementListItem,
   AnnouncementQuery,
+  AnnouncementReadRecord,
   AnnouncementUpdateRequest,
 } from './types/announcements'
 
@@ -103,4 +104,51 @@ export async function deleteAnnouncement(id: number): Promise<void> {
   await http.delete(`/announcements/${id}`)
   invalidate('GET /announcements')
   invalidate(`GET /announcements/${id}`)
+}
+
+/**
+ * GET /api/announcements/{id}/visibilities 查询公告可见组织 ID 列表
+ *（权限 announcement.rules.read；非发布人需 admin）。
+ * @param id 公告 ID（必填）
+ * @param force 是否绕过会话缓存；默认 false
+ * @returns Promise<number[]> 可见组织 ID 数组
+ */
+export function getAnnouncementVisibilities(
+  id: number,
+  force?: boolean,
+): Promise<number[]> {
+  return cachedGet<number[]>(`/announcements/${id}/visibilities`, undefined, { force })
+}
+
+/**
+ * PUT /api/announcements/{id}/visibilities 覆盖式更新公告可见组织 ID 列表
+ *（权限 announcement.rules.update；成功 204）。传空数组表示清空可见范围。
+ * @param id 公告 ID（必填）
+ * @param orgIds 可见组织 ID 数组（必填，可为空数组）
+ * @returns Promise<void>
+ */
+export async function replaceAnnouncementVisibilities(
+  id: number,
+  orgIds: number[],
+): Promise<void> {
+  await http.put(`/announcements/${id}/visibilities`, orgIds)
+  invalidate(`GET /announcements/${id}/visibilities`)
+  invalidate('GET /announcements')
+  invalidate(`GET /announcements/${id}`)
+}
+
+/**
+ * GET /api/announcements/{id}/readers 查询公告阅读记录
+ *（权限 announcement.readers.get；非发布人需 admin）。
+ * @param id 公告 ID（必填）
+ * @param force 是否绕过会话缓存；默认 false
+ * @returns Promise<AnnouncementReadRecord[]>
+ */
+export function getAnnouncementReaders(
+  id: number,
+  force?: boolean,
+): Promise<AnnouncementReadRecord[]> {
+  return cachedGet<AnnouncementReadRecord[]>(`/announcements/${id}/readers`, undefined, {
+    force,
+  })
 }

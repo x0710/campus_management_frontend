@@ -65,5 +65,16 @@ export function submitApproval(data: ApprovalStepResult) {
     })
 }
 
-
-
+/**
+ * DELETE /api/approvals/{id} 撤回审批实例（GLOBAL_AUTH，仅审批实例发起人，成功 204 无 body）。
+ * 撤回后审批步骤与关联业务记录状态会同步更新，因此同时失效审批与请假缓存。
+ * @param id 审批实例 ID（必填）
+ * @returns Promise<void>
+ */
+export function cancelApproval(id: number) {
+  return http.delete(`/approvals/${id}`).then((res) => {
+    invalidate('GET /approvals')
+    invalidate('GET /leaves')
+    return res.data
+  })
+}

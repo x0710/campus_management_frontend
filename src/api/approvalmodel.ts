@@ -24,6 +24,7 @@ import type {
   ApprovalTemplateStepCreate,
   ApprovalTemplateStepUpdate,
   ApprovalTemplateUpdate,
+  MockApprovalApprover,
 } from './types/approvalmodel'
 
 /** 缓存失效前缀：命中审批模板列表与全部详情缓存 */
@@ -153,4 +154,28 @@ export async function deleteApprovalTemplateStep(
 ): Promise<void> {
   await http.delete(`/approvals/templates/${templateId}/steps/${stepId}`)
   invalidate(TEMPLATE_CACHE_PREFIX)
+}
+
+/**
+ * POST /api/approvals/templates/{template_id}/mock 模拟提交审批，获取实际审批人
+ * @param templateId 审批模板 ID（必填，路径参数）
+ * @param orgId 组织 ID（必填，查询参数；后端按该组织解析各步骤实际审批人）
+ * @returns Promise<MockApprovalApprover[]> 实际审批人列表（含步骤序号、审批人 ID、状态）
+ */
+export async function mockApprovalTemplate(
+  templateId: number,
+  orgId: number,
+): Promise<MockApprovalApprover[]> {
+  if (!Number.isFinite(templateId) || templateId <= 0) {
+    throw new Error('审批模板 ID 无效')
+  }
+  if (!Number.isFinite(orgId) || orgId <= 0) {
+    throw new Error('组织 ID 无效')
+  }
+  const res = await http.post<MockApprovalApprover[]>(
+    `/approvals/templates/${templateId}/mock`,
+    undefined,
+    { params: { org_id: orgId } },
+  )
+  return res.data
 }

@@ -17,6 +17,7 @@ import {
   Descriptions,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Spin,
@@ -50,6 +51,7 @@ import { useT } from '../../i18n'
 
 type PositionFormValues = {
   code: string
+  organization_id: number
   name: string
   description?: string
 }
@@ -141,6 +143,7 @@ export default function PositionsAdminView() {
     setModal({ mode: 'edit', position })
     form.setFieldsValue({
       code: position.code,
+      organization_id: position.organization_id,
       name: position.name,
       description: position.description ?? undefined,
     })
@@ -154,6 +157,7 @@ export default function PositionsAdminView() {
       if (modal.mode === 'create') {
         await createPosition({
           code: values.code.trim(),
+          organization_id: values.organization_id,
           name: values.name.trim(),
           description: values.description?.trim() || undefined,
         })
@@ -161,6 +165,7 @@ export default function PositionsAdminView() {
       } else {
         // description 为空时省略该字段：后端将 None 视为「保留原值」
         await updatePosition(modal.position!.code, {
+          organization_id: values.organization_id,
           name: values.name.trim(),
           ...(values.description?.trim() ? { description: values.description.trim() } : {}),
         })
@@ -198,6 +203,12 @@ export default function PositionsAdminView() {
         key: 'code',
         width: 180,
         render: (v: string) => <Tag color="geekblue">{v}</Tag>,
+      },
+      {
+        title: t('adminPositions.fieldOrg'),
+        dataIndex: 'organization_id',
+        key: 'organization_id',
+        width: 120,
       },
       { title: t('adminPositions.fieldName'), dataIndex: 'name', key: 'name', width: 180 },
       {
@@ -349,6 +360,18 @@ export default function PositionsAdminView() {
             />
           </Form.Item>
           <Form.Item
+            name="organization_id"
+            label={t('adminPositions.fieldOrg')}
+            rules={[{ required: true, message: t('adminPositions.orgRequired') }]}
+          >
+            <InputNumber
+              min={1}
+              precision={0}
+              placeholder={t('adminPositions.orgPlaceholder')}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item
             name="name"
             label={t('adminPositions.fieldName')}
             rules={[{ required: true, message: t('adminPositions.nameRequired') }]}
@@ -388,6 +411,11 @@ export default function PositionsAdminView() {
                   key: 'code',
                   label: t('adminPositions.fieldCode'),
                   children: detail?.code ?? '—',
+                },
+                {
+                  key: 'organization_id',
+                  label: t('adminPositions.fieldOrg'),
+                  children: detail?.organization_id ?? '—',
                 },
                 {
                   key: 'name',

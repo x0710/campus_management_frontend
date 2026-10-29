@@ -1,15 +1,16 @@
 /**
- * 认证模块类型定义：登录请求/响应、账户状态、当前用户信息、注册请求/响应。
+ * 认证模块类型定义：登录请求/响应、账户状态、当前用户信息、凭据查询与管理请求。
  * 供 api/auth.ts 的请求函数与各视图复用。
  */
+import type { PageQuery } from './common'
 
-/** POST /api/credentials/login 请求体 */
+/** POST /api/login 请求体 */
 export interface LoginRequest {
   username: string
   password: string
 }
 
-/** POST /api/credentials/login 响应体 */
+/** POST /api/login 响应体 */
 export interface LoginResponse {
   /** JWT Token */
   token: string
@@ -30,18 +31,16 @@ export interface UserInfo {
   last_login_at: string | null
 }
 
-/** POST /api/auth/register 请求体（api.json: RegisterRequest） */
-export interface RegisterRequest {
-  username: string
-  password: string
-  /** 邀请码（可选，不提供则返回 403） */
-  invite_code?: string | null
+/** GET /api/credentials 分页查询参数（api.json: UserListQuery） */
+export interface CredentialQuery extends PageQuery {
+  /** 用户名模糊搜索 */
+  username?: string
+  status?: AccountStatus
 }
 
-/** POST /api/auth/register 响应体（api.json: RegisterResponse） */
-export interface RegisterResponse {
-  id: number
-  username: string
+/** PATCH /api/credentials/{uid}/status 请求体（api.json: AdminUpdateStatusRequest） */
+export interface AdminUpdateStatusRequest {
+  status: AccountStatus
 }
 
 /** PATCH /api/credentials 请求体：本人或管理员修改账户信息（api.json: UpdateInfoRequest） */
@@ -54,4 +53,6 @@ export interface UpdateCredentialRequest {
   new_password?: string
   /** 新用户名（可选） */
   username?: string
+  /** 账户状态（可选；管理员可通过该字段修改目标账户状态） */
+  status?: AccountStatus
 }

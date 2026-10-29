@@ -11,6 +11,7 @@
  * - 步骤 `position` 落库为职位编码，approval_template_step 表对其有外键约束
  *   （REFERENCES position(code)），故只允许填系统中已存在的职位编码。
  */
+import type { ApprovalStepStatus } from './approvals'
 import type { PageQuery } from './common'
 
 /** 审批模板列表条目（GET /api/approvals/templates 数组元素）
@@ -154,4 +155,16 @@ export interface ApprovalTemplateStepUpdate {
  */
 export interface ApprovalTemplateCreatedResponse {
   id: number
+}
+
+/** 模拟提交后实际审批人条目（POST /api/approvals/templates/{template_id}/mock）
+ * Swagger 未声明 200 响应结构，字段按真实响应体建模。
+ * @property step_order 审批步骤序号（从 1 开始）
+ * @property approver_id 实际审批人用户 ID
+ * @property status 步骤状态（模拟提交后通常为 waiting）
+ */
+export interface MockApprovalApprover {
+  step_order: number
+  approver_id: number
+  status: ApprovalStepStatus
 }

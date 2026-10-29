@@ -33,6 +33,8 @@ export interface CourseQuery extends PageQuery {
   /** 按课程代码或课程名称模糊搜索 */
   keyword?: string
   course_type?: CourseType
+  /** 按课程 ID 集合过滤，逗号分隔（如 "1,2,3"） */
+  ids?: string
 }
 
 /** 创建课程请求（POST /api/courses） */

@@ -24,6 +24,16 @@ export async function queryOrganizations(
   )
 }
 
+/**
+ * GET /api/organizations/{id} 查询单个组织详情（会话内缓存）。
+ * @param id 组织 ID（必填）
+ * @param force 是否绕过缓存；默认 false
+ * @returns Promise<OrganizationInfo>
+ */
+export function getOrganization(id: number, force?: boolean): Promise<OrganizationInfo> {
+  return cachedGet<OrganizationInfo>(`/organizations/${id}`, undefined, { force })
+}
+
 /** 拉取全部组织（分页接口循环取完），供组织树使用；force=true 整体绕过缓存 */
 export async function listAllOrganizations(force?: boolean): Promise<OrganizationInfo[]> {
   const pageSize = 100

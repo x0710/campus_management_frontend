@@ -1,158 +1,139 @@
-import { Table, Tag } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { useMemo, useState } from 'react'
-import { useT } from '../i18n'
-import MultiSelectHeaderFilter from './MultiSelectHeaderFilter'
-
 /**
- * 党员端：成绩记录表格（含表头多选筛选与成绩排序）。
- * 「成绩申报-我的申报」与「我的-我的成绩记录」共用该模块。
- * 注意：当前为【模拟数据预览页】，后端暂无接口；接口就绪后替换 MOCK_DECLARATIONS 即可。
+ * 党员端：我的成绩记录表格（真实党建加分申请数据）。
+ *
+ * 数据来自当前用户 GET /api/party-scores（见 useMyPartyScores），
+ * 展示申报编号 / 申报类型 / 申请加分 / 核定分数 / 创建时间，点击行打开详情弹窗。
  */
-
-/** 审批进度 */
-type DeclStatus = 'pending' | 'approved' | 'rejected'
-/** 等级 */
-type DeclLevel = 'national' | 'provincial' | 'municipal' | 'college'
-
-interface MockDeclaration {
-  id: string
-  /** 类型（i18n key） */
-  typeKey: string
-  /** 名称（i18n key） */
-  nameKey: string
-  status: DeclStatus
-  level: DeclLevel
-  /** 成绩：正数为加分，负数为减分 */
-  bonus: number
-}
-
-/** 申报内容（模拟数据） */
-const MOCK_DECLARATIONS: MockDeclaration[] = [
-  { id: 'd1', typeKey: 'partyDeclaration.type_paper', nameKey: 'partyDeclaration.decl_1', status: 'approved', level: 'national', bonus: 8 },
-  { id: 'd2', typeKey: 'partyDeclaration.type_patent', nameKey: 'partyDeclaration.decl_2', status: 'pending', level: 'provincial', bonus: 6 },
-  { id: 'd3', typeKey: 'partyDeclaration.type_contest', nameKey: 'partyDeclaration.decl_3', status: 'approved', level: 'national', bonus: 10 },
-  { id: 'd4', typeKey: 'partyDeclaration.type_project', nameKey: 'partyDeclaration.decl_4', status: 'rejected', level: 'municipal', bonus: 3 },
-  { id: 'd5', typeKey: 'partyDeclaration.type_honor', nameKey: 'partyDeclaration.decl_5', status: 'pending', level: 'college', bonus: 2 },
-  { id: 'd6', typeKey: 'partyDeclaration.type_software', nameKey: 'partyDeclaration.decl_6', status: 'approved', level: 'provincial', bonus: 5 },
-]
-
-/** 审批进度可选项（用于表头筛选） */
-const STATUS_KEYS: DeclStatus[] = ['pending', 'approved', 'rejected']
-/** 等级可选项（用于表头筛选） */
-const LEVEL_KEYS: DeclLevel[] = ['national', 'provincial', 'municipal', 'college']
-
-/** 审批进度标签配色 */
-const STATUS_COLOR: Record<DeclStatus, string> = {
-  pending: 'gold',
-  approved: 'green',
-  rejected: 'red',
-}
-
-/** 等级标签配色 */
-const LEVEL_COLOR: Record<DeclLevel, string> = {
-  national: 'volcano',
-  provincial: 'blue',
-  municipal: 'geekblue',
-  college: 'default',
-}
+import { Table } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import { useEffect, useMemo, useState } from 'react'
+import { queryApprovalTemplates } from '../api/approvalmodel'
+import type { PartyScore } from '../api/types/partyScores'
+import { useMyPartyScores } from '../composables/useMyPartyScores'
+import {
+  PARTY_DECLARATION_PAGE_SIZE,
+  PARTY_TEMPLATE_BUSINESS_TYPE,
+} from '../config/partyDeclaration'
+import { useT } from '../i18n'
+import { useSettingsStore } from '../store/settings'
+import { formatDateTime } from '../utils/datetime'
+import { formatPartyScore, isNegativePartyScore } from '../utils/partyScore'
+import ErrorState from './ErrorState'
+import PartyScoreDetailModal from './PartyScoreDetailModal'
 
 export default function PartyScoreRecords() {
   const t = useT()
-  const [statusFilter, setStatusFilter] = useState<DeclStatus[]>([])
-  const [levelFilter, setLevelFilter] = useState<DeclLevel[]>([])
+  const locale = useSettingsStore((s) => s.locale)
+  const { records, loading, error, refresh } = useMyPartyScores()
+  const [templateNames, setTemplateNames] = useState<Map<number, string>>(new Map())
+  const [detail, setDetail] = useState<PartyScore | null>(null)
 
-  // 空数组表示「全部」；否则仅保留所选状态/等级的记录
-  const data = useMemo(
-    () =>
-      MOCK_DECLARATIONS.filter(
-        (record) =>
-          (statusFilter.length === 0 || statusFilter.includes(record.status)) &&
-          (levelFilter.length === 0 || levelFilter.includes(record.level)),
-      ),
-    [statusFilter, levelFilter],
-  )
+  useEffect(() => {
+    let cancelled = false
+    queryApprovalTemplates({
+      business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
+      enabled: true,
+      page: 1,
+      page_size: PARTY_DECLARATION_PAGE_SIZE,
+    })
+      .then((res) => {
+        if (!cancelled) {
+          setTemplateNames(new Map(res.data.map((item) => [item.id, item.name])))
+        }
+      })
+      .catch(() => {
+        // 模板名称取不到时回退展示模板 ID，不影响成绩记录表格
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  const columns = useMemo<ColumnsType<MockDeclaration>>(
+  const columns = useMemo<ColumnsType<PartyScore>>(
     () => [
       {
-        title: t('partyDeclaration.colType'),
-        dataIndex: 'typeKey',
-        key: 'type',
-        width: 140,
-        render: (typeKey: string) => t(typeKey),
+        title: t('partyDeclaration.colId'),
+        dataIndex: 'id',
+        key: 'id',
+        width: 110,
       },
       {
-        title: t('partyDeclaration.colName'),
-        dataIndex: 'nameKey',
-        key: 'name',
-        render: (nameKey: string) => t(nameKey),
+        title: t('partyDeclaration.colDeclType'),
+        dataIndex: 'template_id',
+        key: 'template_id',
+        width: 200,
+        render: (_, row) =>
+          row.template_id !== undefined
+            ? templateNames.get(row.template_id) ?? row.template_id
+            : t('common.unknown'),
       },
       {
-        title: (
-          <MultiSelectHeaderFilter
-            title={t('partyDeclaration.colStatus')}
-            allLabel={t('partyDeclaration.filterAll')}
-            options={STATUS_KEYS.map((status) => ({
-              value: status,
-              label: t(`partyDeclaration.status_${status}`),
-            }))}
-            value={statusFilter}
-            onChange={(next) => setStatusFilter(next as DeclStatus[])}
-          />
-        ),
-        dataIndex: 'status',
-        key: 'status',
-        width: 140,
-        render: (status: DeclStatus) => (
-          <Tag color={STATUS_COLOR[status]}>{t(`partyDeclaration.status_${status}`)}</Tag>
-        ),
-      },
-      {
-        title: (
-          <MultiSelectHeaderFilter
-            title={t('partyDeclaration.colLevel')}
-            allLabel={t('partyDeclaration.filterAll')}
-            options={LEVEL_KEYS.map((level) => ({
-              value: level,
-              label: t(`partyDeclaration.level_${level}`),
-            }))}
-            value={levelFilter}
-            onChange={(next) => setLevelFilter(next as DeclLevel[])}
-          />
-        ),
-        dataIndex: 'level',
-        key: 'level',
-        width: 140,
-        render: (level: DeclLevel) => (
-          <Tag color={LEVEL_COLOR[level]}>{t(`partyDeclaration.level_${level}`)}</Tag>
-        ),
-      },
-      {
-        title: t('partyDeclaration.colBonus'),
-        dataIndex: 'bonus',
-        key: 'bonus',
+        title: t('partyDeclaration.colScore'),
+        dataIndex: 'requested_score',
+        key: 'requested_score',
         width: 120,
         align: 'center',
-        sorter: (a, b) => a.bonus - b.bonus,
-        // 正数为加分（绿色），负数为减分（红色）
-        render: (score: number) => (
-          <span className={score < 0 ? 'party-score-minus' : 'party-score-plus'}>
-            {score > 0 ? `+${score}` : score}
+        render: (score: string) => (
+          <span className={isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'}>
+            {formatPartyScore(score)}
           </span>
         ),
       },
+      {
+        title: t('partyDeclaration.colApproved'),
+        dataIndex: 'approved_score',
+        key: 'approved_score',
+        width: 120,
+        align: 'center',
+        render: (score: string | null) => (
+          <span className={isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'}>
+            {formatPartyScore(score)}
+          </span>
+        ),
+      },
+      {
+        title: t('partyDeclaration.colCreatedAt'),
+        dataIndex: 'created_at',
+        key: 'created_at',
+        width: 180,
+        render: (value: string) => formatDateTime(value, locale),
+      },
     ],
-    [t, statusFilter, levelFilter],
+    [t, locale, templateNames],
   )
 
+  if (error) {
+    return <ErrorState message={error} onRetry={() => refresh(true)} />
+  }
+
   return (
-    <Table<MockDeclaration>
-      rowKey="id"
-      columns={columns}
-      dataSource={data}
-      pagination={false}
-      scroll={{ x: 720 }}
-    />
+    <>
+      <Table<PartyScore>
+        rowKey="id"
+        loading={loading}
+        columns={columns}
+        dataSource={records}
+        scroll={{ x: 760 }}
+        onRow={(record) => ({
+          onClick: () => setDetail(record),
+          title: t('partyDeclaration.rowClickHint'),
+          style: { cursor: 'pointer' },
+        })}
+        pagination={{
+          pageSize: 20,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (n: number) =>
+            `${t('common.total')} ${n} ${t('common.items')} · ${t('common.totalPages', {
+              n: Math.max(1, Math.ceil(n / 20)),
+            })}`,
+        }}
+      />
+      <PartyScoreDetailModal
+        record={detail}
+        templateNames={templateNames}
+        onClose={() => setDetail(null)}
+      />
+    </>
   )
 }

@@ -2,7 +2,9 @@
  * 成绩接口：
  * - GET   /api/examinations       分页查询成绩（权限 examination.select）
  * - GET   /api/examinations/{id}  成绩详情（权限 examination.select）
+ * - POST  /api/examinations       创建成绩（权限 examination.create，返回新 ID）
  * - PATCH /api/examinations/{id}  更新成绩（权限 examination.update，成功 204 无 body）
+ * - DELETE /api/examinations/{id} 删除成绩（权限 examination.delete，成功 204 无 body）
  *
  * 查询统一走会话缓存 cachedGet：相同查询条件（页码、学生、课程、学期、考试类型、是否及格）
  * 只请求一次，手动刷新传 force=true 绕过缓存。
@@ -14,6 +16,7 @@ import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import type { PaginatedResponse } from './types/common'
 import type {
+  CourseScoreCreateRequest,
   CourseScoreDetail,
   CourseScoreInfo,
   CourseScoreQuery,
@@ -34,9 +37,30 @@ export function getScore(id: number, force?: boolean) {
   return cachedGet<CourseScoreDetail>(`/examinations/${id}`, undefined, { force })
 }
 
+/**
+ * POST /api/examinations 创建成绩，成功后失效成绩列表缓存。
+ * @param body 成绩创建请求（必填）
+ * @returns Promise<number> 新成绩 ID
+ */
+export async function createScore(body: CourseScoreCreateRequest): Promise<number> {
+  const res = await http.post<number>('/examinations', body)
+  invalidate('GET /examinations')
+  return res.data
+}
+
 /** PATCH /api/examinations/{id} 部分更新成绩，成功后失效成绩列表与详情缓存 */
 export async function updateScore(id: number, body: CourseScoreUpdateRequest): Promise<void> {
   await http.patch(`/examinations/${id}`, body)
+  invalidate('GET /examinations')
+}
+
+/**
+ * DELETE /api/examinations/{id} 删除成绩，成功后失效成绩列表与详情缓存。
+ * @param id 成绩 ID（必填）
+ * @returns Promise<void>
+ */
+export async function deleteScore(id: number): Promise<void> {
+  await http.delete(`/examinations/${id}`)
   invalidate('GET /examinations')
 }
 

@@ -150,7 +150,8 @@ export const PORTALS: PortalDef[] = [
       { key: 'school_m1', status: 'preview', icon: <LineChartOutlined /> },
       { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
-      
+      // 我的：不占用侧栏入口，改由顶栏头像菜单进入
+      { key: 'school_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
       { key: 'school_m5', status: 'ready', icon: <IdcardOutlined /> },
     ],
   },
@@ -307,6 +308,7 @@ export const PORTAL_PROFILE_MODULE_KEYS: Partial<Record<PortalKey, string>> = {
   [PARTY_PORTAL_KEY]: 'party_m4',
   [BRANCH_PORTAL_KEY]: 'branch_m4',
   [ACADEMY_PORTAL_KEY]: 'academy_m4',
+  [SCHOOL_PORTAL_KEY]: 'school_m4',
 }
 
 /**

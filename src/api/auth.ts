@@ -1,13 +1,15 @@
-/** 认证模块, 提供登录、注册与当前登录用户信息查询 API */
-import { cachedGet } from './cache'
+/** 认证模块, 提供登录、凭据查询/管理与当前登录用户信息查询 API */
+import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import { queryUserRoles } from './rbac'
+import type { PaginatedResponse } from './types/common'
 import type { UserRoleInfo } from './types/rbac'
 import type {
+  AccountStatus,
+  AdminUpdateStatusRequest,
+  CredentialQuery,
   LoginRequest,
   LoginResponse,
-  RegisterRequest,
-  RegisterResponse,
   UpdateCredentialRequest,
   UserInfo,
 } from './types/auth'
@@ -18,13 +20,19 @@ export function login(data: LoginRequest) {
 }
 
 /**
- * 自助注册账户（POST /api/auth/register）。
- * 邀请码由部署环境配置，不提供或无效时后端返回 403；用户名已存在返回 409。
+ * GET /api/credentials 分页查询账户认证信息（权限 credential.read，会话内缓存）。
+ * @param params 分页与用户名/状态筛选参数
+ * @param force 是否绕过会话缓存（手动刷新）
  */
-export function register(data: RegisterRequest) {
-  return http
-    .post<RegisterResponse>('/auth/register', data)
-    .then((res) => res.data)
+export function queryCredentials(
+  params: CredentialQuery = {},
+  force?: boolean,
+): Promise<PaginatedResponse<UserInfo>> {
+  return cachedGet<PaginatedResponse<UserInfo>>(
+    '/credentials',
+    params as Record<string, unknown>,
+    { force },
+  )
 }
 
 /** 拉取当前登录用户信息（会话内缓存一次） */
@@ -71,4 +79,32 @@ export async function changeMyPassword(
     new_password: newPassword,
   }
   await http.patch('/credentials', body)
+  invalidate('GET /credentials')
+}
+
+/**
+ * PATCH /api/credentials/{uid}/status 管理员启用/禁用指定账户（权限 credential.modify）。
+ * 不允许禁用自己（后端返回 400）。
+ * @param uid 目标用户 ID（必填）
+ * @param status 目标账户状态（必填）
+ * @returns Promise<void>
+ */
+export async function updateCredentialStatus(
+  uid: number,
+  status: AccountStatus,
+): Promise<void> {
+  const body: AdminUpdateStatusRequest = { status }
+  await http.patch(`/credentials/${uid}/status`, body)
+  invalidate('GET /credentials')
+}
+
+/**
+ * DELETE /api/credentials/{id} 删除指定用户的认证信息（权限 credential.delete，成功 204）。
+ * 仅删除登录凭据，不删除用户本身；不能删除自己的账户。
+ * @param uid 目标用户 ID（必填）
+ * @returns Promise<void>
+ */
+export async function deleteCredential(uid: number): Promise<void> {
+  await http.delete(`/credentials/${uid}`)
+  invalidate('GET /credentials')
 }

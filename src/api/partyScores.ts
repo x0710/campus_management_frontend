@@ -44,6 +44,9 @@ const PARTY_SCORE_APPROVAL_DEFAULT_SIZE = 20
 /** 反查审批实例所属业务时的并发上限（避免一次性打出上百个请求） */
 const PARTY_SCORE_LOOKUP_CONCURRENCY = 10
 
+/** 列表摘要补齐详情字段时的并发上限（避免一次性打出上百个详情请求） */
+const PARTY_SCORE_DETAIL_CONCURRENCY = 10
+
 /**
  * 判断某个审批实例是否属于党建加分申请。
  * 审批步骤本身不返回业务类型，只能按实例 ID 精确反查加分申请：
@@ -83,6 +86,40 @@ export function queryPartyScores(params: PartyScoreQuery = {}, force?: boolean) 
  */
 export function getPartyScore(id: number, force?: boolean) {
   return cachedGet<PartyScoreDetail>(`/party-scores/${id}`, undefined, { force })
+}
+
+/**
+ * 把分页返回的加分申请摘要补齐为可直接展示的完整字段。
+ * 后端列表摘要可能不返回 template_id / created_at，详情接口才会返回这两个字段；
+ * 这里仅对缺少任一展示字段的行调用 GET /api/party-scores/{id} 补齐（详情走会话缓存），
+ * 单个详情失败时保留原始摘要，避免整页因某一行失败而不可用。
+ * @param rows 列表摘要数组（必填）
+ * @param force 是否绕过缓存重新请求详情（可选，默认 false；手动刷新时与列表保持同一 force）
+ * @returns Promise<PartyScore[]> 补齐后的记录数组（顺序与入参一致）
+ */
+export async function hydratePartyScoreRows(
+  rows: PartyScore[],
+  force?: boolean,
+): Promise<PartyScore[]> {
+  const hydrated: PartyScore[] = []
+
+  for (let start = 0; start < rows.length; start += PARTY_SCORE_DETAIL_CONCURRENCY) {
+    const chunk = rows.slice(start, start + PARTY_SCORE_DETAIL_CONCURRENCY)
+    const enriched = await Promise.all(
+      chunk.map(async (row) => {
+        if (row.template_id !== undefined && row.created_at) return row
+        try {
+          const detail = await getPartyScore(row.id, force)
+          return { ...row, ...detail }
+        } catch {
+          return row
+        }
+      }),
+    )
+    hydrated.push(...enriched)
+  }
+
+  return hydrated
 }
 
 /**
@@ -183,7 +220,7 @@ export async function queryPartyScoreApprovals(
  * PUT /api/party-scores/approvals/{id}/approve 审批通过，成功返回 200 无 body。
  * 403 表示无权访问，错误信息由调用方展示。
  * @param id 审批步骤 ID（必填）
- * @param data 审批通过请求体（comment、reviewed_score 均必填；reviewed_score 为 DecimalText 字符串）
+ * @param data 审批通过请求体（comment 必填；reviewed_score 为必填 Decimal 字符串，对应后端 DecimalText）
  * @returns Promise<void>
  */
 export function approvePartyScore(id: number, data: PartyScoreApproveRequest): Promise<void> {

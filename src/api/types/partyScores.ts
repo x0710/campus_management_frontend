@@ -17,12 +17,12 @@
 import type { ApprovalStepStatus } from './approvals'
 import type { PageQuery } from './common'
 
-/** 党建活动加分申请记录（api.json: PartyScore，列表项与详情同构） */
+/** 党建活动加分申请记录（api.json: PartyScoreInfo，列表项不含 template_id） */
 export interface PartyScore {
   /** 加分申请 ID */
   id: number
-  /** 审批模板 ID（服务端据此为该用户创建审批实例） */
-  template_id: number
+  /** 审批模板 ID（仅详情接口返回；列表项可能不含） */
+  template_id?: number
   /** 申请人用户 ID */
   user_id: number
   /** 申请加分（DecimalText 字符串，可正可负，如 "5" / "-2.5"） */
@@ -41,6 +41,8 @@ export interface PartyScore {
 
 /** GET /api/party-scores/{id} 加分申请详情（api.json: PartyScoreDetail） */
 export interface PartyScoreDetail extends PartyScore {
+  /** 审批模板 ID（详情必返回） */
+  template_id: number
   /** 附件下载地址列表（后端已签发地址，可直接打开下载） */
   file_urls: string[]
 }
@@ -99,9 +101,8 @@ export interface PartyScoreApproveRequest {
   /** 审批意见（必填） */
   comment: string
   /**
-   * 审批核定分数（必填，DecimalText 字符串）。
-   * 后端已改为必填：审批通过前必须填写，用于留痕并作为最终审批分数；
-   * 前端用 InputNumber 的 stringMode 采集字符串，避免浮点精度丢失。
+   * 审批核定分数（后端 PartyScoreApproveRequest.reviewed_score 为必填 DecimalText，
+   * JSON 中是以字符串传输的 Decimal；审批通过时必传，驳回/转交时不使用）。
    */
   reviewed_score: string
 }

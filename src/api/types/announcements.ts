@@ -36,9 +36,22 @@ export interface AnnouncementListItem {
   preview: string | null
 }
 
-/** 公告详情（GET /api/announcements/{id}，含正文 content） */
-export interface AnnouncementDetail extends AnnouncementListItem {
+/**
+ * 公告详情（GET /api/announcements/{id}，含正文 content）。
+ * 后端详情不返回列表项专用的 status / preview，这里保留为可选字段以兼容运行中实例。
+ */
+export interface AnnouncementDetail {
+  id: number
+  title: string
   content: string
+  e_type: AnnouncementType
+  priority: AnnouncementPriority
+  publisher_id: number
+  expire_time: string | null
+  created_at: string
+  updated_at: string
+  status?: AnnouncementStatus
+  preview?: string | null
 }
 
 /** 公告分页查询参数 */
@@ -48,6 +61,18 @@ export interface AnnouncementQuery extends PageQuery {
   priority?: AnnouncementPriority
   status?: AnnouncementStatus
   publisher_id?: number
+  /** 创建时间起始（含，RFC3339） */
+  from_at?: string
+  /** 创建时间截止（含，RFC3339） */
+  to_at?: string
+}
+
+/** 公告阅读记录（GET /api/announcements/{id}/readers 返回元素） */
+export interface AnnouncementReadRecord {
+  announcement_id: number
+  user_id: number
+  user_name: string | null
+  read_time: string
 }
 
 /** 创建公告请求（api.json: AnnouncementCreateRequest；后端创建后状态直接为 published） */

@@ -7,6 +7,7 @@ import type {
   PositionDetail,
   PositionQuery,
   PositionUpdateRequest,
+  UserPosition,
 } from './types/positions'
 
 /** GET /api/positions 分页查询职位（会话内缓存；force=true 手动刷新绕过缓存） */
@@ -45,6 +46,7 @@ export async function getPosition(code: string): Promise<PositionDetail> {
 export async function createPosition(body: PositionCreateRequest): Promise<string> {
   const res = await http.post<string>('/positions', body)
   invalidate('GET /positions')
+  invalidate('GET /user-positions')
   return res.data
 }
 
@@ -52,10 +54,30 @@ export async function createPosition(body: PositionCreateRequest): Promise<strin
 export async function updatePosition(code: string, body: PositionUpdateRequest): Promise<void> {
   await http.patch(`/positions/${code}`, body)
   invalidate('GET /positions')
+  invalidate('GET /user-positions')
 }
 
 /** DELETE /api/positions/{code} 删除职位 */
 export async function deletePosition(code: string): Promise<void> {
   await http.delete(`/positions/${code}`)
   invalidate('GET /positions')
+  invalidate('GET /user-positions')
+}
+
+/**
+ * GET /api/user-positions?uids=1,2,3 查询用户职位（会话内缓存）。
+ * 只查询本人无需额外权限；包含他人时要求 user.position.read。
+ * @param uids 用户 ID 数组（必填；为空时直接返回空数组，不发请求）
+ * @param force 是否绕过会话缓存（手动刷新）
+ */
+export function queryUserPositions(
+  uids: number[],
+  force?: boolean,
+): Promise<UserPosition[]> {
+  if (uids.length === 0) return Promise.resolve([])
+  return cachedGet<UserPosition[]>(
+    '/user-positions',
+    { uids: uids.join(',') },
+    { force },
+  )
 }

@@ -6,11 +6,13 @@ import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import type { PaginatedResponse } from './types/common'
 import type {
+  CancelLeaveRequest,
   LeaveConflict,
   LeaveCreateRequest,
   LeaveDetail,
   LeaveInfo,
   LeaveQuery,
+  LeaveStatistics,
 } from './types/leaves'
 
 /**
@@ -62,11 +64,23 @@ export function getLeave(id: number, force?: boolean) {
 }
 
 /**
+ * GET /api/leaves/statistics 获取当前用户的请假统计（各状态、各类型数量，会话内缓存）。
+ * @param force 是否绕过会话缓存；默认 false，手动刷新时传 true
+ * @returns Promise<LeaveStatistics>
+ */
+export function getLeaveStatistics(force?: boolean): Promise<LeaveStatistics> {
+  return cachedGet<LeaveStatistics>('/leaves/statistics', undefined, { force })
+}
+
+/**
  * PATCH /api/leaves/{id}/cancel 撤回请假申请（仅本人、仅待审批状态，成功返回 204）。
  * 400 表示状态非待审批，403 表示非本人，错误信息由调用方展示。
+ * @param reason 撤回原因（可选，最长 200 字）
  */
-export function cancelLeave(id: number): Promise<void> {
-  return http.patch(`/leaves/${id}/cancel`).then((res) => {
+export function cancelLeave(id: number, reason?: string): Promise<void> {
+  const body: CancelLeaveRequest | undefined =
+    reason !== undefined ? { reason } : undefined
+  return http.patch(`/leaves/${id}/cancel`, body).then((res) => {
     invalidate('GET /leaves')
     return res.data
   })

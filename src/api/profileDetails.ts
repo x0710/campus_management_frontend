@@ -31,6 +31,11 @@ export async function queryProfileDetails(
   )
 }
 
+/** GET /api/profile-details/{id} 获取档案详情（会话内缓存；force=true 绕过缓存） */
+export function getProfileDetail(id: number, force?: boolean): Promise<ProfileDetail> {
+  return cachedGet<ProfileDetail>(`/profile-details/${id}`, undefined, { force })
+}
+
 /** POST /api/profile-details 创建档案，返回创建出的完整档案 */
 export async function createProfileDetail(
   body: ProfileDetailCreateRequest,

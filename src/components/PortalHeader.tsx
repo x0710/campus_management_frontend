@@ -129,7 +129,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       : undefined
 
   /**
-   * 右上角用户菜单：先展示「我的」（党员端 / 支部端 / 学院端）与「门户选择」，
+   * 右上角用户菜单：先展示「我的」（党员端 / 支部端 / 学院端 / 学校端）与「门户选择」，
    * 「门户选择」点击后再展开本次角色可访问的门户列表，
    * 避免点击头像就直接跳出一串门户（子菜单展开方式设为 click，见下方 Dropdown）。
    */

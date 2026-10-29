@@ -31,6 +31,22 @@ export interface CourseScoreDetail extends CourseScoreInfo {
 }
 
 /**
+ * 成绩创建请求（api.json: CourseScoreCreateRequest）。
+ * score 提交为字符串（后端 Decimal 按字符串解析，避免浮点精度丢失）。
+ */
+export interface CourseScoreCreateRequest {
+  /** 学生 ID（对应 users.id） */
+  uid: number
+  course_id: number
+  semester: string
+  /** 成绩（后端 Decimal → 字符串，如 "70.00"） */
+  score: string
+  is_pass: boolean
+  exam_type: ExamType
+  remark?: string
+}
+
+/**
  * 成绩更新请求（api.json: CourseScoreUpdateRequest）。
  * 唯一键 uid/course_id/semester 不可修改，其余字段可选；省略即保留原值。
  * score 提交为字符串（后端 Decimal 按字符串解析，避免浮点精度丢失）。

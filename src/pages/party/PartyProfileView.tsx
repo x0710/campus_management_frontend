@@ -1,9 +1,16 @@
-import { BellOutlined } from '@ant-design/icons'
-import { Alert, Collapse, Descriptions, Empty, Spin, Steps, Tabs, Tag } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
-import { getApprovalTemplateDetail, queryApprovalTemplates } from '../../api/approvalmodel'
+import { BellOutlined, UserOutlined } from '@ant-design/icons'
+import { Alert, Avatar, Button, Card, Collapse, Descriptions, Empty, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
+import axios from 'axios'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { getApprovalTemplateDetail, mockApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
+import { getMyRoles } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import type { ApprovalStep, ApprovalTemplate } from '../../api/types/approvalmodel'
+import { listUserOrganizations } from '../../api/organizations'
+import { getMyProfile } from '../../api/users'
+import type { ApprovalStep, ApprovalTemplate, MockApprovalApprover } from '../../api/types/approvalmodel'
+import type { UserOrganization } from '../../api/types/organizations'
+import type { UserRoleInfo } from '../../api/types/rbac'
+import type { UserDetail } from '../../api/types/users'
 import ErrorState from '../../components/ErrorState'
 import PartyScoreRecords from '../../components/PartyScoreRecords'
 import PartyScoreSummary from '../../components/PartyScoreSummary'
@@ -14,14 +21,18 @@ import {
 } from '../../config/approvalTemplate'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { usePositionNames } from '../../composables/usePositionNames'
+import { useUserNames } from '../../composables/useUserNames'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
+import { useSettingsStore } from '../../store/settings'
+import { formatDateTime } from '../../utils/datetime'
 
 /**
  * 党员端：我的（我的成绩记录 / 年度评价报告 / 消息通知 / 审批指南 / 关于井大大先锋）。
- * 「我的档案」中的姓名与所属支部：经 useCurrentIdentity 取当前登录用户真实姓名与任职组织，
- * 姓名取不到时回退账户名，组织无任职时回退占位符（不使用业务数据做默认填充）。
- * 其余档案字段与成绩记录仍为【模拟数据预览】，后端尚未提供党员端相关接口。
+ * 「我的档案」按学生端个人信息页展示真实基本资料（GET /api/users/me），
+ * 并保留党员编号 / 所属支部 / 政治面貌 / 入党时间等党员端扩展信息。
+ * 党员编号 / 政治面貌 / 入党时间后端暂无接口，暂以预览值展示；所属支部取真实任职组织。
+ * 其余档案字段与成绩记录仍为【模拟数据预览】。
  * 我的成绩记录：复用总成绩概览（PartyScoreSummary）与成绩记录表格（PartyScoreRecords）。
  */
 
@@ -47,40 +58,164 @@ const MOCK_NOTIFICATIONS: { id: string; titleKey: string; timeKey: string; bodyK
   },
 ]
 
-/** 我的档案：基本信息 */
+/** 我的档案：基本信息 + 党员端扩展信息 */
 function ProfileDescriptions() {
   const t = useT()
+  const locale = useSettingsStore((s) => s.locale)
   const username = useAuthStore((s) => s.username)
+  const positionNames = usePositionNames()
   const { name, organizations } = useCurrentIdentity()
+  const [user, setUser] = useState<UserDetail | null>(null)
+  const [roles, setRoles] = useState<UserRoleInfo[]>([])
+  const [orgs, setOrgs] = useState<UserOrganization[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const profile = await getMyProfile()
+      setUser(profile)
+
+      // 角色 / 组织任职单个失败不阻塞档案主体展示
+      const [roleItems, orgItems] = await Promise.all([
+        getMyRoles().catch(() => []),
+        listUserOrganizations(profile.id).catch(() => []),
+      ])
+      setRoles(roleItems)
+      setOrgs(orgItems)
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      setError(extractErrorReason(err, t))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   // 姓名：真实姓名优先，取不到时回退账户名，最后回退占位符
-  const displayName = name?.trim() || username || t('common.unknown')
+  const displayName = user?.name?.trim() || name?.trim() || username || t('common.unknown')
   // 所属支部：取第一项任职组织名称，无任职时回退占位符
   const displayBranch = organizations[0] || t('common.unknown')
+  // 政治面貌：遍历任职组织的职位名称，仅命中党员身份时展示，其余职位（如书记）忽略
+  const politicalStatus = orgs
+    .map((org) => positionNames.get(org.position)?.trim() ?? '')
+    .find((positionName) => positionName === '中共党员' || positionName === '中共预备党员')
+  const genderLabel =
+    user?.gender === 'male'
+      ? t('profile.male')
+      : user?.gender === 'female'
+        ? t('profile.female')
+        : t('profile.unknown')
 
-  const items = [
-    { key: 'name', label: t('partyProfile.fieldName'), children: displayName },
-    { key: 'phone', label: t('partyProfile.fieldPhone'), children: t('partyProfile.valuePhone') },
-    { key: 'gender', label: t('partyProfile.fieldGender'), children: t('partyProfile.valueGender') },
-    {
-      key: 'memberNo',
-      label: t('partyProfile.fieldMemberNo'),
-      children: t('partyProfile.valueMemberNo'),
-    },
-    { key: 'branch', label: t('partyProfile.fieldBranch'), children: displayBranch },
-    {
-      key: 'political',
-      label: t('partyProfile.fieldPoliticalStatus'),
-      children: t('partyProfile.valuePoliticalStatus'),
-    },
-    {
-      key: 'joinDate',
-      label: t('partyProfile.fieldJoinDate'),
-      children: t('partyProfile.valueJoinDate'),
-    },
-    { key: 'email', label: t('partyProfile.fieldEmail'), children: t('partyProfile.valueEmail') },
-  ]
-  return <Descriptions column={2} items={items} />
+  if (loading) {
+    return <Skeleton active paragraph={{ rows: 8 }} />
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={() => void load()} />
+  }
+
+  if (!user) {
+    return <Empty description={t('profile.noData')} />
+  }
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'stretch', width: '100%' }}>
+        <Card size="small" title={t('profile.basicInfo')} style={{ flex: '1 1 480px', minWidth: 0 }}>
+          <Descriptions column={2} bordered size="small">
+            <Descriptions.Item label={t('profile.name')}>{displayName}</Descriptions.Item>
+            <Descriptions.Item label={t('profile.gender')}>{genderLabel}</Descriptions.Item>
+            <Descriptions.Item label={t('profile.email')}>
+              {user.email?.trim() || t('profile.noData')}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('profile.phone')}>
+              {user.phone?.trim() || t('profile.noData')}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('profile.birthday')}>
+              {user.birthday || t('profile.noData')}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('profile.createdAt')}>
+              {formatDateTime(user.created_at, locale)}
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+
+        <Card size="small" title={t('profile.avatar')} style={{ flex: '0 0 168px' }}>
+          {user.avatar && user.avatar.trim() ? (
+            <Avatar shape="square" size={96} src={user.avatar} />
+          ) : (
+            <Avatar shape="square" size={96} icon={<UserOutlined />} />
+          )}
+        </Card>
+      </div>
+
+      <Card size="small" title={t('partyProfile.partyInfoTitle')}>
+        <Descriptions column={2} bordered size="small">
+          <Descriptions.Item label={t('partyProfile.fieldMemberNo')}>
+            {t('partyProfile.valueMemberNo')}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('partyProfile.fieldBranch')}>{displayBranch}</Descriptions.Item>
+          <Descriptions.Item label={t('partyProfile.fieldPoliticalStatus')}>
+            {politicalStatus ?? t('partyProfile.politicalNotFound')}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('partyProfile.fieldJoinDate')}>
+            {t('partyProfile.valueJoinDate')}
+          </Descriptions.Item>
+        </Descriptions>
+      </Card>
+
+      <Card size="small" title={t('profile.rolesTitle')}>
+        {roles.length === 0 ? (
+          <span>{t('profile.noData')}</span>
+        ) : (
+          <Space size={[8, 8]} wrap>
+            {roles.map((role) => (
+              <Tag key={role.id} color="blue">
+                {role.name || role.code || role.id}
+                {role.description ? ` (${role.description})` : ''}
+              </Tag>
+            ))}
+          </Space>
+        )}
+      </Card>
+
+      <Card size="small" title={t('profile.orgsTitle')}>
+        {orgs.length === 0 ? (
+          <span>{t('profile.noData')}</span>
+        ) : (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            {orgs.map((org) => (
+              <Card key={org.id} size="small" bordered style={{ background: 'transparent' }}>
+                <Descriptions column={2} size="small">
+                  <Descriptions.Item label={t('profile.organization')}>
+                    {org.organization_name}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.position')}>
+                    {org.position ? (
+                      <Tag color="geekblue">
+                        {positionNames.get(org.position) ?? org.position}
+                      </Tag>
+                    ) : (
+                      t('profile.noData')
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.workplace')} span={2}>
+                    {org.workplace ?? t('profile.noData')}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            ))}
+          </Space>
+        )}
+      </Card>
+    </Space>
+  )
 }
 
 /** 占位内容（年度评价报告 / 关于井大大先锋 暂不实现） */
@@ -88,6 +223,12 @@ function Placeholder() {
   const t = useT()
   return (
     <div className="party-placeholder">
+      <Alert
+        type="warning"
+        showIcon
+        title={t('partyProfile.mockHint')}
+        style={{ marginBottom: 12 }}
+      />
       <Empty description={t('partyProfile.emptyHint')} />
     </div>
   )
@@ -112,6 +253,12 @@ function ApprovalGuide() {
   const [stepsLoading, setStepsLoading] = useState<number[]>([])
   // 步骤加载失败的模板 ID → 错误文案
   const [stepsError, setStepsError] = useState<Record<number, string>>({})
+  // 已加载的模拟提交结果：模板 ID → 各步骤实际审批人（step_order 对应模板步骤 step_no）
+  const [approversByTemplate, setApproversByTemplate] = useState<
+    Record<number, MockApprovalApprover[]>
+  >({})
+  // 模拟提交失败的模板 ID → 错误文案
+  const [approversError, setApproversError] = useState<Record<number, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -139,6 +286,14 @@ function ApprovalGuide() {
     setReloadSeq((prev) => prev + 1)
   }
 
+  // 汇总各模板模拟提交解析出的审批人 ID，统一批量解析姓名
+  const approverIds = useMemo(
+    () =>
+      Object.values(approversByTemplate).flatMap((list) => list.map((item) => item.approver_id)),
+    [approversByTemplate],
+  )
+  const approverNames = useUserNames(approverIds)
+
   const loadSteps = useCallback(
     async (templateId: number) => {
       setStepsLoading((prev) => (prev.includes(templateId) ? prev : [...prev, templateId]))
@@ -148,16 +303,37 @@ function ApprovalGuide() {
         delete next[templateId]
         return next
       })
-      try {
-        const detail = await getApprovalTemplateDetail(templateId)
-        setStepsByTemplate((prev) => ({ ...prev, [templateId]: detail.steps ?? [] }))
-      } catch (err) {
-        setStepsError((prev) => ({ ...prev, [templateId]: extractErrorReason(err, t) }))
-      } finally {
-        setStepsLoading((prev) => prev.filter((id) => id !== templateId))
+      setApproversError((prev) => {
+        if (!(templateId in prev)) return prev
+        const next = { ...prev }
+        delete next[templateId]
+        return next
+      })
+      const template = templates.find((row) => row.id === templateId)
+      // 模拟提交：按模板所属组织解析各步骤实际审批人；模板缺失时降级为空列表
+      const mockRequest = template
+        ? mockApprovalTemplate(templateId, template.organization_id)
+        : Promise.resolve<MockApprovalApprover[]>([])
+      const [detailResult, approversResult] = await Promise.allSettled([
+        getApprovalTemplateDetail(templateId),
+        mockRequest,
+      ])
+      if (detailResult.status === 'fulfilled') {
+        setStepsByTemplate((prev) => ({ ...prev, [templateId]: detailResult.value.steps ?? [] }))
+      } else {
+        setStepsError((prev) => ({ ...prev, [templateId]: extractErrorReason(detailResult.reason, t) }))
       }
+      if (approversResult.status === 'fulfilled') {
+        setApproversByTemplate((prev) => ({ ...prev, [templateId]: approversResult.value }))
+      } else {
+        setApproversError((prev) => ({
+          ...prev,
+          [templateId]: extractErrorReason(approversResult.reason, t),
+        }))
+      }
+      setStepsLoading((prev) => prev.filter((id) => id !== templateId))
     },
-    [t],
+    [t, templates],
   )
 
   /** 展开模板时懒加载其步骤详情（已加载 / 加载中 / 失败的不重复请求） */
@@ -194,32 +370,60 @@ function ApprovalGuide() {
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('partyProfile.guideStepsEmpty')} />
       )
     }
+    const approvers = approversByTemplate[template.id] ?? []
+    const approverError = approversError[template.id]
     return (
-      <Steps
-        direction="vertical"
-        size="small"
-        items={steps.map((step) => {
-          const role = step.position
-            ? positionNames.get(step.position) ?? step.position
-            : step.assignee_value ?? t('partyProfile.guideRoleUnset')
-          const parts = []
-          if (step.description?.trim()) parts.push(<div key="desc">{step.description}</div>)
-          if (step.position && step.assignee_value) {
-            parts.push(
-              <div key="assignee">
-                {t('partyProfile.guideAssignee', { value: step.assignee_value })}
-              </div>,
-            )
-          }
-          return {
-            // 统一所有步骤为「进行中」态（process），让每步的圆圈与文字颜色都和第一步一致，
-            // 避免 antd 默认仅把第 1 步高亮为蓝色、后续步骤置灰造成颜色不统一。
-            status: 'process' as const,
-            title: t('partyProfile.guideStepTitle', { no: step.step_no, role }),
-            description: parts.length > 0 ? <>{parts}</> : undefined,
-          }
-        })}
-      />
+      <>
+        <Steps
+          direction="vertical"
+          size="small"
+          items={steps.map((step) => {
+            const role = step.position
+              ? positionNames.get(step.position) ?? step.position
+              : step.assignee_value ?? t('partyProfile.guideRoleUnset')
+            const approver = approvers.find((item) => item.step_order === step.step_no)
+            const parts = []
+            if (step.description?.trim()) parts.push(<div key="desc">{step.description}</div>)
+            if (step.position && step.assignee_value) {
+              parts.push(
+                <div key="assignee">
+                  {t('partyProfile.guideAssignee', { value: step.assignee_value })}
+                </div>,
+              )
+            }
+            if (approver) {
+              const approverName = approverNames.get(approver.approver_id)
+              parts.push(
+                <div key="approver">
+                  {t('partyProfile.guideApprover', {
+                    name: approverName === undefined ? t('common.loading') : approverName ?? '-',
+                  })}
+                </div>,
+              )
+            }
+            return {
+              // 统一所有步骤为「进行中」态（process），让每步的圆圈与文字颜色都和第一步一致，
+              // 避免 antd 默认仅把第 1 步高亮为蓝色、后续步骤置灰造成颜色不统一。
+              status: 'process' as const,
+              title: t('partyProfile.guideStepTitle', { no: step.step_no, role }),
+              description: parts.length > 0 ? <>{parts}</> : undefined,
+            }
+          })}
+        />
+        {approverError ? (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginTop: 8 }}
+            message={t('partyProfile.guideApproverError', { reason: approverError })}
+            action={
+              <Button size="small" type="link" onClick={() => void loadSteps(template.id)}>
+                {t('common.retry')}
+              </Button>
+            }
+          />
+        ) : null}
+      </>
     )
   }
 
@@ -245,7 +449,6 @@ function ApprovalGuide() {
 
   return (
     <div className="party-guide">
-      <Alert type="info" showIcon title={t('partyProfile.guideHint')} className="party-guide-hint" />
       <Collapse
         items={templates.map((template) => ({
           key: String(template.id),
@@ -277,20 +480,28 @@ function ApprovalGuide() {
 function NotificationsList() {
   const t = useT()
   return (
-    <ul className="party-notif-list">
-      {MOCK_NOTIFICATIONS.map((item) => (
-        <li key={item.id} className="party-notif-item">
-          <div className="party-notif-head">
-            <span className="party-notif-title">
-              <BellOutlined className="party-notif-icon" />
-              {t(item.titleKey)}
-            </span>
-            <span className="party-notif-time">{t(item.timeKey)}</span>
-          </div>
-          <div className="party-notif-body">{t(item.bodyKey)}</div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <Alert
+        type="warning"
+        showIcon
+        title={t('partyProfile.mockHint')}
+        style={{ marginBottom: 12 }}
+      />
+      <ul className="party-notif-list">
+        {MOCK_NOTIFICATIONS.map((item) => (
+          <li key={item.id} className="party-notif-item">
+            <div className="party-notif-head">
+              <span className="party-notif-title">
+                <BellOutlined className="party-notif-icon" />
+                {t(item.titleKey)}
+              </span>
+              <span className="party-notif-time">{t(item.timeKey)}</span>
+            </div>
+            <div className="party-notif-body">{t(item.bodyKey)}</div>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -320,12 +531,6 @@ export default function PartyProfileView() {
     <div className="data-page-view">
       <section className="panel-card">
         <div className="panel-card-body">
-          <Alert
-            type="warning"
-            showIcon
-            title={t('common.mockHint')}
-            style={{ marginBottom: 16 }}
-          />
           <Tabs items={items} />
         </div>
       </section>

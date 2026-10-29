@@ -28,7 +28,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { queryApprovalTemplates } from '../../api/approvalmodel'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import { createPartyScore, getPartyScore, queryPartyScores } from '../../api/partyScores'
+import {
+  createPartyScore,
+  getPartyScore,
+  hydratePartyScoreRows,
+  queryPartyScores,
+} from '../../api/partyScores'
 import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import type { PaginatedResponse } from '../../api/types/common'
 import type { PartyScore } from '../../api/types/partyScores'
@@ -119,7 +124,7 @@ export default function PartyDeclarationView() {
    */
   const { data, total, loading, error, page, pageSize, setPage, setPageSize, reload, refresh } =
     usePaginated<PartyScore>(
-      (query, force): Promise<PaginatedResponse<PartyScore>> => {
+      async (query, force): Promise<PaginatedResponse<PartyScore>> => {
         if (myUid === null) {
           return Promise.resolve({
             data: [],
@@ -129,7 +134,9 @@ export default function PartyDeclarationView() {
             total_pages: 0,
           })
         }
-        return queryPartyScores({ ...query, user_id: myUid }, force)
+        const res = await queryPartyScores({ ...query, user_id: myUid }, force)
+        // 列表摘要可能缺 template_id / created_at，详情接口才有；这里补齐后再交给表格展示
+        return { ...res, data: await hydratePartyScoreRows(res.data, force) }
       },
     )
 
@@ -157,7 +164,10 @@ export default function PartyDeclarationView() {
         dataIndex: 'template_id',
         key: 'template_id',
         width: 200,
-        render: (id: number) => templateNameById.get(id) ?? id,
+        render: (_, row) =>
+          row.template_id !== undefined
+            ? templateNameById.get(row.template_id) ?? row.template_id
+            : t('common.unknown'),
       },
       {
         title: t('partyDeclaration.colScore'),
@@ -361,7 +371,9 @@ export default function PartyDeclarationView() {
           <Descriptions column={1} size="small" bordered>
             <Descriptions.Item label={t('partyDeclaration.colId')}>{detail.id}</Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colDeclType')}>
-              {templateNameById.get(detail.template_id) ?? detail.template_id}
+              {detail.template_id !== undefined
+                ? templateNameById.get(detail.template_id) ?? detail.template_id
+                : t('common.unknown')}
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colScore')}>
               {formatPartyScore(detail.requested_score)}

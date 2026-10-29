@@ -11,6 +11,7 @@ import type {
   RoleDataScopeInfo,
   RoleDataScopeRequest,
   RoleInfo,
+  RolePermissionItem,
   RoleQuery,
   RoleUpdateRequest,
   UserRoleInfo,
@@ -126,6 +127,24 @@ export async function removeRolePermission(
   invalidate(`GET /rbac/roles/${roleId}/permissions`)
 }
 
+/**
+ * GET /api/rbac/roles/{role_id}/permissions/list 查询角色-权限关联记录
+ *（仅返回 role_id / permission_id，admin，会话内缓存）。
+ * @param roleId 角色 ID（必填）
+ * @param force 是否绕过缓存；默认 false
+ * @returns Promise<RolePermissionItem[]>
+ */
+export function queryRolePermissionRelations(
+  roleId: number,
+  force?: boolean,
+): Promise<RolePermissionItem[]> {
+  return cachedGet<RolePermissionItem[]>(
+    `/rbac/roles/${roleId}/permissions/list`,
+    undefined,
+    { force },
+  )
+}
+
 // ==================== 角色-数据范围 ====================
 
 /** GET /api/rbac/roles/{role_id}/data-scopes 查询角色已配置的数据范围（admin，会话内缓存） */
@@ -171,6 +190,18 @@ export async function queryUserRoleRelations(uid: number): Promise<UserRoleRelat
 export async function assignUserRoles(uid: number, roleIds: number[]): Promise<void> {
   await http.post(`/rbac/users/${uid}`, { role_ids: roleIds })
   // 失效该用户相关的全部 rbac 缓存：批量角色查询 + 角色关联列表
+  invalidate('GET /rbac/users/roles')
+  invalidate('GET /rbac/users/')
+}
+
+/**
+ * DELETE /api/rbac/users/{uid}/roles/{role_id} 移除用户的单个角色（admin，成功 204）。
+ * @param uid 用户 ID（必填）
+ * @param roleId 角色 ID（必填）
+ * @returns Promise<void>
+ */
+export async function removeUserRole(uid: number, roleId: number): Promise<void> {
+  await http.delete(`/rbac/users/${uid}/roles/${roleId}`)
   invalidate('GET /rbac/users/roles')
   invalidate('GET /rbac/users/')
 }

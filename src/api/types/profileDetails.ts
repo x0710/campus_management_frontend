@@ -12,8 +12,8 @@ export interface ProfileDetail {
   id_card: string
   /** 民族 */
   ethnic: string
-  /** 出生日期（YYYY-MM-DD） */
-  birth_date: string
+  /** 出生日期（后端 DateTime，可为空） */
+  birth_date: string | null
   /** 班级 ID */
   class_id: number
   /** 籍贯 */

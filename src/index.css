@@ -1399,22 +1399,48 @@ h3 {
 /* 已分配权限常驻区：搜索时依然可见，超长可滚动，亮色/夜间均用主题变量 */
 .rbac-assigned {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  /*
+   * 禁止被 flex 压缩：父级是纵向 flex 容器，若允许收缩（原 flex: 0 1 auto），
+   * 下方表格会把它挤成只剩一行高，导致已分配权限无法完整查看。
+   * 改为固定占位，超过 max-height 时由自身滚动。
+   */
+  flex: 0 0 auto;
+  flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
   padding: 8px 10px;
-  max-height: 96px;
+  max-height: 200px;
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--editor-bg);
 }
 
+/* 收起时只保留标题行，不再占用 200px 以内的滚动高度 */
+.rbac-assigned.is-collapsed {
+  max-height: none;
+  overflow: visible;
+}
+
+.rbac-assigned-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .rbac-assigned-label {
   font-size: 13px;
   color: var(--ink-secondary);
   white-space: nowrap;
+}
+
+.rbac-assigned-toggle {
+  flex: none;
+  height: auto;
+  padding: 0;
+  font-size: 13px;
 }
 
 .rbac-assigned-tags {
@@ -2730,10 +2756,6 @@ h3 {
 }
 
 /* 我的：审批指南（审批模板列表 + 展开后的审批流程） */
-.party-guide-hint {
-  margin-bottom: 16px;
-}
-
 .party-guide-title {
   display: inline-flex;
   align-items: center;
