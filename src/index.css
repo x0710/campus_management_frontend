@@ -483,6 +483,19 @@ h3 {
   color: var(--ink-secondary);
 }
 
+.notice-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.notice-item-actions .ant-btn-link {
+  height: auto;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
 .notice-item-dot {
   flex: none;
   width: 8px;
@@ -2972,6 +2985,13 @@ h3 {
   border-radius: 50%;
   background: var(--brand);
   vertical-align: 1px;
+}
+
+.party-notif-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 /* 党委支部端：本支部概况 */

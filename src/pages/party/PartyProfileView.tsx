@@ -1,11 +1,11 @@
 import { BellOutlined, UserOutlined } from '@ant-design/icons'
-import { Alert, Avatar, Button, Card, Collapse, Descriptions, Empty, Pagination, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
+import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, Descriptions, Empty, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getApprovalTemplateDetail, mockApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
 import { getMyRoles } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import { markNoticeRead, queryNotices } from '../../api/notices'
+import { deleteNotice, markNoticeRead, markNoticeUnread, queryNotices } from '../../api/notices'
 import { listUserOrganizations } from '../../api/organizations'
 import { getMyProfile } from '../../api/users'
 import type { ApprovalStep, ApprovalTemplate, MockApprovalApprover } from '../../api/types/approvalmodel'
@@ -462,6 +462,7 @@ function ApprovalGuide() {
 function NotificationsList() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
+  const { message } = AntdApp.useApp()
   const [notices, setNotices] = useState<Notice[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -512,6 +513,39 @@ function NotificationsList() {
     }
   }
 
+  /** 设为未读：已读通知回退为未读态 */
+  const handleMarkUnread = async (notice: Notice) => {
+    if (!notice.is_read) return
+    try {
+      await markNoticeUnread(notice.id)
+      setNotices((prev) =>
+        prev.map((item) => (item.id === notice.id ? { ...item, is_read: false } : item)),
+      )
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    }
+  }
+
+  /** 删除通知：本地移除并同步总数；当前页删空时回退上一页 */
+  const handleDelete = async (notice: Notice) => {
+    try {
+      await deleteNotice(notice.id)
+      const next = notices.filter((item) => item.id !== notice.id)
+      setNotices(next)
+      setTotal((prev) => Math.max(0, prev - 1))
+      if (next.length === 0 && page > 1) setPage(page - 1)
+      message.success(t('notice.deleteSuccess'))
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="party-placeholder">
@@ -551,6 +585,38 @@ function NotificationsList() {
               </span>
             </div>
             <div className="party-notif-body">{item.content}</div>
+            <div className="party-notif-actions">
+              {item.is_read ? (
+                <Button type="link" size="small" onClick={(e) => {
+                  e.stopPropagation()
+                  void handleMarkUnread(item)
+                }}>
+                  {t('notice.markUnread')}
+                </Button>
+              ) : (
+                <Button type="link" size="small" onClick={(e) => {
+                  e.stopPropagation()
+                  void handleRead(item)
+                }}>
+                  {t('notice.markRead')}
+                </Button>
+              )}
+              <Popconfirm
+                title={t('notice.deleteConfirm')}
+                okText={t('common.confirm')}
+                cancelText={t('common.cancel')}
+                onConfirm={() => void handleDelete(item)}
+              >
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t('notice.delete')}
+                </Button>
+              </Popconfirm>
+            </div>
           </li>
         ))}
       </ul>

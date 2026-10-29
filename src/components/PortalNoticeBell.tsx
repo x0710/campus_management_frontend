@@ -3,12 +3,16 @@
  * - 挂载与弹层关闭时查询未读数量 GET /api/notices/unread-count（直连不缓存，展示最新值）；
  * - 点击展开 Popover 时强制刷新最近通知 GET /api/notices（单页 20 条）；
  * - 点击未读通知调用 PUT /api/notices/{id}/read 标记已读，并本地同步未读徽标；
+ * - 已读通知可「设为未读」（DELETE /api/notices/{id}/read），每条通知均可「删除」
+ *   （DELETE /api/notices/{id}），操作后本地同步列表与未读数；
  * - 失败静默降级（保留原值 / 展示加载失败文案），401 由全局拦截器统一处理登录态。
  */
 import { BellOutlined } from '@ant-design/icons'
-import { Badge, Button, Empty, List, Popover, Spin, Tag, Tooltip } from 'antd'
+import { App as AntdApp, Badge, Button, Empty, List, Popconfirm, Popover, Spin, Tag, Tooltip } from 'antd'
+import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { getUnreadNoticeCount, markNoticeRead, queryNotices } from '../api/notices'
+import { extractErrorReason } from '../api/common'
+import { deleteNotice, getUnreadNoticeCount, markNoticeRead, markNoticeUnread, queryNotices } from '../api/notices'
 import type { Notice } from '../api/types/notices'
 import { NOTICE_CATEGORY_LABEL_KEYS } from '../config/notices'
 import { useT } from '../i18n'
@@ -21,6 +25,7 @@ const NOTICE_POPOVER_PAGE_SIZE = 20
 export default function PortalNoticeBell() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
+  const { message } = AntdApp.useApp()
   /** 未读数量（直连接口；查询失败保留原值） */
   const [unread, setUnread] = useState(0)
   /** 弹层内的通知列表 */
@@ -88,6 +93,38 @@ export default function PortalNoticeBell() {
     }
   }
 
+  /** 已读通知设为未读，并同步列表与徽标 */
+  const handleMarkUnread = async (notice: Notice) => {
+    if (!notice.is_read) return
+    try {
+      await markNoticeUnread(notice.id)
+      setNotices((prev) =>
+        prev.map((item) => (item.id === notice.id ? { ...item, is_read: false } : item)),
+      )
+      setUnread((prev) => prev + 1)
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    }
+  }
+
+  /** 删除通知，并同步列表与未读数 */
+  const handleDelete = async (notice: Notice) => {
+    try {
+      await deleteNotice(notice.id)
+      setNotices((prev) => prev.filter((item) => item.id !== notice.id))
+      if (!notice.is_read) setUnread((prev) => Math.max(0, prev - 1))
+      message.success(t('notice.deleteSuccess'))
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    }
+  }
+
   const popoverContent = (
     <div className="notice-popover">
       <div className="notice-popover-title">{t('notice.title')}</div>
@@ -115,6 +152,35 @@ export default function PortalNoticeBell() {
                 <div className="notice-item-meta">
                   <Tag color="blue">{t(NOTICE_CATEGORY_LABEL_KEYS[item.category])}</Tag>
                   <span className="notice-item-time">{formatDateTime(item.created_at, locale)}</span>
+                </div>
+                <div className="notice-item-actions">
+                  {item.is_read ? (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void handleMarkUnread(item)
+                      }}
+                    >
+                      {t('notice.markUnread')}
+                    </Button>
+                  ) : null}
+                  <Popconfirm
+                    title={t('notice.deleteConfirm')}
+                    okText={t('common.confirm')}
+                    cancelText={t('common.cancel')}
+                    onConfirm={() => void handleDelete(item)}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t('notice.delete')}
+                    </Button>
+                  </Popconfirm>
                 </div>
               </div>
               {!item.is_read ? <span className="notice-item-dot" /> : null}
