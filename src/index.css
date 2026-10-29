@@ -1047,6 +1047,22 @@ h3 {
   gap: 4px;
 }
 
+/* 审批列表右侧「操作」占位列：仅提示双击进入详情，单击无行为 */
+.approval-row-action-label {
+  color: var(--ink-secondary);
+  font-size: 13px;
+  cursor: default;
+}
+
+/* 审核管理列表：待处理条目高亮 */
+.party-score-approval-row-pending > td {
+  background: #fff7e6 !important;
+}
+
+:root[data-theme='dark'] .party-score-approval-row-pending > td {
+  background: rgba(250, 173, 20, 0.12) !important;
+}
+
 .approval-modal-meta {
   margin-bottom: 12px;
   color: var(--ink-secondary);
@@ -1137,6 +1153,149 @@ h3 {
 .party-approval-comment-item textarea {
   min-height: 200px;
   resize: vertical;
+}
+
+/* 审批意见常用回复：与意见输入框紧邻展示，点击标签快速填入 */
+.party-approval-quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.party-approval-quick-replies-label {
+  margin-right: 2px;
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.party-approval-quick-reply {
+  margin-inline-end: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 审批流转记录列表：按环节纵向展示操作人、决定、意见与时间 */
+.party-approval-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.party-approval-flow-item {
+  position: relative;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-bg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.party-approval-flow-item--agree {
+  border-left-color: #52c41a;
+}
+
+.party-approval-flow-item--reject {
+  border-left-color: #ff4d4f;
+}
+
+.party-approval-flow-item--transfer {
+  border-left-color: #1677ff;
+}
+
+.party-approval-flow-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.party-approval-flow-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--line);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--line) 35%, transparent);
+}
+
+.party-approval-flow-dot--agree {
+  background: #52c41a;
+  box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.16);
+}
+
+.party-approval-flow-dot--reject {
+  background: #ff4d4f;
+  box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.14);
+}
+
+.party-approval-flow-dot--transfer {
+  background: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.14);
+}
+
+.party-approval-flow-step {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.party-approval-flow-decision-tag {
+  margin-inline-end: 0;
+}
+
+.party-approval-flow-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.party-approval-flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.party-approval-flow-meta-label {
+  margin-right: 4px;
+  color: var(--ink-secondary);
+}
+
+.party-approval-flow-comment {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--line);
+  font-size: 13px;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.party-approval-flow-comment-label {
+  flex: none;
+  color: var(--ink-secondary);
+  font-weight: 500;
+}
+
+.party-approval-flow-comment-text {
+  min-width: 0;
+}
+
+.party-approval-flow-empty {
+  padding: 18px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--ink-secondary);
+  text-align: center;
 }
 
 /* 右栏操作按钮：取消 / 驳回 / 确认通过统一右对齐 */
@@ -1243,6 +1402,61 @@ h3 {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 问题上报页右侧联系信息卡片：左侧反馈列表占满剩余宽度，右侧固定展示图片与提示 */
+.data-page-view.feedback-layout {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.feedback-layout > .feedback-main-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.feedback-layout > .feedback-contact-card {
+  flex: 0 0 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.feedback-contact-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  overflow: auto;
+}
+
+.feedback-contact-image {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.feedback-contact-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-secondary);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .data-page-view.feedback-layout {
+    flex-direction: column;
+  }
+
+  .feedback-layout > .feedback-contact-card {
+    flex: 0 0 auto;
+    max-height: 700px;
+  }
 }
 
 /* 带标签页的数据页：Tabs 撑满卡片体剩余高度，标签栏与筛选工具条固定，仅表格区域滚动 */
@@ -2525,6 +2739,11 @@ h3 {
   color: var(--ink-secondary);
 }
 
+.party-profile-separator {
+  font-size: 14px;
+  color: var(--ink-secondary);
+}
+
 /* 先锋指数卡片（淡黄底 + 红色数字 + 黑色文字） */
 .party-index-card {
   padding: 24px;
@@ -3259,98 +3478,12 @@ h3 {
   color: var(--ink);
 }
 
-.academy-pending {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 14px 18px;
-  border: none;
-  border-radius: 8px;
-  background: #fdf3d8;
-  cursor: pointer;
-  text-align: left;
-}
-
-.academy-pending-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #cf1322;
-}
-
-.academy-pending-icon {
-  font-size: 10px;
-  color: #cf1322;
-}
-
 :root[data-theme='dark'] .academy-overview {
   background: rgba(207, 19, 34, 0.16);
 }
 
 :root[data-theme='dark'] .academy-rank-row {
   background: rgba(255, 255, 255, 0.06);
-}
-
-:root[data-theme='dark'] .academy-pending {
-  background: rgba(250, 140, 22, 0.18);
-}
-
-/* 党委学院端：指标管理 */
-.academy-metrics-add.ant-btn {
-  height: 40px;
-  margin-bottom: 20px;
-  font-weight: 500;
-}
-
-.academy-metrics-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-
-.academy-metrics-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-  border-radius: 10px;
-  background: var(--card-bg);
-  border: 1px solid var(--line);
-}
-
-.academy-metrics-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.academy-metrics-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.academy-metrics-scope {
-  font-size: 12px;
-  color: var(--ink-secondary);
-}
-
-.academy-metrics-points {
-  flex: none;
-  font-size: 15px;
-  font-weight: 600;
-  color: #389e0d;
-}
-
-.academy-metrics-report.ant-btn,
-.academy-metrics-report.ant-btn:hover {
-  height: 40px;
-  font-weight: 500;
-  color: #cf1322 !important;
-  border-color: #cf1322 !important;
-  background: transparent !important;
 }
 
 /* 党委学校端：总览 */

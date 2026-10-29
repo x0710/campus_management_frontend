@@ -25,15 +25,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
+import { listSubsidiaries } from '../../api/organizations'
 import { queryPartyScoreApprovals, queryPartyScores } from '../../api/partyScores'
+import { queryUsers } from '../../api/users'
 import type {
   ApprovalInstanceStep,
   ApprovalStepStatus,
 } from '../../api/types/approvals'
 import type { PartyScore } from '../../api/types/partyScores'
 import ErrorState from '../../components/ErrorState'
+import { resolvePortalOrg } from '../../composables/usePortalOrg'
+import { ACADEMY_ANCESTOR_DEPTHS, BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import {
-  isPartyScoreStepActionable,
   PARTY_SCORE_APPROVAL_PAGE_SIZE,
   PARTY_SCORE_APPROVAL_STATUS_COLOR,
 } from '../../config/partyScoreApproval'
@@ -42,9 +45,6 @@ import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
-
-/** 审批动作类型：通过 / 驳回 / 转交 */
-type ApprovalAction = 'approve' | 'reject' | 'transfer'
 
 /** 列表行：审批步骤 + 关联的加分申请（反查失败时为 null） */
 interface ApprovalRow {
@@ -102,6 +102,67 @@ export default function PartyScoreApprovalView() {
   const [page, setPage] = useState(1)
   /** 状态多选筛选：空数组表示全部 */
   const [statusFilter, setStatusFilter] = useState<ApprovalStepStatus[]>([])
+  /** 申请人筛选：null 表示全部 */
+  const [applicantFilter, setApplicantFilter] = useState<number | null>(null)
+  /** 组织筛选：null 表示全部 */
+  const [organizationFilter, setOrganizationFilter] = useState<number | null>(null)
+  /** 申请人搜索候选与加载态 */
+  const [applicantOptions, setApplicantOptions] = useState<{ value: number; label: string }[]>([])
+  const [searchingApplicants, setSearchingApplicants] = useState(false)
+  /** 当前门户可筛选的下级组织（支部端/学院端） */
+  const [organizationOptions, setOrganizationOptions] = useState<{ value: number; label: string }[]>([])
+
+  /** 搜索申请人：按姓名或 UID 关键字返回候选，选中后按 user_id 精确筛选 */
+  const searchApplicants = useCallback(async (raw: string) => {
+    const keyword = raw.trim()
+    setSearchingApplicants(true)
+    try {
+      if (!keyword) {
+        setApplicantOptions([])
+        return
+      }
+      const res = await queryUsers({ keyword, page: 1, page_size: 20 })
+      setApplicantOptions(
+        res.data.map((user) => ({
+          value: user.uid,
+          label: user.name ? `${user.name}（${user.uid}）` : String(user.uid),
+        })),
+      )
+    } catch {
+      setApplicantOptions([])
+    } finally {
+      setSearchingApplicants(false)
+    }
+  }, [])
+
+  /** 加载支部端/学院端可直接筛选的下级组织 */
+  useEffect(() => {
+    if (portalKey !== 'branch' && portalKey !== 'academy') return
+    let cancelled = false
+    const depths = portalKey === 'branch' ? BRANCH_ANCESTOR_DEPTHS : ACADEMY_ANCESTOR_DEPTHS
+    void resolvePortalOrg(depths)
+      .then(({ orgId }) => (orgId === null ? Promise.resolve([]) : listSubsidiaries(orgId)))
+      .then((children) => {
+        if (cancelled) return
+        setOrganizationOptions(
+          children.map((org) => ({ value: org.id, label: org.name })),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizationOptions([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [portalKey])
+
+  /** 重置全部筛选条件 */
+  const resetFilters = useCallback(() => {
+    setPage(1)
+    setStatusFilter([])
+    setApplicantFilter(null)
+    setOrganizationFilter(null)
+  }, [])
 
   const load = useCallback(
     async (force = false) => {
@@ -114,6 +175,8 @@ export default function PartyScoreApprovalView() {
         const steps = await queryPartyScoreApprovals(
           {
             approver_id: me.uid,
+            applicant_id: applicantFilter ?? undefined,
+            organization_id: organizationFilter ?? undefined,
             page,
             page_size: PARTY_SCORE_APPROVAL_PAGE_SIZE,
           },
@@ -139,7 +202,7 @@ export default function PartyScoreApprovalView() {
         setLoading(false)
       }
     },
-    [page, t],
+    [page, t, applicantFilter, organizationFilter],
   )
 
   useEffect(() => {
@@ -149,15 +212,13 @@ export default function PartyScoreApprovalView() {
   /**
    * 审批详情页地址。
    * @param stepId 审批步骤 ID（必填）
-   * @param action 需要预选的审批动作（可选；不传时详情页展示操作选择）
-   * @returns 带来源模块与动作参数的详情页地址；缺少门户信息时返回 null
+   * @returns 带来源模块参数的详情页地址；缺少门户信息时返回 null
    */
   const buildDetailPath = useCallback(
-    (stepId: number, action?: ApprovalAction): string | null => {
+    (stepId: number): string | null => {
       if (!portalKey) return null
       const params = new URLSearchParams()
       if (moduleKey) params.set('from', moduleKey)
-      if (action) params.set('action', action)
       const query = params.toString()
       return `/portal/${portalKey}/party-score-approvals/${stepId}${query ? `?${query}` : ''}`
     },
@@ -168,15 +229,6 @@ export default function PartyScoreApprovalView() {
   const openDetail = useCallback(
     (row: ApprovalRow) => {
       const path = buildDetailPath(row.step.id)
-      if (path) navigate(path)
-    },
-    [buildDetailPath, navigate],
-  )
-
-  /** 打开审批详情页并预选审批动作（操作列按钮） */
-  const openAction = useCallback(
-    (kind: ApprovalAction, row: ApprovalRow) => {
-      const path = buildDetailPath(row.step.id, kind)
       if (path) navigate(path)
     },
     [buildDetailPath, navigate],
@@ -193,10 +245,14 @@ export default function PartyScoreApprovalView() {
 
   const filteredRows = useMemo(
     () =>
-      statusFilter.length === 0
-        ? rows
-        : rows.filter((row) => statusFilter.includes(row.step.status)),
-    [rows, statusFilter],
+      rows.filter((row) => {
+        const statusOk = statusFilter.length === 0 || statusFilter.includes(row.step.status)
+        const applicantOk = applicantFilter === null || row.score?.user_id === applicantFilter
+        const organizationOk =
+          organizationFilter === null || row.step.organization_id === organizationFilter
+        return statusOk && applicantOk && organizationOk
+      }),
+    [rows, statusFilter, applicantFilter, organizationFilter],
   )
 
   const applicantIds = useMemo(
@@ -302,73 +358,17 @@ export default function PartyScoreApprovalView() {
       {
         title: t('partyScoreApproval.colAction'),
         key: 'action',
-        width: 190,
+        width: 100,
         fixed: 'right',
-        render: (_, row) => {
-          const actionable = isPartyScoreStepActionable(row.step.status)
-          const actionTip = actionable
-            ? t('partyScoreApproval.approve')
-            : t('partyScoreApproval.actionUnavailable')
-          return (
-            <div className="approval-actions">
-              <Tooltip title={actionTip}>
-                <Button
-                  type="link"
-                  size="small"
-                  disabled={!actionable}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openAction('approve', row)
-                  }}
-                >
-                  {t('partyScoreApproval.approve')}
-                </Button>
-              </Tooltip>
-              <Tooltip
-                title={
-                  actionable
-                    ? t('partyScoreApproval.reject')
-                    : t('partyScoreApproval.actionUnavailable')
-                }
-              >
-                <Button
-                  type="link"
-                  size="small"
-                  danger
-                  disabled={!actionable}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openAction('reject', row)
-                  }}
-                >
-                  {t('partyScoreApproval.reject')}
-                </Button>
-              </Tooltip>
-              <Tooltip
-                title={
-                  actionable
-                    ? t('partyScoreApproval.transfer')
-                    : t('partyScoreApproval.actionUnavailable')
-                }
-              >
-                <Button
-                  type="link"
-                  size="small"
-                  disabled={!actionable}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openAction('transfer', row)
-                  }}
-                >
-                  {t('partyScoreApproval.transfer')}
-                </Button>
-              </Tooltip>
-            </div>
-          )
-        },
+        align: 'center',
+        render: () => (
+          <Tooltip title={t('partyScoreApproval.rowDoubleClickHint')}>
+            <span className="approval-row-action-label">{t('partyScoreApproval.colAction')}</span>
+          </Tooltip>
+        ),
       },
     ],
-    [t, locale, userNames, openAction, statusFilter, statusOptions],
+    [t, locale, userNames, statusFilter, statusOptions],
   )
 
   // 审批步骤接口为裸数组，无 total：满页时预估可能还有下一页，用于展示分页与总页数
@@ -382,7 +382,7 @@ export default function PartyScoreApprovalView() {
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('partyScoreApproval.title')}</h3>
-          <div className="approval-toolbar">
+          <div className="approval-toolbar" style={{ flexWrap: 'wrap' }}>
             <Select<ApprovalStepStatus[]>
               mode="multiple"
               allowClear
@@ -396,6 +396,38 @@ export default function PartyScoreApprovalView() {
                 setStatusFilter(next)
               }}
             />
+            <Select<number>
+              showSearch
+              allowClear
+              filterOption={false}
+              loading={searchingApplicants}
+              style={{ width: 220 }}
+              value={applicantFilter ?? undefined}
+              placeholder={t('partyScoreApproval.filterApplicantPlaceholder')}
+              options={applicantOptions}
+              onSearch={(value) => void searchApplicants(value)}
+              onChange={(next) => {
+                setPage(1)
+                setApplicantFilter(next ?? null)
+              }}
+              notFoundContent={
+                searchingApplicants ? t('partyScoreApproval.searchingUsers') : null
+              }
+            />
+            {organizationOptions.length > 0 && (
+              <Select<number>
+                allowClear
+                style={{ width: 180 }}
+                value={organizationFilter ?? undefined}
+                placeholder={t('partyScoreApproval.filterOrganizationPlaceholder')}
+                options={organizationOptions}
+                onChange={(next) => {
+                  setPage(1)
+                  setOrganizationFilter(next ?? null)
+                }}
+              />
+            )}
+            <Button onClick={resetFilters}>{t('partyScoreApproval.filterReset')}</Button>
             <Button icon={<ReloadOutlined />} onClick={() => void load(true)}>
               {t('common.refresh')}
             </Button>
@@ -410,11 +442,14 @@ export default function PartyScoreApprovalView() {
               loading={loading}
               columns={columns}
               dataSource={filteredRows}
-              scroll={{ x: 1220 }}
+              scroll={{ x: 1100 }}
               locale={{ emptyText: t('common.noData') }}
+              rowClassName={(row) =>
+                row.step.status === 'pending' ? 'party-score-approval-row-pending' : ''
+              }
               onRow={(row) => ({
-                onClick: () => openDetail(row),
-                title: t('partyScoreApproval.rowClickHint'),
+                onDoubleClick: () => openDetail(row),
+                title: t('partyScoreApproval.rowDoubleClickHint'),
                 style: { cursor: 'pointer' },
               })}
               /**

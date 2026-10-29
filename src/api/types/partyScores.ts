@@ -3,6 +3,8 @@
  *
  * 对应后端 tag「party-score」的 /api/party-scores 系列接口：
  *   GET   /api/party-scores                                  分页查询加分申请
+ *   GET   /api/party/scores/organization-average             查询组织党建活动加分平均分
+ *   GET   /api/party/scores                                  批量查询用户党建活动加分总计
  *   POST  /api/party-scores                                  创建加分申请
  *   GET   /api/party-scores/{id}                             加分申请详情（含附件下载地址 file_urls）
  *   GET   /api/party-scores/approvals                        当前审批人已处理的审批步骤列表
@@ -120,3 +122,26 @@ export interface PartyScoreTransferRequest {
   /** 转交意见（必填） */
   comment: string
 }
+
+/** GET /api/party/scores/organization-average 组织党建活动加分平均分（api.json: PartyOrganizationScoreAverage） */
+export interface PartyOrganizationScoreAverage {
+  /** 组织 ID */
+  organization_id: number
+  /** 组织名称 */
+  organization_name: string
+  /** 组织成员数（含递归下级时为本级及下级去重人数） */
+  member_count: number
+  /** 党建活动加分平均分（后端 DecimalText，JSON 字符串；无数据时为 null） */
+  average_score: string | null
+}
+
+/** GET /api/party/scores/organization-average 查询参数 */
+export interface PartyOrganizationScoreAverageQuery {
+  /** 组织 ID（必填） */
+  organization_id: number
+  /** 是否递归汇总下级组织，默认 false */
+  recursive?: boolean
+}
+
+/** GET /api/party/scores 批量查询返回项：[用户 ID, 党建活动加分总计（DecimalText 字符串）] */
+export type PartyScoreTotalItem = [number, string]

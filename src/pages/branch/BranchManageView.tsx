@@ -134,6 +134,7 @@ export default function BranchManageView({
       showOrgTree={showOrgTree}
       autoSelectFirst={showOrgTree}
       autoSelectFirstWithMembers
+      partyScoreColumns={fromModuleKey === 'branch_m5'}
     />
   )
 }

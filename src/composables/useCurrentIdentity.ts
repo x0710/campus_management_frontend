@@ -21,6 +21,8 @@ export interface CurrentIdentity {
   name: string | null
   /** 所属组织名称列表（可能为空数组；同一用户多处任职时含多项，按名称去重） */
   organizations: string[]
+  /** 与 organizations 对应的组织 ID 列表（顺序一致，供需要组织树链路的调用方使用） */
+  organizationIds: number[]
   /** 是否仍在解析中（true 表示数据尚未就绪） */
   loading: boolean
 }
@@ -37,6 +39,7 @@ export function useCurrentIdentity(): CurrentIdentity {
   const [state, setState] = useState<CurrentIdentity>({
     name: null,
     organizations: [],
+    organizationIds: [],
     loading: true,
   })
 
@@ -50,19 +53,34 @@ export function useCurrentIdentity(): CurrentIdentity {
         getCurrentUser().catch(() => null),
       ])
 
-      // uid 就绪后再取任职组织；同一用户多任职时按组织名称去重
+      // uid 就绪后再取任职组织；同一用户多任职时按组织名称去重，ID 与名称顺序保持一致
       let organizations: string[] = []
+      let organizationIds: number[] = []
       if (me) {
         try {
           const userOrgs = await listUserOrganizations(me.uid)
-          organizations = [...new Set(userOrgs.map((o) => o.organization_name).filter(Boolean))]
+          const seenNames = new Set<string>()
+          const items = userOrgs
+            .filter((o) => Boolean(o.organization_name))
+            .filter((o) => {
+              if (seenNames.has(o.organization_name)) return false
+              seenNames.add(o.organization_name)
+              return true
+            })
+          organizations = items.map((o) => o.organization_name)
+          organizationIds = items.map((o) => o.organization_id)
         } catch {
           // 组织查询失败：保持空数组，不影响姓名展示
         }
       }
 
       if (!cancelled) {
-        setState({ name: profile?.name ?? null, organizations, loading: false })
+        setState({
+          name: profile?.name ?? null,
+          organizations,
+          organizationIds,
+          loading: false,
+        })
       }
     })()
 

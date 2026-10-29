@@ -1,6 +1,7 @@
 /**
  * 党员端：首页（先锋指数概览 + 近期成绩申报记录）。
  * 顶部「姓名 + 所属组织」：经 useCurrentIdentity 取当前登录用户的真实姓名与任职组织，
+ * 再取首个任职组织的组织树，展示「学院党委」容器节点之前的名称并用 `|` 连接；
  * 姓名取不到时回退账户名，组织无任职时回退占位符（不使用业务数据做默认填充）。
  *
  * 分数与近期记录：经 useMyPartyScores 接真实接口 GET /api/party-scores，
@@ -10,6 +11,7 @@
 import { Spin } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { queryApprovalTemplates } from '../../api/approvalmodel'
+import { getOrganizationTree } from '../../api/organizations'
 import type { PartyScore } from '../../api/types/partyScores'
 import ErrorState from '../../components/ErrorState'
 import PartyScoreDetailModal from '../../components/PartyScoreDetailModal'
@@ -21,6 +23,10 @@ import {
   PARTY_RECENT_RECORD_LIMIT,
   PARTY_TEMPLATE_BUSINESS_TYPE,
 } from '../../config/partyDeclaration'
+import {
+  PARTY_HOME_ORG_FALLBACK_NAME,
+  PARTY_HOME_ORG_PATH_STOP_ID,
+} from '../../config/organization'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
@@ -35,15 +41,42 @@ function formatRecordDate(value: string): string {
 export default function PartyHomeView() {
   const t = useT()
   const username = useAuthStore((s) => s.username)
-  const { name, organizations } = useCurrentIdentity()
+  const { name, organizations, organizationIds } = useCurrentIdentity()
   const { records, loading, error, refresh } = useMyPartyScores()
   const [templateNames, setTemplateNames] = useState<Map<number, string>>(new Map())
   const [detailRecord, setDetailRecord] = useState<PartyScore | null>(null)
+  /** 首页顶部组织路径：取首个任职组织的祖先链，截取到「学院党委」容器节点之前 */
+  const [organizationPath, setOrganizationPath] = useState<string | null>(null)
+  const firstOrganizationId = organizationIds[0]
 
   // 姓名：真实姓名优先，取不到时回退账户名，最后回退占位符
   const displayName = name?.trim() || username || t('common.unknown')
-  // 所属组织：取第一项任职组织名称，无任职时回退占位符
-  const displayOrg = organizations[0] || t('common.unknown')
+  // 所属组织：优先展示组织路径；树查询失败时回退根组织名称，无任职时回退占位符
+  const displayOrg = organizationPath || organizations[0] || t('common.unknown')
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (firstOrganizationId === undefined) {
+      setOrganizationPath(null)
+      return
+    }
+
+    getOrganizationTree(firstOrganizationId)
+      .then((chain) => {
+        if (cancelled) return
+        const stopIndex = chain.findIndex((node) => node.id === PARTY_HOME_ORG_PATH_STOP_ID)
+        const prefix = stopIndex === -1 ? chain : chain.slice(0, stopIndex)
+        setOrganizationPath(prefix.map((node) => node.name).filter(Boolean).join('|'))
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizationPath(PARTY_HOME_ORG_FALLBACK_NAME)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [firstOrganizationId])
 
   // 申报类型名称：失败时保持空 Map，列表回退展示模板 ID，不影响其余内容
   useEffect(() => {
@@ -84,6 +117,7 @@ export default function PartyHomeView() {
       {/* 顶部：姓名 + 所属支部 */}
       <section className="party-profile">
         <span className="party-member-name">{displayName}</span>
+        <span className="party-profile-separator">|</span>
         <span className="party-branch-name">{displayOrg}</span>
       </section>
 

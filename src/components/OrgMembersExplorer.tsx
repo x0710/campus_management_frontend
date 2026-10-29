@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'rea
 import { useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
+import { getPartyScoreTotals } from '../api/partyScores'
 import type { OrganizationMember } from '../api/types/organizations'
 import { useMemberSearch } from '../composables/useMemberSearch'
 import { usePositionNames } from '../composables/usePositionNames'
@@ -37,6 +38,7 @@ import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
 import { useUiStateStore } from '../store/uiState'
+import { formatPartyScoreTotal } from '../utils/partyScore'
 import ErrorState from './ErrorState'
 import MatchedMembersTable from './MatchedMembersTable'
 import MemberSearchModeToggle from './MemberSearchModeToggle'
@@ -83,6 +85,12 @@ interface OrgMembersExplorerProps {
    * 适用于「支部」等最底层组织（无下级组织，无需树形切换）。
    */
   showOrgTree?: boolean
+  /**
+   * 支部端「支部管理」成员列模式。
+   * 开启后把「职位」列改为「身份」，移除「工作地点」，新增「先锋等级」列
+   * （通过 GET /api/party/scores 批量查询成员党建加分）。
+   */
+  partyScoreColumns?: boolean
 }
 
 export default function OrgMembersExplorer({
@@ -95,6 +103,7 @@ export default function OrgMembersExplorer({
   autoSelectFirst = false,
   autoSelectFirstWithMembers = false,
   showOrgTree = true,
+  partyScoreColumns = false,
 }: OrgMembersExplorerProps) {
   const t = useT()
   const navigate = useNavigate()
@@ -114,6 +123,9 @@ export default function OrgMembersExplorer({
   const [membersError, setMembersError] = useState<string | null>(null)
   const [memberPage, setMemberPage] = useState(1)
   const [memberTotal, setMemberTotal] = useState(0)
+  /** 支部管理「先锋等级」列：uid → 党建加分总计（无记录按 0 分处理） */
+  const [partyScores, setPartyScores] = useState<Map<number, string>>(new Map())
+  const [partyScoresLoading, setPartyScoresLoading] = useState(false)
 
   /** 加载指定组织的成员（force=true 绕过会话缓存） */
   const loadMembers = useCallback(
@@ -272,6 +284,35 @@ export default function OrgMembersExplorer({
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
   const positionNames = usePositionNames()
 
+  // 支部端「支部管理」批量查询成员党建加分，展示先锋等级
+  useEffect(() => {
+    if (!partyScoreColumns || memberIds.length === 0) {
+      setPartyScores(new Map())
+      setPartyScoresLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setPartyScoresLoading(true)
+    getPartyScoreTotals(memberIds)
+      .then((items) => {
+        if (cancelled) return
+        const next = new Map<number, string>(memberIds.map((uid) => [uid, '0']))
+        for (const [uid, score] of items) next.set(uid, score)
+        setPartyScores(next)
+      })
+      .catch(() => {
+        if (!cancelled) setPartyScores(new Map())
+      })
+      .finally(() => {
+        if (!cancelled) setPartyScoresLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [memberIds, partyScoreColumns])
+
   /** 点击成员行 → 进入成员详情页（?from 用于侧栏高亮来源模块） */
   const openMember = useCallback(
     (uid: number) => {
@@ -281,7 +322,56 @@ export default function OrgMembersExplorer({
   )
 
   const memberColumns = useMemo<ColumnsType<OrganizationMember>>(() => {
-    const cols: ColumnsType<OrganizationMember> = [
+    if (partyScoreColumns) {
+      return [
+        { title: t('memberDetail.fieldUid'), dataIndex: 'user_id', key: 'user_id', width: 90 },
+        {
+          title: t('profile.name'),
+          key: 'user_name',
+          width: 160,
+          render: (_, record) =>
+            memberNames.has(record.user_id)
+              ? (memberNames.get(record.user_id) ?? '—')
+              : t('common.loading'),
+        },
+        {
+          title: t('branch.colIdentity'),
+          dataIndex: 'position',
+          key: 'position',
+          width: 160,
+          // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
+          render: (v: string) => (
+            <Tooltip title={v}>
+              <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
+            </Tooltip>
+          ),
+        },
+        {
+          title: t('branch.colPioneerLevel'),
+          key: 'pioneer_level',
+          width: 140,
+        render: (_, record) => {
+          if (partyScoresLoading) return t('common.loading')
+          const score = partyScores.get(record.user_id) ?? '0'
+          return <Tag color="green">{formatPartyScoreTotal(score)}</Tag>
+        },
+        },
+        {
+          title: t('approval.colAction'),
+          key: 'action',
+          width: 120,
+          render: (_, record) => (
+            <Tooltip title={t('memberDetail.viewDetailHint')}>
+              <Button type="link" size="small" onClick={() => openMember(record.user_id)}>
+                {t('memberDetail.detail')}
+              </Button>
+            </Tooltip>
+          ),
+        },
+      ]
+    }
+
+    return [
       { title: t('memberDetail.fieldUid'), dataIndex: 'user_id', key: 'user_id', width: 90 },
       {
         title: t('profile.name'),
@@ -323,8 +413,7 @@ export default function OrgMembersExplorer({
         ),
       },
     ]
-    return cols
-  }, [t, memberNames, positionNames, openMember])
+  }, [t, memberNames, positionNames, openMember, partyScoreColumns, partyScores, partyScoresLoading])
 
   return (
     <div className={`admin-org-view${showOrgTree && treeCollapsed ? ' is-tree-collapsed' : ''}`}>

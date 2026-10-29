@@ -89,7 +89,7 @@ export interface PortalDef {
 export const PORTALS: PortalDef[] = [
   {
     // 党员端门户：首页近期记录接真实成绩申报接口（先锋指数仍为模拟数据，页面内有说明）；
-    // 成绩申报、整改提升、我的仍使用虚拟数据预览
+    // 成绩申报、整改提升使用虚拟数据预览；我的已开通并复用真实档案/成绩记录/消息通知页面
     key: 'party',
     icon: <FlagOutlined />,
     gradient: 'linear-gradient(135deg, #a8071a 0%, #f5222d 100%)',
@@ -98,12 +98,11 @@ export const PORTALS: PortalDef[] = [
       { key: 'party_m1', status: 'ready', icon: <HomeOutlined /> },
       { key: 'party_m2', status: 'ready', icon: <FormOutlined /> },
       { key: 'party_m3', status: 'preview', icon: <RiseOutlined /> },
-      // 我的：不再占用侧栏入口，改由顶栏头像菜单进入
-      { key: 'party_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
+      { key: 'party_m4', status: 'ready', icon: <UserOutlined /> },
     ],
   },
   {
-    // 党委支部端门户：工作台（党员总数、待审核申报接真实接口，平均分/等级分布为虚拟数据）、
+    // 党委支部端门户：工作台（党员总数、平均分、待审核申报接真实接口，等级分布由前端计算）、
     // 我的使用虚拟数据预览；审核管理接入党建活动加分审批接口
     // （审批步骤由 GET /api/party-scores + /api/approvals 前端合成，
     //   审核动作走 PUT /api/party-scores/approvals/{id}/approve|reject|transfer），
@@ -113,7 +112,7 @@ export const PORTALS: PortalDef[] = [
     gradient: 'linear-gradient(135deg, #873800 0%, #fa8c16 100%)',
     accent: '#873800',
     modules: [
-      { key: 'branch_m1', status: 'preview', icon: <LineChartOutlined /> },
+      { key: 'branch_m1', status: 'ready', icon: <LineChartOutlined /> },
       { key: 'branch_m3', status: 'ready', icon: <AuditOutlined /> },
       // 我的：不再占用侧栏入口，改由顶栏头像菜单进入
       { key: 'branch_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
@@ -121,7 +120,8 @@ export const PORTALS: PortalDef[] = [
     ],
   },
   {
-    // 党委学院端门户：工作台（党员总数接真实接口，平均分/排名/待认定为虚拟数据）、指标、我的使用虚拟数据预览；
+    // 党委学院端门户：工作台（党员总数、平均分、各支部排名均接真实接口）、我的使用虚拟数据预览；
+    // 指标与审批模板管理为同一功能，接真实审批模板接口；
     // 审核管理接入党建活动加分审批接口（加分审批步骤 / 通过 / 驳回 / 转交），
     // 学院支部管理与支部端同一套支部判定逻辑，均接真实接口
     key: 'academy',
@@ -129,26 +129,25 @@ export const PORTALS: PortalDef[] = [
     gradient: 'linear-gradient(135deg, #531dab 0%, #9254de 100%)',
     accent: '#531dab',
     modules: [
-      { key: 'academy_m1', status: 'preview', icon: <HomeOutlined /> },
-      { key: 'academy_m2', status: 'preview', icon: <ProfileOutlined /> },
+      { key: 'academy_m1', status: 'ready', icon: <HomeOutlined /> },
+      { key: 'academy_m2', status: 'ready', icon: <ProfileOutlined /> },
       { key: 'academy_m3', status: 'ready', icon: <AuditOutlined /> },
       // 我的：不再占用侧栏入口，改由顶栏头像菜单进入
       { key: 'academy_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
       { key: 'academy_m5', status: 'ready', icon: <ApartmentOutlined /> },
-      { key: 'academy_m6', status: 'ready', icon: <AuditOutlined /> },
     ],
   },
   {
-    // 党委学校端门户：总览（党员总数接真实接口，平均分/排名为虚拟数据）；
+    // 党委学校端门户：总览（党员总数、平均分、各二级党委排名均接真实接口）；
     // 组织管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
-    // 岗位管理复用管理端「岗位管理」页面，审批模板管理复用领导端「审批模板管理」页面，均接真实接口
+    // 岗位管理复用管理端「岗位管理」页面，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
     gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
     accent: '#08979c',
     modules: [
-      { key: 'school_m1', status: 'preview', icon: <LineChartOutlined /> },
       { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
+      { key: 'school_m1', status: 'ready', icon: <LineChartOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
       // 我的：不占用侧栏入口，改由顶栏头像菜单进入
       { key: 'school_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
@@ -302,10 +301,11 @@ export const ACADEMY_PORTAL_KEY: PortalKey = 'academy'
 export const SCHOOL_PORTAL_KEY: PortalKey = 'school'
 
 /**
- * 各门户「我的」模块 key：该模块不在侧栏展示（hiddenFromMenu），统一由顶栏头像菜单进入。
+ * 各门户「我的」模块 key。
+ * 党员端「我的」保留在左侧菜单；支部端 / 学院端 / 学校端仍隐藏侧栏入口，
+ * 统一由顶栏头像菜单进入。
  */
 export const PORTAL_PROFILE_MODULE_KEYS: Partial<Record<PortalKey, string>> = {
-  [PARTY_PORTAL_KEY]: 'party_m4',
   [BRANCH_PORTAL_KEY]: 'branch_m4',
   [ACADEMY_PORTAL_KEY]: 'academy_m4',
   [SCHOOL_PORTAL_KEY]: 'school_m4',

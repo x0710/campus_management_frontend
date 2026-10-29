@@ -40,10 +40,10 @@ import {
   Tooltip,
 } from 'antd'
 import axios from 'axios'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { getApprovalTemplateDetail } from '../../api/approvalmodel'
-import { findApprovalStepById } from '../../api/approvals'
+import { findApprovalStepById, getApprovalRecords } from '../../api/approvals'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import {
@@ -53,7 +53,7 @@ import {
   rejectPartyScore,
   transferPartyScore,
 } from '../../api/partyScores'
-import type { ApprovalInstanceStep } from '../../api/types/approvals'
+import type { ApprovalInstanceStep, ApprovalRecordItem } from '../../api/types/approvals'
 import type { PartyScoreDetail } from '../../api/types/partyScores'
 import { queryUsers } from '../../api/users'
 import AttachmentLinks from '../../components/AttachmentLinks'
@@ -140,6 +140,8 @@ function PartyScoreApprovalDetail() {
   const [score, setScore] = useState<PartyScoreDetail | null>(null)
   /** 审批模板名称：undefined 表示加载中；null 表示取不到（回退展示模板 ID） */
   const [templateName, setTemplateName] = useState<string | null | undefined>(undefined)
+  /** 审批流转记录：按环节顺序展示操作人、决定、意见与时间 */
+  const [approvalRecords, setApprovalRecords] = useState<ApprovalRecordItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [myUid, setMyUid] = useState<number | null>(null)
@@ -147,6 +149,8 @@ function PartyScoreApprovalDetail() {
   const [submittingAction, setSubmittingAction] = useState<ApprovalAction | null>(null)
   const [actionMode, setActionMode] = useState<ActionMode>(toActionMode(initialAction))
   const [actionForm] = Form.useForm<ActionFormValues>()
+  /** 操作成功后延迟返回上一层，组件卸载时清理定时器避免误跳转 */
+  const returnTimerRef = useRef<number | null>(null)
 
   /** 转交对象搜索选项与加载态 */
   const [transferUsers, setTransferUsers] = useState<{ value: number; label: string }[]>([])
@@ -154,6 +158,28 @@ function PartyScoreApprovalDetail() {
 
   /** 申请人真实姓名：审批详情就绪后批量查询（失败时 Map 中为 null，回退展示用户 ID） */
   const userNames = useUserNames(score ? [score.user_id] : [])
+
+  /** 审批流转记录涉及的用户：操作人与转交目标 */
+  const recordUserIds = useMemo(
+    () =>
+      approvalRecords.flatMap((record) => [
+        record.operator_id,
+        ...(record.transfer_to === null ? [] : [record.transfer_to]),
+      ]),
+    [approvalRecords],
+  )
+  const recordUserNames = useUserNames(recordUserIds)
+
+  /** 审批记录决定文案：agree/reject/transfer 映射为现有操作文案 */
+  const recordDecisionText = useCallback(
+    (decision: ApprovalRecordItem['decision']) =>
+      decision === 'agree'
+        ? t('partyScoreApproval.approve')
+        : decision === 'reject'
+          ? t('partyScoreApproval.reject')
+          : t('partyScoreApproval.transfer'),
+    [t],
+  )
 
   const load = useCallback(
     async (force = false) => {
@@ -210,6 +236,14 @@ function PartyScoreApprovalDetail() {
         }
         setScore(loadedScore)
 
+        try {
+          const records = await getApprovalRecords(foundStep.instance_id, force)
+          setApprovalRecords(records)
+        } catch {
+          // 审批记录仅用于流转展示，接口失败时保持空列表，不影响详情主体
+          setApprovalRecords([])
+        }
+
         /*
          * 模板名称：必须以加分申请详情里的 template_id 请求模板详情。
          * 列表接口的加分申请摘要可能不返回 template_id，直接使用会让请求变成
@@ -245,6 +279,13 @@ function PartyScoreApprovalDetail() {
     void load()
   }, [load])
 
+  useEffect(
+    () => () => {
+      if (returnTimerRef.current !== null) window.clearTimeout(returnTimerRef.current)
+    },
+    [],
+  )
+
   /**
    * 通过表单的核定分数默认值：进入通过表单（或申请分数刷新）时预填申请加分。
    * 驳回按钮使用同一份表单，因此不会清空用户已填写的审批意见。
@@ -268,6 +309,15 @@ function PartyScoreApprovalDetail() {
       navigate('/')
     }
   }, [portalKey, fromModuleKey, navigate])
+
+  /** 审批操作成功后停留 3 秒，再返回上一层 */
+  const scheduleBackAfterSuccess = useCallback(() => {
+    if (returnTimerRef.current !== null) window.clearTimeout(returnTimerRef.current)
+    returnTimerRef.current = window.setTimeout(() => {
+      returnTimerRef.current = null
+      backToList()
+    }, 3000)
+  }, [backToList])
 
   /** 切换审批表单模式：清空上一次表单，避免通过 / 转交之间串值 */
   const chooseMode = useCallback(
@@ -371,13 +421,14 @@ function PartyScoreApprovalDetail() {
       }
 
       actionForm.resetFields()
-      // 转交后步骤已不属于当前审批人，直接回列表；通过/驳回则留在本页展示最新状态
+      // 操作成功后统一停留 3 秒返回上一层
       if (kind === 'transfer') {
-        backToList()
+        scheduleBackAfterSuccess()
         return
       }
       // 审批结果会改变步骤状态与核定分数，强制刷新当前详情
       await load(true)
+      scheduleBackAfterSuccess()
     } catch (err) {
       reportError(err)
     } finally {
@@ -388,6 +439,18 @@ function PartyScoreApprovalDetail() {
   const actionable = step !== null && isPartyScoreStepActionable(step.status)
   const applicantName = score ? userNames.get(score.user_id) : undefined
   const busy = submittingAction !== null
+
+  /** 审批意见常用回复：点击后直接填入意见输入框 */
+  const commonReplies = useMemo(
+    () => [
+      t('partyScoreApproval.quickReplyApproveVerified'),
+      t('partyScoreApproval.quickReplyApproveTrue'),
+      t('partyScoreApproval.quickReplyNeedSupplement'),
+      t('partyScoreApproval.quickReplyRejectInvalid'),
+      t('partyScoreApproval.quickReplyTransfer'),
+    ],
+    [t],
+  )
 
   return (
     <div className="party-approval-detail">
@@ -479,22 +542,81 @@ function PartyScoreApprovalDetail() {
                 <h4 className="party-approval-section-title">
                   {t('partyScoreApproval.flowSectionTitle')}
                 </h4>
-                <Descriptions column={2} bordered size="small">
-                  <Descriptions.Item label={t('partyScoreApproval.fieldStepOrder')}>
-                    {t('partyScoreApproval.stepOrderValue', { n: String(step.step_order) })}
-                  </Descriptions.Item>
-                  <Descriptions.Item label={t('partyScoreApproval.fieldStepStatus')}>
-                    <Tag color={PARTY_SCORE_APPROVAL_STATUS_COLOR[step.status]}>
-                      {t(`partyScoreApproval.status_${step.status}`)}
-                    </Tag>
-                  </Descriptions.Item>
-                  <Descriptions.Item label={t('partyScoreApproval.fieldStartedAt')}>
-                    {formatDateTime(step.started_at, locale)}
-                  </Descriptions.Item>
-                  <Descriptions.Item label={t('partyScoreApproval.fieldFinishedAt')}>
-                    {formatDateTime(step.finished_at, locale)}
-                  </Descriptions.Item>
-                </Descriptions>
+                {approvalRecords.length === 0 ? (
+                  <div className="party-approval-flow-empty">
+                    {t('partyScoreApproval.flowEmpty')}
+                  </div>
+                ) : (
+                  <div className="party-approval-flow-list">
+                    {approvalRecords.map((record) => {
+                      const operatorName = recordUserNames.get(record.operator_id)
+                      const transferName =
+                        record.transfer_to === null
+                          ? null
+                          : recordUserNames.get(record.transfer_to)
+                      return (
+                        <div
+                          key={record.id}
+                          className={`party-approval-flow-item party-approval-flow-item--${record.decision}`}
+                        >
+                          <div className="party-approval-flow-head">
+                            <span
+                              className={`party-approval-flow-dot party-approval-flow-dot--${record.decision}`}
+                            />
+                            <span className="party-approval-flow-step">
+                              {t('partyScoreApproval.stepOrderValue', {
+                                n: String(record.step_order),
+                              })}
+                            </span>
+                            <Tag
+                              color={
+                                record.decision === 'agree'
+                                ? 'success'
+                                : record.decision === 'reject'
+                                  ? 'error'
+                                  : 'processing'
+                              }
+                              className="party-approval-flow-decision-tag"
+                            >
+                              {recordDecisionText(record.decision)}
+                            </Tag>
+                            <span className="party-approval-flow-time">
+                              {formatDateTime(record.created_at, locale)}
+                            </span>
+                          </div>
+                          <div className="party-approval-flow-meta">
+                            <span>
+                              <span className="party-approval-flow-meta-label">
+                                {t('partyScoreApproval.flowOperator')}
+                              </span>
+                              {operatorName === undefined
+                                ? t('common.loading')
+                                : (operatorName ?? record.operator_id)}
+                            </span>
+                            {record.transfer_to !== null && (
+                              <span>
+                                <span className="party-approval-flow-meta-label">
+                                  {t('partyScoreApproval.flowTransferTo')}
+                                </span>
+                                {transferName === undefined
+                                  ? t('common.loading')
+                                  : (transferName ?? record.transfer_to)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="party-approval-flow-comment">
+                            <span className="party-approval-flow-comment-label">
+                              {t('partyScoreApproval.flowComment')}
+                            </span>
+                            <span className="party-approval-flow-comment-text">
+                              {record.comment || '—'}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </section>
 
               <section className="party-approval-section">
@@ -598,6 +720,20 @@ function PartyScoreApprovalDetail() {
                       />
                     </Form.Item>
                   )}
+                  <div className="party-approval-quick-replies">
+                    <span className="party-approval-quick-replies-label">
+                      {t('partyScoreApproval.quickRepliesLabel')}
+                    </span>
+                    {commonReplies.map((reply) => (
+                      <Tag
+                        key={reply}
+                        className="party-approval-quick-reply"
+                        onClick={() => actionForm.setFieldValue('comment', reply)}
+                      >
+                        {reply}
+                      </Tag>
+                    ))}
+                  </div>
                   <Form.Item
                     name="comment"
                     label={t('partyScoreApproval.commentLabel')}

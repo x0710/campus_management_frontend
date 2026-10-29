@@ -18,6 +18,7 @@ import { App as AntdApp, Button, Input, Select, Space, Table, Tag, Tooltip } fro
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import {
@@ -52,8 +53,10 @@ interface FeedbackModalState {
 export default function FeedbackView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
+  const { moduleKey } = useParams<{ moduleKey?: string }>()
   const { message, modal } = AntdApp.useApp()
   const reportError = useErrorFeedback()
+  const showContactCard = moduleKey === undefined
 
   const [rows, setRows] = useState<FeedbackDto[]>([])
   const [total, setTotal] = useState(0)
@@ -215,8 +218,8 @@ export default function FeedbackView() {
   )
 
   return (
-    <div className="data-page-view">
-      <section className="panel-card">
+    <div className={showContactCard ? 'data-page-view feedback-layout' : 'data-page-view'}>
+      <section className={`panel-card${showContactCard ? ' feedback-main-card' : ''}`}>
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('feedback.title')}</h3>
           <div className="student-toolbar">
@@ -292,6 +295,20 @@ export default function FeedbackView() {
           )}
         </div>
       </section>
+
+      {showContactCard ? (
+        <aside className="panel-card feedback-contact-card" aria-label={t('feedback.contactImageAlt')}>
+          <div className="panel-card-body feedback-contact-body">
+            <img
+              className="feedback-contact-image"
+              src="/mmexport1793304431141.jpg"
+              alt={t('feedback.contactImageAlt')}
+              loading="lazy"
+            />
+            <p className="feedback-contact-hint">{t('feedback.contactPersonHint')}</p>
+          </div>
+        </aside>
+      ) : null}
 
       <FeedbackFormModal
         open={modalState.open}

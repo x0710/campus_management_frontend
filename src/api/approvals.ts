@@ -2,7 +2,12 @@
 
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { ApprovalInstanceStep, ApprovalStepResult, ApprovalTodoQuery } from './types/approvals'
+import type {
+  ApprovalInstanceStep,
+  ApprovalRecordItem,
+  ApprovalStepResult,
+  ApprovalTodoQuery,
+} from './types/approvals'
 
 /** 按步骤 ID 查找审批步骤时单页拉取条数（后端允许的最大值） */
 const APPROVAL_STEP_SCAN_PAGE_SIZE = 100
@@ -52,6 +57,17 @@ export async function findApprovalStepById(
     if (steps.length < APPROVAL_STEP_SCAN_PAGE_SIZE) break
   }
   return null
+}
+
+/**
+ * GET /api/approvals/{id}/records 查询审批实例中的全部审批意见记录。
+ * 审批流转区按记录展示每个环节的操作人、决定、意见与时间。
+ * @param instanceId 审批实例 ID（必填）
+ * @param force 是否绕过会话缓存重新请求，默认 false
+ * @returns Promise<ApprovalRecordItem[]> 按环节顺序排列的审批记录
+ */
+export function getApprovalRecords(instanceId: number, force?: boolean) {
+  return cachedGet<ApprovalRecordItem[]>(`/approvals/${instanceId}/records`, undefined, { force })
 }
 
 /** PUT /api/approvals 提交审批结果（同意 / 驳回 / 转交），成功返回 200 无 body */

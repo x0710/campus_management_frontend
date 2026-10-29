@@ -22,6 +22,19 @@ export interface ApprovalInstanceStep {
   finished_at: string | null
 }
 
+/** 审批意见记录（api.json: ApprovalRecordItem） */
+export interface ApprovalRecordItem {
+  id: number
+  instance_id: number
+  instance_step_id: number
+  step_order: number
+  operator_id: number
+  decision: ApprovalDecision
+  comment: string
+  transfer_to: number | null
+  created_at: string
+}
+
 /** PUT /api/approvals 请求体（api.json: ApprovalStepResultDto） */
 export interface ApprovalStepResult {
   approval_instance_step_id: number

@@ -3,6 +3,8 @@
  *
  * 提供加分申请的查询/详情/创建，以及审批待办列表与通过/驳回/转交处理：
  *   GET    /api/party-scores                                        分页查询加分申请
+ *   GET    /api/party/scores/organization-average                   查询指定组织党建活动加分平均分
+ *   GET    /api/party/scores                                        批量查询用户党建活动加分总计
  *   POST   /api/party-scores                                        创建加分申请
  *   GET    /api/party-scores/{id}                                   加分申请详情
  *   PUT    /api/party-scores/approvals/{id}/approve                 审批通过（必须提交核定分数）
@@ -30,6 +32,9 @@ import type {
   PartyScoreCreateRequest,
   PartyScoreCreateResponse,
   PartyScoreDetail,
+  PartyOrganizationScoreAverage,
+  PartyOrganizationScoreAverageQuery,
+  PartyScoreTotalItem,
   PartyScoreQuery,
   PartyScoreRejectRequest,
   PartyScoreTransferRequest,
@@ -86,6 +91,44 @@ export function queryPartyScores(params: PartyScoreQuery = {}, force?: boolean) 
  */
 export function getPartyScore(id: number, force?: boolean) {
   return cachedGet<PartyScoreDetail>(`/party-scores/${id}`, undefined, { force })
+}
+
+/**
+ * GET /api/party/scores/organization-average 查询指定组织党建活动加分平均分（会话缓存）。
+ * 支持递归汇总下级组织；返回结果含组织名称、去重成员数与平均分（平均分无数据时为 null）。
+ * @param params organization_id 必填，recursive 可选（默认 false）
+ * @param force 是否强制绕过缓存重新请求（用于手动刷新），默认 false
+ * @returns Promise<PartyOrganizationScoreAverage> 组织平均分统计
+ */
+export function getPartyScoreOrganizationAverage(
+  params: PartyOrganizationScoreAverageQuery,
+  force?: boolean,
+) {
+  return cachedGet<PartyOrganizationScoreAverage>(
+    '/party/scores/organization-average',
+    params as unknown as Record<string, unknown>,
+    { force },
+  )
+}
+
+/**
+ * GET /api/party/scores 批量查询用户党建活动加分总计（会话缓存）。
+ * 后端按 `uids=1,2,3` 逗号分隔查询，返回 `Vec<(uid, score_text)>`；
+ * score_text 为 DecimalText 字符串，未返回的用户按 0 分处理。
+ * @param uids 用户 ID 数组（必填；为空时直接返回空数组，不发请求）
+ * @param force 是否强制绕过缓存重新请求（用于手动刷新），默认 false
+ * @returns Promise<PartyScoreTotalItem[]> 用户加分总计数组
+ */
+export function getPartyScoreTotals(
+  uids: number[],
+  force?: boolean,
+): Promise<PartyScoreTotalItem[]> {
+  if (uids.length === 0) return Promise.resolve([])
+  return cachedGet<PartyScoreTotalItem[]>(
+    '/party/scores',
+    { uids: uids.join(',') },
+    { force },
+  )
 }
 
 /**

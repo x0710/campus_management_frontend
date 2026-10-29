@@ -13,6 +13,7 @@ import { getPortal, type PortalKey, type PortalModule } from '../../config/porta
 import {
   ACADEMY_ANCESTOR_DEPTHS,
   BRANCH_ANCESTOR_DEPTHS,
+  SCHOOL_COLLEGE_PARENT_ORG_ID,
 } from '../../config/organization'
 import { useT } from '../../i18n'
 const AnnouncementsView = lazy(() => import('./AnnouncementsView'))
@@ -46,7 +47,6 @@ const PartyScoreApprovalView = lazy(() => import('../party/PartyScoreApprovalVie
 const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
 const BranchManageView = lazy(() => import('../branch/BranchManageView'))
 const AcademyWorkbenchView = lazy(() => import('../academy/AcademyWorkbenchView'))
-const AcademyMetricsView = lazy(() => import('../academy/AcademyMetricsView'))
 const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
 
 /**
@@ -59,7 +59,9 @@ const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
  * 党委学校端「组织管理」：复用管理端组织架构页面（组织树 + 组织 CRUD + 成员任职管理），
  * 接真实组织/成员接口；用独立 uiKey 隔离选中态，避免与管理端串用。
  */
-const SchoolOrgAdminView = () => <OrgAdminView uiKey="school_m2" />
+const SchoolOrgAdminView = () => (
+  <OrgAdminView uiKey="school_m2" rootOrgId={SCHOOL_COLLEGE_PARENT_ORG_ID} />
+)
 
 /**
  * 党委支部端「支部管理」：按组织树深度判定当前用户所属支部后展示其成员
@@ -95,15 +97,14 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   // 党委支部端「支部管理」：判定所属支部后展示其成员（有下级支部则展示组织树）
   'branch:branch_m5': BranchManageModule,
   'academy:academy_m1': AcademyWorkbenchView,
-  'academy:academy_m2': AcademyMetricsView,
+  // 党委学院端「指标」：审批模板管理就是指标功能，直接复用领导端审批模板管理页面
+  'academy:academy_m2': ApprovalTemplateManageView,
   // 党委学院端「审核管理」：党建活动加分审批
   'academy:academy_m3': PartyScoreApprovalView,
   // 党委学院端「我的」：与党员端「我的」复用同一页面
   'academy:academy_m4': PartyProfileView,
   // 党委学院端「学院支部管理」：与支部端同一支部判定逻辑（所属支部 + 下级组织成员）
   'academy:academy_m5': AcademyBranchManageModule,
-  // 党委学院端「审批模板管理」：复用领导端「审批模板管理」页面（接真实审批模板接口）
-  'academy:academy_m6': ApprovalTemplateManageView,
   'school:school_m1': SchoolOverviewView,
   // 党委学校端「组织管理」：复用管理端「组织架构」页面（接真实组织/成员接口）
   'school:school_m2': SchoolOrgAdminView,

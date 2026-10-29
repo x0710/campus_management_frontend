@@ -80,10 +80,18 @@ interface OrgAdminViewProps {
    * 管理端与党委学校端复用同一页面时各用一个 key，避免两端的选择状态互相串用。
    */
   uiKey?: string
+  /**
+   * 左侧组织树的固定根节点 ID。
+   * 未传时按顶级组织（parent_id=null）建树；党委学校端传入 2，只展示「学院党委」及其下级。
+   */
+  rootOrgId?: number
 }
 
 /** 管理端：组织架构（组织树 + 组织 CRUD + 成员任职管理，成员详情跳转共用领导端成员详情页） */
-export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) {
+export default function OrgAdminView({
+  uiKey = 'admin_m3',
+  rootOrgId,
+}: OrgAdminViewProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
@@ -130,6 +138,29 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   const [addModalOpen, setAddModalOpen] = useState(false)
 
   const reportError = useErrorFeedback()
+
+  /** 左侧组织树实际展示的组织范围；传入 rootOrgId 时只保留该节点及其全部下级 */
+  const orgsInTree = useMemo(() => {
+    if (rootOrgId === undefined) return orgs
+
+    const byParent = new Map<number, OrganizationInfo[]>()
+    for (const org of orgs) {
+      if (org.parent_id == null) continue
+      const siblings = byParent.get(org.parent_id)
+      if (siblings) siblings.push(org)
+      else byParent.set(org.parent_id, [org])
+    }
+
+    const result: OrganizationInfo[] = []
+    const walk = (id: number) => {
+      const org = orgs.find((item) => item.id === id)
+      if (!org) return
+      result.push(org)
+      for (const child of byParent.get(id) ?? []) walk(child.id)
+    }
+    walk(rootOrgId)
+    return result
+  }, [orgs, rootOrgId])
 
   const loadOrgs = useCallback(async (force?: boolean) => {
     setOrgsLoading(true)
@@ -184,7 +215,7 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
 
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
   const search = useMemberSearch({
-    orgs,
+    orgs: orgsInTree,
     memberPageSize: MEMBER_PAGE_SIZE,
     activeOrgId: selectedId,
     onSelectOrg: (orgId: number) => setSelectedId(uiKey, orgId),
@@ -198,10 +229,10 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   const { consumePendingPage } = search
 
   // 组织树默认只展开根节点（进入页面不全量展开，避免树过长铺满；深层分支点击再展开）
-  const rootKeys = useMemo<React.Key[]>(
-    () => orgs.filter((o) => o.parent_id === null).map((o) => o.id),
-    [orgs],
-  )
+  const rootKeys = useMemo<React.Key[]>(() => {
+    if (rootOrgId !== undefined) return [rootOrgId]
+    return orgsInTree.filter((o) => o.parent_id === null).map((o) => o.id)
+  }, [orgsInTree, rootOrgId])
   // 展开节点：搜索命中时展开到目标组织链；否则用上次手动展开的节点（跨路由保留）；再否则只展开根节点
   const expandedKeys = useMemo<React.Key[]>(
     () => search.focusKeys ?? storedExpandedKeys ?? rootKeys,
@@ -224,22 +255,25 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   const treeData = useMemo<TreeProps['treeData']>(() => {
     const kw = orgSearch.trim().toLowerCase()
     const filtered = kw
-      ? orgs.filter(
+      ? orgsInTree.filter(
           (o) =>
             o.name.toLowerCase().includes(kw) || o.code.toLowerCase().includes(kw),
         )
-      : orgs
+      : orgsInTree
     // 保留匹配节点的祖先链，使树结构完整
     const visible = new Set<number>()
     for (const o of filtered) {
       let cur: OrganizationInfo | undefined = o
       while (cur) {
         visible.add(cur.id)
-        cur = cur.parent_id != null ? orgs.find((x) => x.id === cur!.parent_id) : undefined
+        cur =
+          cur.parent_id != null
+            ? orgsInTree.find((x) => x.id === cur!.parent_id)
+            : undefined
       }
     }
     const byParent = new Map<number | null, OrganizationInfo[]>()
-    for (const o of orgs) {
+    for (const o of orgsInTree) {
       if (kw && !visible.has(o.id)) continue
       const key = o.parent_id
       const arr = byParent.get(key)
@@ -252,16 +286,20 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
         title: `${o.name}（${o.code}）`,
         children: build(byParent.get(o.id)),
       }))
-    return build(byParent.get(null))
-  }, [orgs, orgSearch])
+    const roots =
+      rootOrgId !== undefined
+        ? orgsInTree.filter((o) => o.id === rootOrgId)
+        : orgsInTree.filter((o) => o.parent_id === null)
+    return build(roots)
+  }, [orgsInTree, orgSearch, rootOrgId])
 
   const parentOptions = useMemo(
     () =>
-      orgs.map((o) => ({
+      orgsInTree.map((o) => ({
         value: o.id,
         title: `${o.name}（${o.code}）`,
       })),
-    [orgs],
+    [orgsInTree],
   )
 
   const positionOptions = useMemo(
@@ -270,8 +308,8 @@ export default function OrgAdminView({ uiKey = 'admin_m3' }: OrgAdminViewProps) 
   )
 
   const selectedOrg = useMemo(
-    () => orgs.find((o) => o.id === selectedId) ?? null,
-    [orgs, selectedId],
+    () => orgsInTree.find((o) => o.id === selectedId) ?? null,
+    [orgsInTree, selectedId],
   )
 
   // 当前成员页内的用户 ID → 姓名 / 任职组织（均走会话缓存，相同 ID 不重复请求）

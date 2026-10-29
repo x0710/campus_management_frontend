@@ -8,36 +8,103 @@
  *   待审核申报（条） 前端用 GET /api/party-scores + /api/approvals 合成党建加分审批步骤，
  *                   按 status=waiting / pending 各取一页后合计条数；
  *                   底层接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
- *
- * 平均分与等级分布后端暂无对应接口，仍为模拟数据，故本页保留模拟数据提示。
+ *   平均分          GET /api/party/scores/organization-average?organization_id=…&recursive=true
+ *   等级分布        前端拉取支部成员 uid，再经 GET /api/party/scores 批量查询分数后按等级统计
  *
  * 卡片跳转：党员总数 → 支部管理（branch_m5），待审核申报 → 审核管理（branch_m3）。
  */
-import { Alert } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { queryPartyScoreApprovals } from '../../api/partyScores'
+import { listSubsidiaries, queryOrgMembers } from '../../api/organizations'
+import {
+  getPartyScoreOrganizationAverage,
+  getPartyScoreTotals,
+  queryPartyScoreApprovals,
+} from '../../api/partyScores'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
+import { formatPartyScoreTotal, getPartyScoreGrade, toPartyScoreTotal } from '../../utils/partyScore'
 
 /** 待审核申报统计单页条数：底层审批步骤接口无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
 const APPROVAL_TODO_PAGE_SIZE = 100
 
-/** 平均分（模拟数据，后端暂无接口） */
-const MOCK_AVG_SCORE = 82.4
+/** 支部成员单页拉取条数 */
+const BRANCH_MEMBER_PAGE_SIZE = 100
 
-/** 等级分布（模拟数据，后端暂无接口；各等级人数合计与党员总数保持一致） */
-const MOCK_DISTRIBUTION: { key: string; tone: string; count: number }[] = [
-  { key: 'branch.grade_pioneer', tone: 'pioneer', count: 32 },
-  { key: 'branch.grade_demonstration', tone: 'demonstration', count: 58 },
-  { key: 'branch.grade_progress', tone: 'progress', count: 26 },
-  { key: 'branch.grade_warning', tone: 'warning', count: 12 },
+interface GradeDistributionItem {
+  key: string
+  tone: 'pioneer' | 'demonstration' | 'progress' | 'warning'
+  count: number
+}
+
+const GRADE_DISTRIBUTION_ITEMS: Omit<GradeDistributionItem, 'count'>[] = [
+  { key: 'branch.grade_pioneer', tone: 'pioneer' },
+  { key: 'branch.grade_demonstration', tone: 'demonstration' },
+  { key: 'branch.grade_progress', tone: 'progress' },
+  { key: 'branch.grade_warning', tone: 'warning' },
 ]
+
+/** 收集组织及其全部下级组织 ID */
+async function collectOrgIds(rootId: number): Promise<number[]> {
+  const ids = [rootId]
+  const queue = [rootId]
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (current === undefined) continue
+    const children = await listSubsidiaries(current)
+    for (const child of children) {
+      ids.push(child.id)
+      queue.push(child.id)
+    }
+  }
+  return ids
+}
+
+/** 收集多个组织下的去重成员 uid */
+async function collectMemberIds(orgIds: number[]): Promise<number[]> {
+  const memberIds = new Set<number>()
+  for (const orgId of orgIds) {
+    for (let page = 1; ; page += 1) {
+      const res = await queryOrgMembers(
+        orgId,
+        { page, page_size: BRANCH_MEMBER_PAGE_SIZE },
+      )
+      for (const member of res.data) memberIds.add(member.user_id)
+      if (page >= res.total_pages) break
+    }
+  }
+  return [...memberIds]
+}
+
+/** 前端根据成员党建活动加分计算等级分布 */
+async function buildGradeDistribution(orgId: number): Promise<GradeDistributionItem[]> {
+  const orgIds = await collectOrgIds(orgId)
+  const memberIds = await collectMemberIds(orgIds)
+  const batchScores = await getPartyScoreTotals(memberIds)
+  const scoreMap = new Map<number, string>()
+  for (const [uid, score] of batchScores) {
+    scoreMap.set(uid, score)
+  }
+
+  const counts = new Map<string, number>()
+  for (const item of GRADE_DISTRIBUTION_ITEMS) counts.set(item.key, 0)
+  for (const uid of memberIds) {
+    const total = toPartyScoreTotal(scoreMap.get(uid) ?? '0') ?? 0
+    const grade = getPartyScoreGrade(total).grade
+    const key = `branch.grade_${grade}` as const
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+
+  return GRADE_DISTRIBUTION_ITEMS.map((item) => ({
+    ...item,
+    count: counts.get(item.key) ?? 0,
+  }))
+}
 
 export default function BranchWorkbenchView() {
   const t = useT()
@@ -47,6 +114,10 @@ export default function BranchWorkbenchView() {
   const [members, setMembers] = useState<number | null>(null)
   /** 待审核申报条数（waiting + pending） */
   const [todoApprove, setTodoApprove] = useState<number | null>(null)
+  /** 本支部党建活动加分平均分（后端为字符串；null 表示无数据或加载失败） */
+  const [averageScore, setAverageScore] = useState<string | null>(null)
+  /** 等级分布（前端根据成员分数计算） */
+  const [distribution, setDistribution] = useState<GradeDistributionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,15 +125,23 @@ export default function BranchWorkbenchView() {
   const load = useCallback(async () => {
     try {
       const { orgId } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
-      const [memberTotal, waitingSteps, pendingSteps] = await Promise.all([
+      const [memberTotal, waitingSteps, pendingSteps, average, gradeDistribution] = await Promise.all([
         orgId === null
           ? Promise.resolve(0)
           : countOrgMemberTotal(orgId),
         queryPartyScoreApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
         queryPartyScoreApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
+        orgId === null
+          ? Promise.resolve({ average_score: null } as const)
+          : getPartyScoreOrganizationAverage({ organization_id: orgId, recursive: true }),
+        orgId === null
+          ? Promise.resolve([])
+          : buildGradeDistribution(orgId),
       ])
       setMembers(memberTotal)
       setTodoApprove(waitingSteps.length + pendingSteps.length)
+      setAverageScore(average.average_score)
+      setDistribution(gradeDistribution)
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
@@ -85,19 +164,18 @@ export default function BranchWorkbenchView() {
   }, [load])
 
   // 横向柱状图以最高人数为满长基准
-  const maxCount = Math.max(...MOCK_DISTRIBUTION.map((item) => item.count))
+  const maxCount = Math.max(0, ...distribution.map((item) => item.count))
   /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
   const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
+  const averageText = loading ? '—' : formatPartyScoreTotal(averageScore)
 
   return (
     <div className="party-view">
-      {error ? (
+      {error && (
         <ErrorState
           message={error}
           onRetry={retry}
         />
-      ) : (
-        <Alert type="warning" showIcon title={t('branch.mockHint')} />
       )}
 
       {/* 本支部概况 */}
@@ -121,7 +199,7 @@ export default function BranchWorkbenchView() {
             <div className="branch-overview-item">
               <div className="branch-overview-label">{t('branch.statAvgScore')}</div>
               <div className="branch-overview-value">
-                {MOCK_AVG_SCORE}
+                {averageText}
                 <span className="branch-overview-unit">{t('party.scoreUnit')}</span>
               </div>
             </div>
@@ -136,7 +214,7 @@ export default function BranchWorkbenchView() {
         </header>
         <div className="panel-card-body">
           <div className="branch-chart-list">
-            {MOCK_DISTRIBUTION.map((item) => (
+            {distribution.map((item) => (
               <div key={item.tone} className="branch-chart-row">
                 <span className="branch-chart-label">{t(item.key)}</span>
                 <div className="branch-chart-track">

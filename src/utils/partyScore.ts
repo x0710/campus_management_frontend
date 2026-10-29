@@ -38,6 +38,30 @@ export function isNegativePartyScore(score: string | null | undefined): boolean 
   return Number.isFinite(numeric) && numeric < 0
 }
 
+/**
+ * 把后端返回的项目加分转换为前端展示的党建总分。
+ * 后端不返回基础分，因此总分 = 基础分 70 + 项目加分（项目加分上限 30），总分最高 100。
+ * @param score 后端项目加分 DecimalText（字符串）或空值
+ * @returns 党建总分；空值或非法数字返回 null
+ */
+export function toPartyScoreTotal(score: string | null | undefined): number | null {
+  if (score === null || score === undefined || score.trim() === '') return null
+  const raw = Number(score)
+  if (!Number.isFinite(raw)) return null
+  const bonus = Math.min(raw, PARTY_SCORE_MAX_BONUS)
+  return Math.min(PARTY_SCORE_BASE + bonus, PARTY_SCORE_MAX_TOTAL)
+}
+
+/**
+ * 党建总分展示文本：总分可计算时返回字符串，空值返回占位符。
+ * @param score 后端项目加分 DecimalText（字符串）或空值
+ * @returns 党建总分文本（如 "75"；空值返回 "—"）
+ */
+export function formatPartyScoreTotal(score: string | null | undefined): string {
+  const total = toPartyScoreTotal(score)
+  return total === null ? '—' : String(total)
+}
+
 /** 党员先锋指数汇总结果 */
 export interface PartyScoreSummary {
   /** 总分（基础分 + 加分项，最高不超过上限） */

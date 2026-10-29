@@ -31,6 +31,30 @@ export const ACADEMY_ANCESTOR_DEPTHS: readonly number[] = [2]
 export const SCHOOL_ANCESTOR_DEPTHS: readonly number[] = [0]
 
 /**
+ * 党委学校端「各二级党委排名」使用的学院容器组织 ID。
+ *
+ * 实际组织树中，各二级学院党委挂在 ID 为 2 的「学院党委」容器节点下，
+ * 而不是直接挂在根组织（ID 为 1）下；因此学校端总览排名需按 2 拉取直接下级。
+ */
+export const SCHOOL_COLLEGE_PARENT_ORG_ID = 2
+
+/**
+ * 党员端首页顶部组织路径的截止节点 ID。
+ *
+ * 与学校端排名一致，该节点为 ID=2 的「学院党委」容器；首页只展示该节点之前
+ * （即更靠近根节点）的组织名称，并用 `|` 拼接，避免显示班级等过细的任职组织。
+ */
+export const PARTY_HOME_ORG_PATH_STOP_ID = 2
+
+/**
+ * 党员端首页组织路径无法查询到组织树时的兜底名称。
+ *
+ * 普通党员 / 学生可能没有 `organization.read` 权限，但首页仍需展示「组织 2 之前」的
+ * 根组织名称；该校组织树根节点固定为井冈山大学。
+ */
+export const PARTY_HOME_ORG_FALLBACK_NAME = '井冈山大学'
+
+/**
  * 组织成员「按用户 ID 搜索」定位时，最多向后扫描的成员分页页数。
  * 目标成员不在第 1 页时会按页扫描以跳到其所在页；设上限避免超大组织搜索时请求过多
  * （每页固定取 100 行，满足代码要求 12；扫描走会话缓存，重复搜索不再发起请求）。
