@@ -16,6 +16,7 @@ import { formatDateTime } from '../utils/datetime'
 import { formatPartyScore } from '../utils/partyScore'
 import AttachmentLinks from './AttachmentLinks'
 import ErrorState from './ErrorState'
+import PartyScoreApprovalRecords from './PartyScoreApprovalRecords'
 
 interface PartyScoreDetailModalProps {
   /** 当前要展示详情的记录；null 表示关闭弹窗 */
@@ -73,6 +74,7 @@ export default function PartyScoreDetailModal({
       footer={<Button onClick={onClose}>{t('partyDeclaration.close')}</Button>}
     >
       {detail ? (
+        <>
         <Descriptions column={1} size="small" bordered>
           <Descriptions.Item label={t('partyDeclaration.colId')}>
             {detail.id}
@@ -87,6 +89,9 @@ export default function PartyScoreDetailModal({
           </Descriptions.Item>
           <Descriptions.Item label={t('partyDeclaration.colApproved')}>
             {formatPartyScore(detail.approved_score)}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('partyDeclaration.fieldReason')}>
+            {detail.reason?.trim() ? detail.reason : '—'}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyDeclaration.detailInstance')}>
             {detail.approval_instance_id}
@@ -110,6 +115,13 @@ export default function PartyScoreDetailModal({
             )}
           </Descriptions.Item>
         </Descriptions>
+        <div className="party-declaration-records">
+          <div className="party-declaration-records-title">
+            {t('partyDeclaration.flowSectionTitle')}
+          </div>
+          <PartyScoreApprovalRecords instanceId={detail.approval_instance_id} force />
+        </div>
+        </>
       ) : null}
     </Modal>
   )

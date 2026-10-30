@@ -1143,6 +1143,30 @@ h3 {
   font-weight: 600;
 }
 
+/* 申请理由单独整行展示：大段文字不再被 Descriptions 单元格压缩 */
+.party-approval-reason-block {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--editor-bg);
+}
+
+.party-approval-reason-label {
+  padding: 10px 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.party-approval-reason-content {
+  padding: 8px 12px 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+}
+
 /* 右栏审批表单：撑满卡片高度，操作按钮紧随审批意见展示 */
 .party-approval-action-form {
   display: flex;
@@ -1296,6 +1320,22 @@ h3 {
   border-radius: 10px;
   color: var(--ink-secondary);
   text-align: center;
+}
+
+/* 审批详情：加分申请详情加载失败提示 */
+.party-approval-detail-alert {
+  margin-bottom: 16px;
+}
+
+/* 党员端成绩申报/成绩记录详情里的「审批意见」区块 */
+.party-declaration-records {
+  margin-top: 16px;
+}
+
+.party-declaration-records-title {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 /* 右栏操作按钮：取消 / 驳回 / 确认通过统一右对齐 */

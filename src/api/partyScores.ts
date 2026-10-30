@@ -133,7 +133,7 @@ export function getPartyScoreTotals(
 
 /**
  * 把分页返回的加分申请摘要补齐为可直接展示的完整字段。
- * 后端列表摘要可能不返回 template_id / created_at，详情接口才会返回这两个字段；
+ * 后端列表摘要可能不返回 template_id / created_at / updated_at，详情接口才会返回这些字段；
  * 这里仅对缺少任一展示字段的行调用 GET /api/party-scores/{id} 补齐（详情走会话缓存），
  * 单个详情失败时保留原始摘要，避免整页因某一行失败而不可用。
  * @param rows 列表摘要数组（必填）
@@ -150,7 +150,7 @@ export async function hydratePartyScoreRows(
     const chunk = rows.slice(start, start + PARTY_SCORE_DETAIL_CONCURRENCY)
     const enriched = await Promise.all(
       chunk.map(async (row) => {
-        if (row.template_id !== undefined && row.created_at) return row
+        if (row.template_id !== undefined && row.created_at && row.updated_at) return row
         try {
           const detail = await getPartyScore(row.id, force)
           return { ...row, ...detail }
@@ -270,6 +270,8 @@ export function approvePartyScore(id: number, data: PartyScoreApproveRequest): P
   return http.put(`/party-scores/approvals/${id}/approve`, data).then((res) => {
     invalidate('GET /party-scores')
     invalidate('GET /approvals?')
+    // 审批意见记录（GET /api/approvals/{id}/records）随操作变化，同步失效
+    invalidate('GET /approvals/')
     return res.data
   })
 }
@@ -285,6 +287,8 @@ export function rejectPartyScore(id: number, data: PartyScoreRejectRequest): Pro
   return http.put(`/party-scores/approvals/${id}/reject`, data).then((res) => {
     invalidate('GET /party-scores')
     invalidate('GET /approvals?')
+    // 审批意见记录（GET /api/approvals/{id}/records）随操作变化，同步失效
+    invalidate('GET /approvals/')
     return res.data
   })
 }
@@ -300,6 +304,8 @@ export function transferPartyScore(id: number, data: PartyScoreTransferRequest):
   return http.put(`/party-scores/approvals/${id}/transfer`, data).then((res) => {
     invalidate('GET /party-scores')
     invalidate('GET /approvals?')
+    // 审批意见记录（GET /api/approvals/{id}/records）随操作变化，同步失效
+    invalidate('GET /approvals/')
     return res.data
   })
 }

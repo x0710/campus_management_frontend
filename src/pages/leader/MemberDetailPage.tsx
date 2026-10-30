@@ -9,11 +9,16 @@
  * 管理端用户与账户 admin_m1 / 管理端组织架构 admin_m3 / 党委学校端 school_m2）时
  * 在「基本信息」页额外提供「编辑成员信息」入口，复用 admin/UserEditPanel 修改资料、角色与组织任职。
  *
- * 六个 Tab（党委支部端 / 学院端 / 学校端的组织管理只保留前三个，
+ * 六个 Tab（党委支部端 / 学院端 / 学校端的组织管理只保留前两个，
  * 见 MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES）：
  *   1. 基本信息：GET /api/users/{id}（可编辑来源另提供资料/角色/组织任职编辑）
+ *      （党委支部端 / 学院端 / 学校端额外展示「党员信息」卡片：党员编号、所属支部、
+ *       政治面貌、入党时间，与党员端「我的」页展示口径一致）
  *   2. 详细信息：GET /api/profile-details?user_id=成员
+ *      （党委支部端 / 学院端 / 学校端不展示该 Tab，见 MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES）
  *   3. 成绩信息（可编辑）：GET /api/examinations?uid=成员 → 点击行编辑 → PATCH /api/examinations/{id}
+ *      （党委支部端 / 学院端 / 学校端改为「获得加分总数」= 基础分 70 + 党建活动加分，
+ *       并分页展示该成员全部加分申请 GET /api/party-scores?user_id=成员）
  *   4. 请假信息：GET /api/approvals?applicant_id=成员 取审批实例 → GET /api/leaves/{id} 取详情
  *   5. 违规信息（查看详细 + 编辑）：GET /api/violations?user_id=成员 → GET/PATCH /api/violations/{id}
  *   6. 奖学金及补助：GET /api/rewardings?uid=成员（只读）
@@ -32,10 +37,12 @@ import {
   PlusOutlined,
   ReloadOutlined,
   TeamOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
   App as AntdApp,
+  Avatar,
   Button,
   Card,
   DatePicker,
@@ -89,6 +96,14 @@ import {
   updateProfileDetail,
 } from '../../api/profileDetails'
 import type { ProfileDetail } from '../../api/types/profileDetails'
+import {
+  getPartyScore,
+  getPartyScoreTotals,
+  hydratePartyScoreRows,
+  queryPartyScores,
+} from '../../api/partyScores'
+import type { PartyScore, PartyScoreDetail } from '../../api/types/partyScores'
+import PartyScoreApprovalRecords from '../../components/PartyScoreApprovalRecords'
 import { getUser } from '../../api/users'
 import type { UserDetail } from '../../api/types/users'
 import {
@@ -119,9 +134,12 @@ import {
   MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES,
   MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES,
   MEMBER_DETAIL_PAGE_SIZE,
+  MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES,
   MEMBER_DETAIL_READONLY_FROM_MODULES,
 } from '../../config/leaderOrg'
 import { LEAVE_STATUS_COLOR, LEAVE_TYPE_COLOR } from '../../config/leave'
+import { PARTY_SCORE_BASE } from '../../config/partyDeclaration'
+import { PARTY_POLITICAL_STATUS_NAMES } from '../../config/partyProfile'
 import {
   REWARDING_AMOUNT_MAX_YUAN,
   REWARDING_AMOUNT_MIN_YUAN,
@@ -141,6 +159,7 @@ import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import { formatCentsAsYuan, yuanToCents } from '../../utils/money'
+import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 import ErrorState from '../../components/ErrorState'
 import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
 
@@ -218,6 +237,9 @@ export default function MemberDetailPage() {
   const canEditBasic = MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES.includes(fromModuleKey)
   // 党委支部端 / 学院端 / 学校端的组织管理不需要请假、违规与奖助信息
   const hideExtraTabs = MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES.includes(fromModuleKey)
+  // 党委支部端 / 学院端 / 学校端：不展示「详细信息」，并把「成绩信息」替换为
+  // 「获得加分总数（基础分 70 + 党建活动加分）+ 该成员全部加分申请」
+  const partyScoreView = MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES.includes(fromModuleKey)
   const userId = Number(uid)
 
   const [user, setUser] = useState<UserDetail | null>(null)
@@ -327,21 +349,32 @@ export default function MemberDetailPage() {
                     locale={locale}
                     t={t}
                     canEdit={canEditBasic}
+                    showPartyInfo={partyScoreView}
                     onEdit={(section) => void openEdit(section)}
                   />
                 ),
               },
-              {
-                key: 'profile',
-                label: t('memberDetail.tabProfile'),
-                children: (
-                  <ProfileDetailTab uid={userId} locale={locale} t={t} readOnly={readOnly} />
-                ),
-              },
+              ...(partyScoreView
+                ? []
+                : [
+                    {
+                      key: 'profile',
+                      label: t('memberDetail.tabProfile'),
+                      children: (
+                        <ProfileDetailTab uid={userId} locale={locale} t={t} readOnly={readOnly} />
+                      ),
+                    },
+                  ]),
               {
                 key: 'grades',
-                label: t('memberDetail.tabGrades'),
-                children: <GradesTab uid={userId} t={t} readOnly={readOnly} />,
+                label: partyScoreView
+                  ? t('memberDetail.tabPartyScoreTotal')
+                  : t('memberDetail.tabGrades'),
+                children: partyScoreView ? (
+                  <PartyScoreTab uid={userId} locale={locale} t={t} />
+                ) : (
+                  <GradesTab uid={userId} t={t} readOnly={readOnly} />
+                ),
               },
               ...(hideExtraTabs
                 ? []
@@ -404,7 +437,7 @@ export default function MemberDetailPage() {
   )
 }
 
-/** 基本信息面板：用户资料 + 系统角色 + 组织任职（角色/组织在本面板内按需加载） */
+/** 基本信息面板：用户资料 + 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载） */
 function BasicInfoPanel({
   user,
   loading,
@@ -412,6 +445,7 @@ function BasicInfoPanel({
   locale,
   t,
   canEdit,
+  showPartyInfo,
   onEdit,
 }: {
   user: UserDetail | null
@@ -421,6 +455,8 @@ function BasicInfoPanel({
   t: TranslateFn
   /** 是否展示编辑入口（管理端 / 党委学校端等来源为 true） */
   canEdit: boolean
+  /** 是否展示「党员信息」卡片（党委支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） */
+  showPartyInfo: boolean
   /** 打开指定区块的编辑弹窗（复用 admin/UserEditPanel；一次只编辑一个部分） */
   onEdit: (section: EditSection) => void
 }) {
@@ -478,10 +514,22 @@ function BasicInfoPanel({
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />
   if (!user) return <Alert type="info" showIcon title={t('memberDetail.loadUserFailed')} />
 
+  // 党员信息（党委支部端 / 学院端 / 学校端）：展示口径与党员端「我的」页一致。
+  // 所属支部取第一项任职组织；政治面貌取任职职位名中的党员身份（书记等其他职位忽略）；
+  // 党员编号 / 入党时间后端暂无接口，统一显示「暂无数据」。
+  const positionNameOf = (uo: OrgItem): string =>
+    (uo.positionDetail?.name ?? (uo.position ? positionNames.get(uo.position) : '') ?? '').trim()
+  const partyBranch =
+    orgs.map((uo) => uo.organization_name?.trim() ?? '').find((name) => name.length > 0) ??
+    t('common.noData')
+  const politicalStatus = orgs
+    .map(positionNameOf)
+    .find((name) => PARTY_POLITICAL_STATUS_NAMES.includes(name))
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* 具备用户管理权限的来源（管理端 / 党委学校端）提供三个独立编辑入口：
-          基本信息（资料表格上方，资料本身无独立卡片标题）、系统角色与组织任职（各自卡片右上角） */}
+          基本信息（资料卡片上方工具栏）、系统角色与组织任职（各自卡片右上角） */}
       {canEdit && (
         <div className="approval-toolbar approval-toolbar-right">
           <Tooltip title={t('memberDetail.editBasicHint')}>
@@ -491,33 +539,102 @@ function BasicInfoPanel({
           </Tooltip>
         </div>
       )}
-      <Descriptions
-        bordered
-        size="small"
-        column={2}
-        items={[
-          { key: 'uid', label: t('memberDetail.fieldUid'), children: user.id },
-          { key: 'name', label: t('profile.name'), children: user.name ?? t('profile.noData') },
-          { key: 'gender', label: t('profile.gender'), children: genderLabel },
-          { key: 'email', label: t('profile.email'), children: user.email ?? t('profile.noData') },
-          { key: 'phone', label: t('profile.phone'), children: user.phone ?? t('profile.noData') },
-          {
-            key: 'birthday',
-            label: t('profile.birthday'),
-            children: user.birthday ?? t('profile.noData'),
-          },
-          {
-            key: 'created_at',
-            label: t('profile.createdAt'),
-            children: formatDateTime(user.created_at, locale),
-          },
-          {
-            key: 'updated_at',
-            label: t('memberDetail.fieldUpdatedAt'),
-            children: formatDateTime(user.updated_at, locale),
-          },
-        ]}
-      />
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 16,
+          alignItems: 'stretch',
+          width: '100%',
+        }}
+      >
+        {/* 头像（avatar 为图片地址），与党员端「我的」/ 学生端个人信息展示一致 */}
+        <Card size="small" title={t('profile.avatar')} style={{ flex: '0 0 168px' }}>
+          {user.avatar && user.avatar.trim() ? (
+            <Avatar shape="square" size={96} src={user.avatar} />
+          ) : (
+            <Avatar shape="square" size={96} icon={<UserOutlined />} />
+          )}
+        </Card>
+        <Card
+          size="small"
+          title={t('profile.basicInfo')}
+          style={{ flex: '1 1 480px', minWidth: 0 }}
+        >
+          <Descriptions
+            bordered
+            size="small"
+            column={2}
+            items={[
+              { key: 'uid', label: t('memberDetail.fieldUid'), children: user.id },
+              { key: 'name', label: t('profile.name'), children: user.name ?? t('profile.noData') },
+              { key: 'gender', label: t('profile.gender'), children: genderLabel },
+              {
+                key: 'email',
+                label: t('profile.email'),
+                children: user.email ?? t('profile.noData'),
+              },
+              {
+                key: 'phone',
+                label: t('profile.phone'),
+                children: user.phone ?? t('profile.noData'),
+              },
+              {
+                key: 'birthday',
+                label: t('profile.birthday'),
+                children: user.birthday ?? t('profile.noData'),
+              },
+              {
+                key: 'created_at',
+                label: t('profile.createdAt'),
+                children: formatDateTime(user.created_at, locale),
+              },
+              {
+                key: 'updated_at',
+                label: t('memberDetail.fieldUpdatedAt'),
+                children: formatDateTime(user.updated_at, locale),
+              },
+            ]}
+          />
+        </Card>
+      </div>
+
+      {/* 党员信息（党委支部端 / 学院端 / 学校端）：与党员端「我的」页展示一致的党员端扩展信息 */}
+      {showPartyInfo && (
+        <Card size="small" title={t('partyProfile.partyInfoTitle')}>
+          {extrasLoading ? (
+            <Skeleton active paragraph={{ rows: 1 }} />
+          ) : (
+            <Descriptions
+              bordered
+              size="small"
+              column={2}
+              items={[
+                {
+                  key: 'member_no',
+                  label: t('partyProfile.fieldMemberNo'),
+                  children: t('common.noData'),
+                },
+                {
+                  key: 'branch',
+                  label: t('partyProfile.fieldBranch'),
+                  children: partyBranch,
+                },
+                {
+                  key: 'political_status',
+                  label: t('partyProfile.fieldPoliticalStatus'),
+                  children: politicalStatus ?? t('partyProfile.politicalNotFound'),
+                },
+                {
+                  key: 'join_date',
+                  label: t('partyProfile.fieldJoinDate'),
+                  children: t('common.noData'),
+                },
+              ]}
+            />
+          )}
+        </Card>
+      )}
 
       {/* 系统角色（编辑入口置于卡片右上角） */}
       <Card
@@ -1313,6 +1430,311 @@ function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly
               <Input.TextArea rows={3} maxLength={500} showCount />
             </Form.Item>
           </Form>
+        </Spin>
+      </Modal>
+    </>
+  )
+}
+
+/**
+ * 「获得加分总数」Tab（党委支部端 / 学院端 / 学校端成员详情专用）：
+ * 顶部展示「基础分 70 + 党建活动加分 = 获得加分总数」；
+ * 下方分页列出该成员的全部加分申请（GET /api/party-scores?user_id=成员），
+ * 点击行通过 GET /api/party-scores/{id} 查看详情（含附件下载地址，代码要求 14）。
+ */
+function PartyScoreTab({
+  uid,
+  t,
+  locale,
+}: {
+  uid: number
+  t: TranslateFn
+  locale: 'zh' | 'en'
+}) {
+  const reportError = useErrorFeedback()
+
+  const [records, setRecords] = useState<PartyScore[]>([])
+  const [total, setTotal] = useState(0)
+  const [bonusText, setBonusText] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [reload, setReload] = useState({ seq: 0, force: false })
+
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detail, setDetail] = useState<PartyScoreDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // 该成员的全部加分申请（分页最多 100 行，代码要求 12）
+      const res = await queryPartyScores(
+        { user_id: uid, page, page_size: MEMBER_DETAIL_PAGE_SIZE },
+        reload.force,
+      )
+      // 列表摘要可能缺 template_id / created_at / updated_at，详情接口才返回完整字段；
+      // 这里补齐后再交给表格展示，确保创建时间与更新时间可见。
+      setRecords(await hydratePartyScoreRows(res.data, reload.force))
+      setTotal(res.total)
+      try {
+        // 加分总计接口失败时退回「本页已核定分数之和」，保证总数区域仍可展示
+        const totals = await getPartyScoreTotals([uid], reload.force)
+        const hit = totals.find(([id]) => id === uid)
+        setBonusText(hit ? hit[1] : '0')
+      } catch (err) {
+        const sum = res.data.reduce((acc, record) => {
+          const value = Number(record.approved_score)
+          return Number.isFinite(value) ? acc + value : acc
+        }, 0)
+        setBonusText(String(sum))
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+          reportError(err)
+        }
+      }
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        setError(extractErrorReason(err, t))
+      }
+    } finally {
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, page, reload.seq, reload.force])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  /** 获得加分总数 = 基础分 70 + 党建活动加分合计 */
+  const totalText = useMemo(() => {
+    if (bonusText === null) return '—'
+    const bonus = Number(bonusText)
+    return Number.isFinite(bonus) ? String(PARTY_SCORE_BASE + bonus) : '—'
+  }, [bonusText])
+
+  const openDetail = useCallback(
+    async (record: PartyScore) => {
+      setDetailOpen(true)
+      setDetail(null)
+      setDetailLoading(true)
+      try {
+        setDetail(await getPartyScore(record.id, true))
+      } catch (err) {
+        reportError(err)
+        setDetailOpen(false)
+      } finally {
+        setDetailLoading(false)
+      }
+    },
+    [reportError],
+  )
+
+  const columns = useMemo<ColumnsType<PartyScore>>(
+    () => [
+      {
+        title: t('memberDetail.partyScoreColId'),
+        dataIndex: 'id',
+        key: 'id',
+        width: 100,
+      },
+      {
+        title: t('memberDetail.partyScoreColRequested'),
+        dataIndex: 'requested_score',
+        key: 'requested_score',
+        width: 110,
+        align: 'center',
+        render: (v: string) => (
+          <span style={{ fontWeight: 600, color: isNegativePartyScore(v) ? '#cf1322' : '#389e0d' }}>
+            {formatPartyScore(v)}
+          </span>
+        ),
+      },
+      {
+        title: t('memberDetail.partyScoreColApproved'),
+        dataIndex: 'approved_score',
+        key: 'approved_score',
+        width: 110,
+        align: 'center',
+        render: (v: string | null) => (
+          <span style={{ fontWeight: 600, color: isNegativePartyScore(v) ? '#cf1322' : '#389e0d' }}>
+            {formatPartyScore(v)}
+          </span>
+        ),
+      },
+      {
+        title: t('memberDetail.partyScoreColInstance'),
+        dataIndex: 'approval_instance_id',
+        key: 'approval_instance_id',
+        width: 110,
+      },
+      {
+        title: t('memberDetail.partyScoreColCreatedAt'),
+        dataIndex: 'created_at',
+        key: 'created_at',
+        width: 170,
+        render: (v: string) => formatDateTime(v, locale),
+      },
+      {
+        title: t('memberDetail.partyScoreColUpdatedAt'),
+        dataIndex: 'updated_at',
+        key: 'updated_at',
+        width: 170,
+        render: (v: string) => formatDateTime(v, locale),
+      },
+    ],
+    [t, locale],
+  )
+
+  return (
+    <>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+        <Tooltip title={t('memberDetail.partyScoreRefreshHint')}>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+          >
+            {t('common.refresh')}
+          </Button>
+        </Tooltip>
+      </div>
+
+      <Descriptions
+        bordered
+        size="small"
+        column={3}
+        style={{ marginBottom: 12 }}
+        items={[
+          {
+            key: 'base',
+            label: t('memberDetail.partyScoreBaseScore'),
+            children: PARTY_SCORE_BASE,
+          },
+          {
+            key: 'bonus',
+            label: t('memberDetail.partyScoreBonusScore'),
+            children: bonusText === null ? '—' : formatPartyScore(bonusText),
+          },
+          {
+            key: 'total',
+            label: t('memberDetail.partyScoreTotalLabel'),
+            children: <Text strong>{totalText}</Text>,
+          },
+        ]}
+      />
+
+      {error ? (
+        <ErrorState
+          message={error}
+          onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
+        />
+      ) : (
+        <Table<PartyScore>
+          rowKey="id"
+          size="small"
+          loading={loading}
+          columns={columns}
+          dataSource={records}
+          locale={{ emptyText: t('memberDetail.partyScoreEmpty') }}
+          scroll={{ x: 900 }}
+          onRow={(record) => ({
+            onClick: () => void openDetail(record),
+            title: t('memberDetail.partyScoreRowClickHint'),
+            style: { cursor: 'pointer' },
+          })}
+          pagination={{
+            current: page,
+            pageSize: MEMBER_DETAIL_PAGE_SIZE,
+            total,
+            showSizeChanger: false,
+            showQuickJumper: true,
+            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            onChange: (p: number) => setPage(p),
+          }}
+        />
+      )}
+
+      <Modal
+        open={detailOpen}
+        title={t('memberDetail.partyScoreDetailTitle')}
+        footer={null}
+        onCancel={() => setDetailOpen(false)}
+        destroyOnHidden
+      >
+        <Spin spinning={detailLoading}>
+          {detail && (
+            <>
+              <Descriptions
+                bordered
+                size="small"
+                column={1}
+                items={[
+                  {
+                    key: 'id',
+                    label: t('memberDetail.partyScoreColId'),
+                    children: detail.id,
+                  },
+                  {
+                    key: 'template',
+                    label: t('memberDetail.partyScoreTemplate'),
+                    children: detail.template_id,
+                  },
+                  {
+                    key: 'requested',
+                    label: t('memberDetail.partyScoreColRequested'),
+                    children: formatPartyScore(detail.requested_score),
+                  },
+                  {
+                    key: 'approved',
+                    label: t('memberDetail.partyScoreColApproved'),
+                    children: formatPartyScore(detail.approved_score),
+                  },
+                  {
+                    key: 'reason',
+                    label: t('memberDetail.partyScoreReason'),
+                    children: detail.reason?.trim() ? detail.reason : '—',
+                  },
+                  {
+                    key: 'instance',
+                    label: t('memberDetail.partyScoreColInstance'),
+                    children: detail.approval_instance_id,
+                  },
+                  {
+                    key: 'created',
+                    label: t('memberDetail.partyScoreColCreatedAt'),
+                    children: formatDateTime(detail.created_at, locale),
+                  },
+                  {
+                    key: 'updated',
+                    label: t('memberDetail.partyScoreColUpdatedAt'),
+                    children: formatDateTime(detail.updated_at, locale),
+                  },
+                  {
+                    key: 'files',
+                    label: t('memberDetail.partyScoreFiles'),
+                    children: (detail.file_urls ?? []).length ? (
+                      <Space direction="vertical" size={4}>
+                        {(detail.file_urls ?? []).map((url, idx) => (
+                          <a key={`${url}-${idx}`} href={url} target="_blank" rel="noreferrer">
+                            {t('memberDetail.partyScoreFileItem', { n: idx + 1 })}
+                          </a>
+                        ))}
+                      </Space>
+                    ) : (
+                      t('memberDetail.partyScoreNoFiles')
+                    ),
+                  },
+                ]}
+              />
+              <section className="party-approval-section" style={{ marginTop: 16 }}>
+                <h4 className="party-approval-section-title">
+                  {t('memberDetail.partyScoreApprovalFlow')}
+                </h4>
+                <PartyScoreApprovalRecords instanceId={detail.approval_instance_id} force />
+              </section>
+            </>
+          )}
         </Spin>
       </Modal>
     </>

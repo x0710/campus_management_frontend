@@ -29,7 +29,7 @@ import { invalidate } from '../api/cache'
 import { changeMyPassword, getCurrentUser, getMyRoles } from '../api/auth'
 import { getMyProfile } from '../api/users'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
-import { getAccessiblePortalKeys, getPortal, PORTAL_PROFILE_MODULE_KEYS, PORTALS, type PortalKey } from '../config/portals'
+import { getAccessiblePortalKeys, getPortal, PORTAL_PROFILE_MODULE_KEYS, PORTALS, type PortalKey, type PortalRole } from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
@@ -45,6 +45,16 @@ interface ResetPasswordForm {
   old_password: string
   new_password: string
   confirm_password: string
+}
+
+/** 是否为超级管理员角色：优先匹配后端 code，兼顾中文角色名兜底 */
+function isSuperAdminRole(role: PortalRole): boolean {
+  const code = role.code.trim().toLowerCase()
+  return (
+    code === 'super_admin' ||
+    role.name.includes('超级管理员') ||
+    role.name.includes('超管')
+  )
 }
 
 /** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
@@ -65,6 +75,8 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const [realName, setRealName] = useState<string | null>(null)
   // 当前用户可访问的门户 key：由角色查询结果映射而来
   const [portalKeys, setPortalKeys] = useState<PortalKey[]>([])
+  // 是否为超级管理员：仅超管显示左上角门户选择按钮
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   // 「重置密码」弹窗：本人改密（需旧密码校验）
   const [resetOpen, setResetOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -90,6 +102,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       .then((roles) => {
         if (cancelled) return
         // 按角色过滤门户：党员端始终可选，支部端 / 学院端 / 学校端仅对应书记角色可见
+        setIsSuperAdmin(roles.some(isSuperAdminRole))
         setPortalKeys(getAccessiblePortalKeys(roles))
       })
       .catch(() => {
@@ -176,6 +189,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const refreshPortalKeys = async () => {
     try {
       const roles = await getMyRoles(true)
+      setIsSuperAdmin(roles.some(isSuperAdminRole))
       setPortalKeys(getAccessiblePortalKeys(roles))
     } catch {
       // 刷新失败时保留原菜单，不打断用户操作
@@ -239,26 +253,28 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           </span>
           <span className="header-brand-name">{t('common.appName')}</span>
         </div>
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: portalSwitchItems,
-            selectable: true,
-            selectedKeys: currentPortalKey ? [`portal:${currentPortalKey}`] : [],
-            onClick: ({ key }: { key: string }) => {
-              const portalKey = key.replace('portal:', '')
-              if (getPortal(portalKey)) {
-                navigate(`/portal/${portalKey}`)
-              }
-            },
-          }}
-        >
-          <Button type="text" className="portal-switcher">
-            <span className="portal-switcher-icon">{currentPortal?.icon}</span>
-            <span className="portal-switcher-name">{currentPortalName}</span>
-            <DownOutlined className="portal-switcher-arrow" />
-          </Button>
-        </Dropdown>
+        {isSuperAdmin && (
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: portalSwitchItems,
+              selectable: true,
+              selectedKeys: currentPortalKey ? [`portal:${currentPortalKey}`] : [],
+              onClick: ({ key }: { key: string }) => {
+                const portalKey = key.replace('portal:', '')
+                if (getPortal(portalKey)) {
+                  navigate(`/portal/${portalKey}`)
+                }
+              },
+            }}
+          >
+            <Button type="text" className="portal-switcher">
+              <span className="portal-switcher-icon">{currentPortal?.icon}</span>
+              <span className="portal-switcher-name">{currentPortalName}</span>
+              <DownOutlined className="portal-switcher-arrow" />
+            </Button>
+          </Dropdown>
+        )}
         {left}
       </div>
 

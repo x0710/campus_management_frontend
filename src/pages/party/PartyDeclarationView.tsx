@@ -18,6 +18,7 @@ import {
   Button,
   Descriptions,
   Form,
+  Input,
   InputNumber,
   Modal,
   Select,
@@ -40,6 +41,7 @@ import type { PartyScore } from '../../api/types/partyScores'
 import AttachmentLinks from '../../components/AttachmentLinks'
 import AttachmentUploader from '../../components/AttachmentUploader'
 import ErrorState from '../../components/ErrorState'
+import PartyScoreApprovalRecords from '../../components/PartyScoreApprovalRecords'
 import {
   PARTY_DECLARATION_MAX_FILES,
   PARTY_DECLARATION_PAGE_SIZE,
@@ -58,6 +60,8 @@ interface DeclarationFormValues {
   template_id: number
   /** 申请加分（DecimalText 字符串，正数加分、负数减分） */
   requested_score: string
+  /** 申请理由 */
+  reason: string
   /** 附件文件 ID 列表（由 AttachmentUploader 上传 /api/files 后回填） */
   files?: number[]
 }
@@ -244,6 +248,7 @@ export default function PartyDeclarationView() {
       await createPartyScore({
         template_id: values.template_id,
         requested_score: values.requested_score,
+        reason: values.reason?.trim() ?? '',
         // files 为必填字段：无附件时传空数组，申请人由后端按登录身份确定
         files: values.files ?? [],
       })
@@ -298,6 +303,19 @@ export default function PartyDeclarationView() {
               >
                 {/* 后端分数为 DecimalText（字符串），用 stringMode 采集并原样提交 */}
                 <InputNumber style={{ width: 180 }} stringMode step="1" />
+              </Form.Item>
+
+              <Form.Item
+                name="reason"
+                label={t('partyDeclaration.fieldReason')}
+                rules={[{ required: true, message: t('partyDeclaration.reasonRequired') }]}
+              >
+                <Input.TextArea
+                  rows={4}
+                  maxLength={200}
+                  showCount
+                  placeholder={t('partyDeclaration.reasonPlaceholder')}
+                />
               </Form.Item>
 
               <Form.Item
@@ -368,6 +386,7 @@ export default function PartyDeclarationView() {
         footer={<Button onClick={closeDetail}>{t('partyDeclaration.close')}</Button>}
       >
         {detail ? (
+          <>
           <Descriptions column={1} size="small" bordered>
             <Descriptions.Item label={t('partyDeclaration.colId')}>{detail.id}</Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colDeclType')}>
@@ -380,6 +399,9 @@ export default function PartyDeclarationView() {
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.colApproved')}>
               {formatPartyScore(detail.approved_score)}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('partyDeclaration.fieldReason')}>
+              {detail.reason?.trim() ? detail.reason : '—'}
             </Descriptions.Item>
             <Descriptions.Item label={t('partyDeclaration.detailInstance')}>
               {detail.approval_instance_id}
@@ -403,6 +425,13 @@ export default function PartyDeclarationView() {
               )}
             </Descriptions.Item>
           </Descriptions>
+          <div className="party-declaration-records">
+            <div className="party-declaration-records-title">
+              {t('partyDeclaration.flowSectionTitle')}
+            </div>
+            <PartyScoreApprovalRecords instanceId={detail.approval_instance_id} force />
+          </div>
+          </>
         ) : null}
       </Modal>
     </div>

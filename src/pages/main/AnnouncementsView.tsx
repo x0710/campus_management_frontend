@@ -341,6 +341,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
       current: page,
       pageSize,
       showSizeChanger: true,
+      showQuickJumper: true,
       showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
     }),
     [page, pageSize, t],

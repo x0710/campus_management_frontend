@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { invalidate } from './cache'
 import { useAuthStore } from '../store/auth'
 
 /**
@@ -28,6 +29,8 @@ http.interceptors.response.use(
       error.response?.status === 401 &&
       error.config?.url !== '/login'
     ) {
+      // 先清空接口会话缓存再清登录态，避免下一位登录用户读到上一位用户的数据（代码要求 17）
+      invalidate()
       useAuthStore.getState().clearAuth()
       /*
        * 这里不再使用 window.location.assign('/login') 强制整页跳转：

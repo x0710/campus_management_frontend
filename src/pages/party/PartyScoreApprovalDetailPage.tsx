@@ -24,6 +24,7 @@
  *   GET /api/approvals/templates/{id}        审批模板名称
  *   PUT /api/party-scores/approvals/{id}/approve|reject|transfer  审批操作
  *   GET /api/users                           搜索转交对象
+ *   GET /api/approvals/{id}/records          审批流转记录（操作人 / 决定 / 意见 / 时间）
  */
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
@@ -138,6 +139,8 @@ function PartyScoreApprovalDetail() {
 
   const [step, setStep] = useState<ApprovalInstanceStep | null>(null)
   const [score, setScore] = useState<PartyScoreDetail | null>(null)
+  /** 加分申请详情（GET /api/party-scores/{id}）加载失败时的状态码文案；成功加载后清空 */
+  const [detailError, setDetailError] = useState<string | null>(null)
   /** 审批模板名称：undefined 表示加载中；null 表示取不到（回退展示模板 ID） */
   const [templateName, setTemplateName] = useState<string | null | undefined>(undefined)
   /** 审批流转记录：按环节顺序展示操作人、决定、意见与时间 */
@@ -222,17 +225,23 @@ function PartyScoreApprovalDetail() {
           return
         }
 
-        // 详情接口补充附件下载地址与模板 ID；失败时仍展示列表字段（附件区为空）
+        // 详情接口补充申请理由、附件下载地址与模板 ID；失败时仍展示列表字段并提示
         let loadedScore: PartyScoreDetail = {
           ...summary,
           // 列表摘要可能不带 template_id；详情请求失败时用 0 表示未知，避免伪造有效模板
           template_id: summary.template_id ?? 0,
           file_urls: summary.file_urls ?? [],
+          reason: summary.reason ?? '',
         }
         try {
-          loadedScore = await getPartyScore(summary.id, force)
+          // 详情接口才包含完整的申请理由、模板与附件地址；这里始终强制绕过会话缓存，
+          // 避免列表摘要缺少 reason 或详情被旧缓存命中导致审批页看不到申请理由。
+          loadedScore = await getPartyScore(summary.id, true)
+          setDetailError(null)
         } catch (err) {
           if (axios.isAxiosError(err) && err.response?.status === 401) return
+          // 保留列表摘要继续展示主体，但把详情加载失败原因暴露给用户（代码要求 9）
+          setDetailError(extractErrorReason(err, t))
         }
         setScore(loadedScore)
 
@@ -488,6 +497,20 @@ function PartyScoreApprovalDetail() {
           {/* 左栏：审批内容（基础信息 / 审批流转 / 附件材料） */}
           <section className="panel-card">
             <div className="panel-card-body">
+              {detailError && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  className="party-approval-detail-alert"
+                  message={t('partyScoreApproval.detailLoadFailed')}
+                  description={detailError}
+                  action={
+                    <Button size="small" onClick={() => void load(true)}>
+                      {t('common.retry')}
+                    </Button>
+                  }
+                />
+              )}
               <section className="party-approval-section">
                 <h4 className="party-approval-section-title">
                   {t('partyScoreApproval.basicInfoTitle')}
@@ -536,6 +559,14 @@ function PartyScoreApprovalDetail() {
                     {formatDateTime(score.updated_at, locale)}
                   </Descriptions.Item>
                 </Descriptions>
+                <div className="party-approval-reason-block">
+                  <div className="party-approval-reason-label">
+                    {t('partyScoreApproval.fieldReason')}
+                  </div>
+                  <div className="party-approval-reason-content">
+                    {score.reason?.trim() ? score.reason : '—'}
+                  </div>
+                </div>
               </section>
 
               <section className="party-approval-section">

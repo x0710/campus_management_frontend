@@ -39,6 +39,8 @@ export interface PartyScore {
   updated_at: string
   /** 附件下载地址列表（详情接口返回；列表项可能不含） */
   file_urls?: string[]
+  /** 申请加分原因（列表摘要可能不含；详情接口必返回，可为空串） */
+  reason?: string
 }
 
 /** GET /api/party-scores/{id} 加分申请详情（api.json: PartyScoreDetail） */
@@ -47,6 +49,8 @@ export interface PartyScoreDetail extends PartyScore {
   template_id: number
   /** 附件下载地址列表（后端已签发地址，可直接打开下载） */
   file_urls: string[]
+  /** 申请加分原因（详情必返回，可为空串） */
+  reason: string
 }
 
 /**
@@ -73,6 +77,8 @@ export interface PartyScoreCreateRequest {
    * 需先调用 POST /api/files 上传文件，再把返回的 id 填入此字段，实现申请与附件匹配。
    */
   files: number[]
+  /** 申请加分原因（可选，推荐填写；后端按字符串原样保存） */
+  reason?: string
 }
 
 /** POST /api/party-scores 创建成功响应（api.json: PartyScoreCreateResponse） */

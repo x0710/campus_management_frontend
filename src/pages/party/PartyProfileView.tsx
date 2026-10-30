@@ -23,6 +23,7 @@ import {
 } from '../../config/approvalTemplate'
 import { NOTICE_CATEGORY_LABEL_KEYS } from '../../config/notices'
 import { PARTY_NOTICE_PAGE_SIZE } from '../../config/partyDeclaration'
+import { PARTY_POLITICAL_STATUS_NAMES } from '../../config/partyProfile'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
@@ -86,7 +87,7 @@ function ProfileDescriptions() {
   // 政治面貌：遍历任职组织的职位名称，仅命中党员身份时展示，其余职位（如书记）忽略
   const politicalStatus = orgs
     .map((org) => positionNames.get(org.position)?.trim() ?? '')
-    .find((positionName) => positionName === '中共党员' || positionName === '中共预备党员')
+    .find((positionName) => PARTY_POLITICAL_STATUS_NAMES.includes(positionName))
   const genderLabel =
     user?.gender === 'male'
       ? t('profile.male')
@@ -140,14 +141,14 @@ function ProfileDescriptions() {
       <Card size="small" title={t('partyProfile.partyInfoTitle')}>
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label={t('partyProfile.fieldMemberNo')}>
-            {t('partyProfile.valueMemberNo')}
+            {t('common.noData')}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyProfile.fieldBranch')}>{displayBranch}</Descriptions.Item>
           <Descriptions.Item label={t('partyProfile.fieldPoliticalStatus')}>
             {politicalStatus ?? t('partyProfile.politicalNotFound')}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyProfile.fieldJoinDate')}>
-            {t('partyProfile.valueJoinDate')}
+            {t('common.noData')}
           </Descriptions.Item>
         </Descriptions>
       </Card>

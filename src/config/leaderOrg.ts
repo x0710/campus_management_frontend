@@ -49,3 +49,17 @@ export const MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES: string[] = [
   'academy_m5',
   'school_m2',
 ]
+
+/**
+ * 成员详情页展示「获得加分总数 + 加分申请记录」的来源模块 key：
+ * 党委支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5、
+ * 党委学校端组织管理 school_m2 进入成员详情时：
+ * - 不展示「详细信息」Tab；
+ * - 把「成绩信息」Tab 改为「获得加分总数」（基础分 70 + 党建活动加分合计），
+ *   并在同一 Tab 内分页展示该成员的全部加分申请（GET /api/party-scores?user_id=成员）。
+ */
+export const MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES: string[] = [
+  'branch_m5',
+  'academy_m5',
+  'school_m2',
+]

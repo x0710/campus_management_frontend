@@ -86,6 +86,7 @@ export default function CalendarsView() {
               pageSize,
               total,
               showSizeChanger: true,
+              showQuickJumper: true,
               showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
               onChange: (nextPage: number, nextSize: number) => {
                 if (nextSize !== pageSize) setPageSize(nextSize)
