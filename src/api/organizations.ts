@@ -163,8 +163,13 @@ export async function listUserOrganizationsBatch(
   )
 }
 
-/** GET /api/organization-members?uids={uid} 查询单个用户的全部组织任职（会话内缓存） */
-export async function listUserOrganizations(uid: number): Promise<UserOrganization[]> {
-  return listUserOrganizationsBatch([uid])
+/**
+ * GET /api/organization-members?uids={uid} 查询单个用户的全部组织任职（会话内缓存）。
+ * @param uid 用户 ID（必填）
+ * @param force 是否绕过会话缓存强制重新请求（默认 false；任职变更后刷新展示时传 true）
+ * @returns Promise<UserOrganization[]> 任职记录数组
+ */
+export function listUserOrganizations(uid: number, force?: boolean): Promise<UserOrganization[]> {
+  return listUserOrganizationsBatch([uid], force)
 }
 

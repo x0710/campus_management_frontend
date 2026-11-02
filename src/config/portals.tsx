@@ -285,20 +285,32 @@ export interface PortalRole {
   name: string
 }
 
-/** 默认门户：所有人登录后默认进入党员端（支部书记 / 书记按角色另行分流） */
+/** 默认门户：所有人登录后默认进入党员端（支部书记 / 党委委员 / 校级党委按角色另行分流） */
 export const DEFAULT_PORTAL_KEY: PortalKey = 'party'
 
 /** 党员端门户 key：默认门户，全部登录用户可访问 */
 export const PARTY_PORTAL_KEY: PortalKey = 'party'
 
-/** 党委支部端门户 key：仅支部书记角色可访问 */
+/** 党委支部端门户 key：仅支部书记（branch_secretary）角色可访问 */
 export const BRANCH_PORTAL_KEY: PortalKey = 'branch'
 
-/** 党委学院端门户 key：仅书记（学院书记）角色可访问 */
+/** 党委学院端门户 key：仅党委委员（secretary）角色可访问 */
 export const ACADEMY_PORTAL_KEY: PortalKey = 'academy'
 
-/** 党委学校端门户 key：仅学校书记角色可访问 */
+/** 党委学校端门户 key：仅校级党委（PARTY_SCH）角色可访问 */
 export const SCHOOL_PORTAL_KEY: PortalKey = 'school'
+
+/**
+ * 党委相关角色的后端角色 code -> 门户端（code 统一转小写比较，兼容 PARTY_SCH 这类大写编码）。
+ * - branch_secretary（支部书记）→ 党委支部端
+ * - secretary（党委委员）→ 党委学院端
+ * - PARTY_SCH（校级党委）→ 党委学校端
+ */
+const PARTY_ROLE_CODE_TO_PORTAL: Record<string, PortalKey> = {
+  branch_secretary: BRANCH_PORTAL_KEY,
+  secretary: ACADEMY_PORTAL_KEY,
+  party_sch: SCHOOL_PORTAL_KEY,
+}
 
 /**
  * 各门户「我的」模块 key。
@@ -327,18 +339,39 @@ function roleMatches(role: PortalRole, nameKeywords: string[], codeKeywords: str
   return nameHit || codeHit
 }
 
-/** 支部书记：名称含「支部」「书记」，或编码同时含 branch / secretary */
+/**
+ * 按后端角色 code 精确解析党委门户端（大小写不敏感）。
+ * @param role 角色信息（必填）
+ * @returns 该角色 code 对应的 PortalKey；不属于党委角色时返回 undefined
+ */
+function getPartyPortalKeyByRoleCode(role: PortalRole): PortalKey | undefined {
+  return PARTY_ROLE_CODE_TO_PORTAL[role.code.trim().toLowerCase()]
+}
+
+/** 支部书记：角色 code 为 branch_secretary，或名称含「支部」「书记」，或编码同时含 branch / secretary */
 function isBranchSecretary(role: PortalRole): boolean {
-  return roleMatches(role, ['支部', '书记'], ['branch', 'secretar'])
+  return (
+    getPartyPortalKeyByRoleCode(role) === BRANCH_PORTAL_KEY ||
+    roleMatches(role, ['支部', '书记'], ['branch', 'secretar'])
+  )
 }
 
-/** 学校书记：名称含「学校」「书记」，或编码同时含 school / secretary */
+/** 学校书记：角色 code 为 PARTY_SCH，或名称含「学校」「书记」，或编码同时含 school / secretary */
 function isSchoolSecretary(role: PortalRole): boolean {
-  return roleMatches(role, ['学校', '书记'], ['school', 'secretar'])
+  return (
+    getPartyPortalKeyByRoleCode(role) === SCHOOL_PORTAL_KEY ||
+    roleMatches(role, ['学校', '书记'], ['school', 'secretar'])
+  )
 }
 
-/** 学院书记：名称含「书记」（排除支部 / 学校书记），或编码为 academy / college secretary */
+/**
+ * 学院书记：角色 code 为 secretary（党委委员），或名称含「书记」（排除支部 / 学校书记），
+ * 或编码为 academy / college secretary。
+ */
 function isAcademySecretary(role: PortalRole): boolean {
+  // 已命中明确 code 的角色直接按其门户判定，避免名称关键字误判
+  const codePortalKey = getPartyPortalKeyByRoleCode(role)
+  if (codePortalKey) return codePortalKey === ACADEMY_PORTAL_KEY
   if (isBranchSecretary(role) || isSchoolSecretary(role)) return false
   if (role.name.includes('书记')) return true
   const code = role.code.trim().toLowerCase()
@@ -346,8 +379,9 @@ function isAcademySecretary(role: PortalRole): boolean {
 }
 
 /**
- * 登录后默认门户：支部书记 → 党委支部端；书记 → 党委学院端；其余 → 党员端。
- * 多个角色同时命中时按支部书记、学院书记、学校书记的顺序优先。
+ * 登录后默认门户：支部书记（branch_secretary）→ 党委支部端；
+ * 党委委员（secretary）→ 党委学院端；校级党委（PARTY_SCH）→ 党委学校端；其余 → 党员端。
+ * 多个角色同时命中时按支部、学院、学校的顺序优先。
  * @param roles 当前用户的角色列表（必填）
  * @returns 默认进入的 PortalKey（必返回；无匹配角色时为党员端）
  */
@@ -361,9 +395,9 @@ export function resolveDefaultPortalKey(roles: PortalRole[]): PortalKey {
 /**
  * 根据角色获取当前用户可访问的全部门户：
  *   党员端：全部登录用户；
- *   党委支部端：仅支部书记；
- *   党委学院端：仅书记；
- *   党委学校端：仅学校书记；
+ *   党委支部端：仅支部书记（branch_secretary）；
+ *   党委学院端：仅党委委员（secretary）；
+ *   党委学校端：仅校级党委（PARTY_SCH）；
  *   其余门户（学生 / 教师 / 领导 / 管理）仍按原有角色 code 映射。
  * 返回顺序为党员端 / 支部端 / 学院端 / 学校端在前，其余按 PORTALS 定义顺序。
  * @param roles 当前用户的角色列表（必填）

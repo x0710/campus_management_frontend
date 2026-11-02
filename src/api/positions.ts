@@ -37,9 +37,14 @@ export async function listAllPositions(force?: boolean): Promise<PositionDetail[
   return all
 }
 
-/** GET /api/positions/{code} 查询职位详情（会话内缓存） */
-export async function getPosition(code: string): Promise<PositionDetail> {
-  return cachedGet<PositionDetail>(`/positions/${code}`)
+/**
+ * GET /api/positions/{code} 查询职位详情（会话内缓存）。
+ * @param code 职位编码（必填）
+ * @param force 是否绕过会话缓存强制重新请求（默认 false；职位变更后刷新展示时传 true）
+ * @returns Promise<PositionDetail> 职位详情
+ */
+export function getPosition(code: string, force?: boolean): Promise<PositionDetail> {
+  return cachedGet<PositionDetail>(`/positions/${code}`, undefined, { force })
 }
 
 /** POST /api/positions 创建职位，返回新职位 code（后端响应体为纯字符串） */

@@ -26,6 +26,7 @@
  * 约定（代码要求）：
  * - 表格每页最多 100 行，支持页码跳转与总数展示（要求 12）；
  * - 点击表格行查看详细信息（要求 14），编辑保存后刷新表格（要求 13）；
+ * - 资料 / 系统角色 / 组织任职保存后强制重新请求最新数据，无需手动刷新（要求 25）；
  * - 错误提示经 extractErrorReason 附带 HTTP 状态码与中文原因（要求 9），按钮/选项带悬停提示（要求 10）；
  * - 常量集中在 config/，文案走 i18n。
  */
@@ -245,6 +246,13 @@ export default function MemberDetailPage() {
   const [user, setUser] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // 成员详情重载令牌：编辑保存后 seq+1 且 force=true，强制绕过会话缓存重新请求最新资料
+  const [basicReload, setBasicReload] = useState<{ seq: number; force: boolean }>({
+    seq: 0,
+    force: false,
+  })
+  // 基本信息面板内角色 / 组织任职的重载令牌：编辑保存后自增，强制重新请求最新关联数据
+  const [extrasReloadSeq, setExtrasReloadSeq] = useState(0)
 
   // 成员信息编辑弹窗（复用 admin/UserEditPanel）：null 表示关闭
   // 资料 / 系统角色 / 组织任职拆成三个独立入口，一个弹窗只编辑一个部分（每次打开时按区块重新挂载）
@@ -255,28 +263,35 @@ export default function MemberDetailPage() {
     positions: PositionDetail[]
   } | null>(null)
 
-  const loadUser = useCallback(async () => {
-    if (!Number.isFinite(userId) || userId <= 0) {
-      setError(t('common.loadFailed'))
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      setUser(await getUser(userId))
-    } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorReason(err, t))
+  /**
+   * 拉取成员详情。
+   * @param force 是否绕过会话缓存强制重新请求（必填否，默认 false；编辑保存后传 true）
+   */
+  const loadUser = useCallback(
+    async (force?: boolean) => {
+      if (!Number.isFinite(userId) || userId <= 0) {
+        setError(t('common.loadFailed'))
+        setLoading(false)
+        return
       }
-    } finally {
-      setLoading(false)
-    }
-  }, [userId, t])
+      setLoading(true)
+      setError(null)
+      try {
+        setUser(await getUser(userId, force))
+      } catch (err) {
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+          setError(extractErrorReason(err, t))
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [userId, t],
+  )
 
   useEffect(() => {
-    void loadUser()
-  }, [loadUser])
+    void loadUser(basicReload.force)
+  }, [loadUser, basicReload.seq, basicReload.force])
 
   // 打开指定区块的编辑弹窗：首次打开时并行拉取角色/职位/组织选项（均走会话缓存），失败仅提示不阻塞
   const openEdit = useCallback(
@@ -303,6 +318,16 @@ export default function MemberDetailPage() {
     },
     [editRefs, reportError],
   )
+
+  /**
+   * 成员资料 / 系统角色 / 组织任职保存成功后的统一刷新：
+   * 强制重新请求成员详情，并使基本信息面板强制重查角色与组织任职，
+   * 确保保存后立即展示最新数据，无需用户手动刷新（代码要求 25）。
+   */
+  const handleChanged = useCallback(() => {
+    setBasicReload((r) => ({ seq: r.seq + 1, force: true }))
+    setExtrasReloadSeq((s) => s + 1)
+  }, [])
 
   const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey}`)
 
@@ -334,7 +359,7 @@ export default function MemberDetailPage() {
       </header>
       <div className="panel-card-body">
         {error ? (
-          <ErrorState message={error} onRetry={() => void loadUser()} />
+          <ErrorState message={error} onRetry={() => void loadUser(true)} />
         ) : (
           <Tabs
             items={[
@@ -350,6 +375,7 @@ export default function MemberDetailPage() {
                     t={t}
                     canEdit={canEditBasic}
                     showPartyInfo={partyScoreView}
+                    reloadSeq={extrasReloadSeq}
                     onEdit={(section) => void openEdit(section)}
                   />
                 ),
@@ -425,8 +451,8 @@ export default function MemberDetailPage() {
             organizations={editRefs.organizations}
             positions={editRefs.positions}
             section={editSection ?? undefined}
-            // 任一区块保存后刷新页面上的基本信息与（基本信息面板内的）角色/组织任职展示
-            onChanged={() => void loadUser()}
+            // 任一区块保存后强制刷新成员资料、系统角色与组织任职展示（代码要求 25）
+            onChanged={handleChanged}
           />
         ) : (
           <Skeleton active paragraph={{ rows: 6 }} />
@@ -446,6 +472,7 @@ function BasicInfoPanel({
   t,
   canEdit,
   showPartyInfo,
+  reloadSeq,
   onEdit,
 }: {
   user: UserDetail | null
@@ -457,6 +484,8 @@ function BasicInfoPanel({
   canEdit: boolean
   /** 是否展示「党员信息」卡片（党委支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） */
   showPartyInfo: boolean
+  /** 角色 / 组织任职重载令牌：保存后自增，强制绕过缓存重新请求最新关联数据（代码要求 25） */
+  reloadSeq: number
   /** 打开指定区块的编辑弹窗（复用 admin/UserEditPanel；一次只编辑一个部分） */
   onEdit: (section: EditSection) => void
 }) {
@@ -467,49 +496,59 @@ function BasicInfoPanel({
   // 职位详情接口不可用时的兜底映射：编码 → 名称（未命中仍显示编码）
   const positionNames = usePositionNames()
 
-  /** 并行加载角色关联与组织任职；单个角色/职位详情失败不影响整体 */
-  const loadExtras = useCallback(async () => {
-    if (!user) return
-    setExtrasLoading(true)
-    setExtrasError(null)
-    try {
-      const [relations, userOrgs] = await Promise.all([
-        queryUserRoleRelations(user.id),
-        listUserOrganizations(user.id),
-      ])
-      const roleItems = await Promise.all(
-        relations.map(async (rel): Promise<RoleInfo | null> => {
-          try {
-            return await getRole(rel.role_id)
-          } catch {
-            return null
-          }
-        }),
-      )
-      const orgItems = await Promise.all(
-        userOrgs.map(async (uo): Promise<OrgItem> => {
-          if (!uo.position) return { ...uo }
-          try {
-            return { ...uo, positionDetail: await getPosition(uo.position) }
-          } catch {
-            return { ...uo }
-          }
-        }),
-      )
-      setRoles(roleItems.filter((r): r is RoleInfo => r !== null))
-      setOrgs(orgItems)
-    } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setExtrasError(extractErrorReason(err, t))
+  // 仅依赖成员 ID（而非整个 user 对象），避免成员详情重新拉取后因对象引用变化而重复请求
+  const memberId = user?.id
+
+  /**
+   * 并行加载角色关联与组织任职；单个角色/职位详情失败不影响整体。
+   * @param force 是否绕过会话缓存强制重新请求（必填否，默认 false；保存后刷新传 true）
+   */
+  const loadExtras = useCallback(
+    async (force?: boolean) => {
+      if (!memberId) return
+      setExtrasLoading(true)
+      setExtrasError(null)
+      try {
+        const [relations, userOrgs] = await Promise.all([
+          queryUserRoleRelations(memberId, force),
+          listUserOrganizations(memberId, force),
+        ])
+        const roleItems = await Promise.all(
+          relations.map(async (rel): Promise<RoleInfo | null> => {
+            try {
+              return await getRole(rel.role_id, force)
+            } catch {
+              return null
+            }
+          }),
+        )
+        const orgItems = await Promise.all(
+          userOrgs.map(async (uo): Promise<OrgItem> => {
+            if (!uo.position) return { ...uo }
+            try {
+              return { ...uo, positionDetail: await getPosition(uo.position, force) }
+            } catch {
+              return { ...uo }
+            }
+          }),
+        )
+        setRoles(roleItems.filter((r): r is RoleInfo => r !== null))
+        setOrgs(orgItems)
+      } catch (err) {
+        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+          setExtrasError(extractErrorReason(err, t))
+        }
+      } finally {
+        setExtrasLoading(false)
       }
-    } finally {
-      setExtrasLoading(false)
-    }
-  }, [user, t])
+    },
+    [memberId, t],
+  )
 
   useEffect(() => {
-    void loadExtras()
-  }, [loadExtras])
+    // 首次加载可命中会话缓存；保存后 reloadSeq 变化时强制重查，确保立即展示最新角色/任职
+    void loadExtras(reloadSeq > 0)
+  }, [loadExtras, reloadSeq])
 
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />
   if (!user) return <Alert type="info" showIcon title={t('memberDetail.loadUserFailed')} />

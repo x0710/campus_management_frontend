@@ -25,9 +25,14 @@ export async function queryUsers(
   )
 }
 
-/** GET /api/users/{id} 用户详情（会话内缓存） */
-export async function getUser(id: number): Promise<UserDetail> {
-  return cachedGet<UserDetail>(`/users/${id}`)
+/**
+ * GET /api/users/{id} 用户详情（会话内缓存）。
+ * @param id 用户 ID（必填）
+ * @param force 是否绕过会话缓存强制重新请求（默认 false；保存后刷新展示时传 true）
+ * @returns Promise<UserDetail> 用户详情
+ */
+export function getUser(id: number, force?: boolean): Promise<UserDetail> {
+  return cachedGet<UserDetail>(`/users/${id}`, undefined, { force })
 }
 
 /**

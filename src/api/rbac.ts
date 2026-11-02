@@ -32,9 +32,14 @@ export async function queryRoles(
   )
 }
 
-/** GET /api/rbac/roles/{id} 查询单个角色详情（会话内缓存） */
-export async function getRole(id: number): Promise<RoleInfo> {
-  return cachedGet<RoleInfo>(`/rbac/roles/${id}`)
+/**
+ * GET /api/rbac/roles/{id} 查询单个角色详情（会话内缓存）。
+ * @param id 角色 ID（必填）
+ * @param force 是否绕过会话缓存强制重新请求（默认 false）
+ * @returns Promise<RoleInfo> 角色详情
+ */
+export function getRole(id: number, force?: boolean): Promise<RoleInfo> {
+  return cachedGet<RoleInfo>(`/rbac/roles/${id}`, undefined, { force })
 }
 
 /** POST /api/rbac/roles 创建角色，返回新角色 ID */
@@ -181,9 +186,14 @@ export async function queryUserRoles(
   return cachedGet<UserRoleInfo[]>('/rbac/users/roles', { uids: uids.join(',') }, { force })
 }
 
-/** GET /api/rbac/users/{uid}/role-relations 查询用户角色关联列表（会话内缓存） */
-export async function queryUserRoleRelations(uid: number): Promise<UserRoleRelation[]> {
-  return cachedGet<UserRoleRelation[]>(`/rbac/users/${uid}/role-relations`)
+/**
+ * GET /api/rbac/users/{uid}/role-relations 查询用户角色关联列表（会话内缓存）。
+ * @param uid 用户 ID（必填）
+ * @param force 是否绕过会话缓存强制重新请求（默认 false；角色保存后刷新展示时传 true）
+ * @returns Promise<UserRoleRelation[]> 角色关联列表
+ */
+export function queryUserRoleRelations(uid: number, force?: boolean): Promise<UserRoleRelation[]> {
+  return cachedGet<UserRoleRelation[]>(`/rbac/users/${uid}/role-relations`, undefined, { force })
 }
 
 /** POST /api/rbac/users/{uid} 覆盖式分配角色（role_ids 不能为空） */
