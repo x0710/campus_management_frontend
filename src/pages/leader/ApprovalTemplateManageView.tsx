@@ -1,29 +1,29 @@
 /**
- * 领导端：审批模板管理（查询 + 新增 + 查看详情 + 编辑 + 删除 + 审批步骤增删改）。
+ * 领导端：审批指标（审批模板）管理（查询 + 新增 + 查看详情 + 编辑 + 删除 + 审批步骤增删改）。
  * 接口：
  * - GET    /api/approvals/templates   分页查询（权限 approval.read）
  * - POST   /api/approvals/templates   创建（权限 approval.create）
  * - GET    /api/approvals/templates/{id}   详情（权限 approval.read）
  * - PATCH  /api/approvals/templates/{id}   更新（权限 approval.update）
  * - DELETE /api/approvals/templates/{id}   删除（权限 approval.delete）
- * 步骤相关接口在详情弹窗内使用（见 ApprovalTemplateFormModal）。
+ * 步骤相关接口在详情页内使用（见 ApprovalTemplateDetailPage 与 ApprovalTemplateStepModal）。
  *
  * 说明：后端 business_type 筛选仅支持单值，无法承载代码要求 18 的「类型多选」，
  * 因此本页一次性取回（page_size = APPROVAL_TEMPLATE_FETCH_SIZE）后在前端完成多选筛选与分页；
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
- * 交互：工具栏可按业务类型多选、启用状态筛选；点击表格任意一行或「详情」按钮查看详情。
+ * 交互：工具栏可按业务类型多选、启用状态筛选；点击表格任意一行或「详情」按钮进入独立详情页
+ * （/portal/:portalKey/approval-templates/:id?from=<moduleKey>），不再弹窗；新增仍使用弹窗。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { deleteApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
 import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import { extractErrorReason } from '../../api/common'
-import ApprovalTemplateFormModal, {
-  type ApprovalTemplateFormMode,
-} from '../../components/ApprovalTemplateFormModal'
+import ApprovalTemplateFormModal from '../../components/ApprovalTemplateFormModal'
 import ErrorState from '../../components/ErrorState'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
@@ -40,16 +40,15 @@ import { formatDateTime } from '../../utils/datetime'
 /** 启用状态筛选值：'all' 表示不限状态 */
 type EnabledFilter = 'all' | 'on' | 'off'
 
-/** 弹窗状态：关闭 / 新增 / 编辑 / 查看详情（后两者携带模板 ID） */
-interface ModalState {
-  mode: ApprovalTemplateFormMode
-  templateId?: number
-}
-
 export default function ApprovalTemplateManageView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
+  const navigate = useNavigate()
+  const { portalKey, moduleKey } = useParams<{
+    portalKey?: string
+    moduleKey?: string
+  }>()
 
   const [allRows, setAllRows] = useState<ApprovalTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,11 +63,23 @@ export default function ApprovalTemplateManageView() {
     force: false,
   })
 
-  const [modal, setModal] = useState<ModalState | null>(null)
+  /** 新增指标弹窗：查看详情已改为独立页面，弹窗仅保留新增场景 */
+  const [createOpen, setCreateOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
   const reportError = useErrorFeedback()
+
+  /** 打开指标详情页：携带来源模块，返回时回到本列表并保持侧栏高亮 */
+  const openDetail = useCallback(
+    (templateId: number) => {
+      if (!portalKey) return
+      navigate(
+        `/portal/${portalKey}/approval-templates/${templateId}?from=${moduleKey ?? 'academy_m2'}`,
+      )
+    },
+    [portalKey, moduleKey, navigate],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -207,7 +218,7 @@ export default function ApprovalTemplateManageView() {
                 type="link"
                 size="small"
                 icon={<EyeOutlined />}
-                onClick={() => setModal({ mode: 'view', templateId: record.id })}
+                onClick={() => openDetail(record.id)}
               >
                 {t('approvalTemplate.view')}
               </Button>
@@ -235,7 +246,7 @@ export default function ApprovalTemplateManageView() {
         ),
       },
     ],
-    [t, locale, deletingId, doDelete],
+    [t, locale, deletingId, doDelete, openDetail],
   )
 
   return (
@@ -294,7 +305,7 @@ export default function ApprovalTemplateManageView() {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => setModal({ mode: 'create' })}
+                onClick={() => setCreateOpen(true)}
               >
                 {t('approvalTemplate.createTitle')}
               </Button>
@@ -319,7 +330,7 @@ export default function ApprovalTemplateManageView() {
                   // 点击按钮/气泡确认框时不触发行点击
                   const target = e.target as HTMLElement
                   if (target.closest('button') || target.closest('.ant-popover')) return
-                  setModal({ mode: 'view', templateId: record.id })
+                  openDetail(record.id)
                 },
                 title: t('approvalTemplate.rowClickHint'),
                 style: { cursor: 'pointer' },
@@ -342,25 +353,13 @@ export default function ApprovalTemplateManageView() {
       </section>
 
       <ApprovalTemplateFormModal
-        open={modal !== null}
-        mode={modal?.mode ?? 'create'}
-        templateId={modal?.templateId}
-        onCancel={() => setModal(null)}
-        onEdit={() =>
-          setModal((m) =>
-            m && m.templateId !== undefined ? { mode: 'edit', templateId: m.templateId } : m,
-          )
-        }
+        open={createOpen}
+        mode="create"
+        onCancel={() => setCreateOpen(false)}
         onSaved={() => {
-          // 由详情进入编辑并保存后，停留在弹窗内回显最新详情；新增则关闭
-          setModal((m) =>
-            m && m.mode === 'edit' && m.templateId !== undefined
-              ? { mode: 'view', templateId: m.templateId }
-              : null,
-          )
+          setCreateOpen(false)
           setReload((r) => ({ seq: r.seq + 1, force: false }))
         }}
-        onStepsChanged={() => setReload((r) => ({ seq: r.seq + 1, force: false }))}
       />
     </div>
   )

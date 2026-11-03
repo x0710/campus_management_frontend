@@ -25,18 +25,19 @@ import { NOTICE_CATEGORY_LABEL_KEYS } from '../../config/notices'
 import { PARTY_NOTICE_PAGE_SIZE } from '../../config/partyDeclaration'
 import { PARTY_POLITICAL_STATUS_NAMES } from '../../config/partyProfile'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
+import { usePartyProfiles } from '../../composables/usePartyProfiles'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 import { useSettingsStore } from '../../store/settings'
-import { formatDateTime } from '../../utils/datetime'
+import { formatDateOnly, formatDateTime } from '../../utils/datetime'
 
 /**
  * 党员端：我的（我的成绩记录 / 年度评价报告 / 消息通知 / 审批指南 / 关于井大大先锋）。
  * 「我的档案」按学生端个人信息页展示真实基本资料（GET /api/users/me），
  * 并保留党员编号 / 所属支部 / 政治面貌 / 入党时间等党员端扩展信息。
- * 党员编号 / 政治面貌 / 入党时间后端暂无接口，暂以预览值展示；所属支部取真实任职组织。
+ * 党员编号 / 入党时间取 GET /api/party/profiles；政治面貌取任职职位名称；所属支部取真实任职组织。
  * 我的成绩记录：复用总成绩概览（PartyScoreSummary）与成绩记录表格（PartyScoreRecords）。
  * 消息通知：分页展示站内通知（GET /api/notices），点击未读项标记已读。
  */
@@ -53,6 +54,12 @@ function ProfileDescriptions() {
   const [orgs, setOrgs] = useState<UserOrganization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // 党员编号 / 入党时间：拿到当前用户 ID 后按需查询党员档案
+  const {
+    profiles: partyProfiles,
+    loading: partyProfilesLoading,
+    notFound: partyProfilesNotFound,
+  } = usePartyProfiles(user ? [user.id] : [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -84,6 +91,9 @@ function ProfileDescriptions() {
   const displayName = user?.name?.trim() || name?.trim() || username || t('common.unknown')
   // 所属支部：取第一项任职组织名称，无任职时回退占位符
   const displayBranch = organizations[0] || t('common.unknown')
+  // 党员档案：当前用户的党员编号 / 入党时间（无档案时展示未查到，字段为空时展示暂无数据）
+  const partyProfile = user ? partyProfiles.get(user.id) : undefined
+  const partyProfileNotFound = user ? partyProfilesNotFound.has(user.id) : false
   // 政治面貌：遍历任职组织的职位名称，仅命中党员身份时展示，其余职位（如书记）忽略
   const politicalStatus = orgs
     .map((org) => positionNames.get(org.position)?.trim() ?? '')
@@ -121,7 +131,7 @@ function ProfileDescriptions() {
               {user.phone?.trim() || t('profile.noData')}
             </Descriptions.Item>
             <Descriptions.Item label={t('profile.birthday')}>
-              {user.birthday || t('profile.noData')}
+              {user.birthday ? formatDateOnly(user.birthday) : t('profile.noData')}
             </Descriptions.Item>
             <Descriptions.Item label={t('profile.createdAt')}>
               {formatDateTime(user.created_at, locale)}
@@ -141,14 +151,26 @@ function ProfileDescriptions() {
       <Card size="small" title={t('partyProfile.partyInfoTitle')}>
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label={t('partyProfile.fieldMemberNo')}>
-            {t('common.noData')}
+            {partyProfilesLoading
+              ? t('common.loading')
+              : partyProfileNotFound
+                ? t('common.notFound')
+                : partyProfile?.party_no != null
+                  ? String(partyProfile.party_no)
+                  : t('common.noData')}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyProfile.fieldBranch')}>{displayBranch}</Descriptions.Item>
           <Descriptions.Item label={t('partyProfile.fieldPoliticalStatus')}>
             {politicalStatus ?? t('partyProfile.politicalNotFound')}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyProfile.fieldJoinDate')}>
-            {t('common.noData')}
+            {partyProfilesLoading
+              ? t('common.loading')
+              : partyProfileNotFound
+                ? t('common.notFound')
+                : partyProfile?.join_time?.trim()
+                  ? formatDateOnly(partyProfile.join_time)
+                  : t('common.noData')}
           </Descriptions.Item>
         </Descriptions>
       </Card>

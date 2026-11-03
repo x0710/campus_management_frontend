@@ -1,9 +1,11 @@
 /**
  * 党委学校端：组织概览（左侧组织树 + 右侧下级组织统计列表）。
  *
- * 左侧组织树与「组织成员管理」（school_m2）一致：按「学院党委」容器（ID=2）裁剪，
- * 点击某个组织后右侧以表格展示其**直接下级组织**；点击表格行 / 「查看详细」
- * 会跳转到组织成员管理并选中该组织，以便查看该组织的成员（成员详细页沿用组织成员管理的跳转链路）。
+ * 左侧组织树与「组织成员管理」（school_m2）一致：按「学院党委」容器（ID=2）裁剪。
+ * 进入页面时不默认选中、也不默认展开任何组织（仅展示折叠的根节点），须由用户先选择组织，
+ * 再查询该组织的**直接下级组织**统计；未选择时右侧展示选择提示且不发起统计请求。
+ * 点击表格行 / 「查看详细」会跳转到组织成员管理并选中该组织，以便查看该组织的成员
+ * （成员详细页沿用组织成员管理的跳转链路）。
  * 从「总览」点击某党委的成绩排名也会跳到本页并选中该党委（展开其节点并滚动定位）。
  *
  * 组织维护：右侧表头提供「新建下级 / 编辑 / 删除」，与组织成员管理的组织 CRUD 一致，
@@ -35,6 +37,7 @@ import {
 import {
   App as AntdApp,
   Button,
+  Empty,
   Form,
   Input,
   Modal,
@@ -310,19 +313,29 @@ export default function SchoolOrgOverviewView() {
     [orgsInTree, orgSearch],
   )
 
-  /** 未手动选中时默认选中「学院党委」容器节点，进入页面即可看到各二级党委 */
-  const activeOrgId = selectedId ?? SCHOOL_COLLEGE_PARENT_ORG_ID
+  /** 当前选中的组织；null 表示尚未选择（进入页面不默认填充业务数据，需用户先选择） */
+  const activeOrgId = selectedId
 
-  // 默认只展开「学院党委」容器节点；之后沿用用户手动调整过的展开态（跨路由保留）
+  // 默认不展开任何节点（仅展示折叠的「学院党委」根节点）；之后沿用用户手动调整过的展开态（跨路由保留）
   const expandedKeys = useMemo<React.Key[]>(
-    () => storedExpandedKeys ?? [SCHOOL_COLLEGE_PARENT_ORG_ID],
+    () => storedExpandedKeys ?? [],
     [storedExpandedKeys],
   )
 
   const activeOrg = useMemo(
-    () => orgsInTree.find((org) => org.id === activeOrgId) ?? null,
+    () => (activeOrgId === null ? null : orgsInTree.find((org) => org.id === activeOrgId) ?? null),
     [orgsInTree, activeOrgId],
   )
+
+  /**
+   * 每次进入本页（「总览」排名定位跳转除外）清空上一次的选中组织与树展开态：
+   * 组织概览须先由用户选择组织，再查询该组织的下级组织信息，避免进入页面就展开全部组织并自动查询。
+   */
+  useEffect(() => {
+    if (focusOrgId !== null) return
+    setSelectedId(uiKey, null)
+    setOrgTreeExpanded(uiKey, [])
+  }, [focusOrgId, setOrgTreeExpanded, setSelectedId, uiKey])
 
   /** 从「总览」排名跳转过来时，把左侧组织树滚动到选中的党委节点（与组织成员管理的搜索定位一致） */
   useEffect(() => {
@@ -336,9 +349,14 @@ export default function SchoolOrgOverviewView() {
     return () => window.clearTimeout(timer)
   }, [treeCollapsed, focusOrgId, activeOrgId, treeData])
 
-  /** 右侧列表数据：当前选中组织的直接下级组织（按 ID 升序） */
+  /** 右侧列表数据：当前选中组织的直接下级组织（按 ID 升序；未选择组织时为空，不查询） */
   const childOrgs = useMemo(
-    () => orgsInTree.filter((org) => org.parent_id === activeOrgId).sort((a, b) => a.id - b.id),
+    () =>
+      activeOrgId === null
+        ? []
+        : orgsInTree
+            .filter((org) => org.parent_id === activeOrgId)
+            .sort((a, b) => a.id - b.id),
     [orgsInTree, activeOrgId],
   )
 
@@ -360,7 +378,7 @@ export default function SchoolOrgOverviewView() {
   /** 打开新建弹窗：默认把当前选中组织作为上级（即「新建下级」，也可在弹窗内改上级） */
   const openCreate = () => {
     setOrgModal({ mode: 'create' })
-    orgForm.setFieldsValue({ code: '', name: '', parent_id: activeOrgId })
+    orgForm.setFieldsValue({ code: '', name: '', parent_id: activeOrgId ?? null })
   }
 
   /** 打开编辑弹窗：回填当前选中组织的名称、编码与上级组织 */
@@ -388,9 +406,9 @@ export default function SchoolOrgOverviewView() {
       if (orgModal.mode === 'create') {
         await createOrganization(body)
         message.success(t('adminOrg.createSuccess'))
-        // 新建后展开当前组织，确保左侧组织树中能看到新加的下级节点
+        // 新建后展开其上级组织，确保左侧组织树中能看到新加的下级节点
         const keys = new Set(expandedKeys.map(Number))
-        keys.add(activeOrgId)
+        if (body.parent_id !== null) keys.add(body.parent_id)
         setOrgTreeExpanded(uiKey, [...keys])
       } else {
         await updateOrganization(orgModal.org!.id, body)
@@ -430,8 +448,10 @@ export default function SchoolOrgOverviewView() {
   }
 
   const childrenKey = childOrgs.map((org) => org.id).join(',')
-  const activeStatsKey = `${activeOrgId}:${refreshTick}`
-  const statsLoading = childOrgs.length > 0 && statsKey !== activeStatsKey
+  const activeStatsKey = `${activeOrgId ?? 'none'}:${refreshTick}`
+  // 未选择组织时不统计、不展示加载态，避免出现「无意义的加载中」
+  const statsLoading =
+    activeOrgId !== null && childOrgs.length > 0 && statsKey !== activeStatsKey
 
   // 切换选中组织（或手动刷新）后统计其下级组织：
   // 组织/职位数据未就绪时先跳过，数据到达后由依赖变化自动重跑。
@@ -562,6 +582,7 @@ export default function SchoolOrgOverviewView() {
     setPage(1)
     const nextId = keys.length ? Number(keys[0]) : activeOrgId
     setSelectedId(uiKey, nextId)
+    if (nextId === null) return
     const current = expandedKeys.map((key) => Number(key))
     if (!current.includes(nextId)) setOrgTreeExpanded(uiKey, [...current, nextId])
   }
@@ -695,7 +716,7 @@ export default function SchoolOrgOverviewView() {
                   onExpand={(keys: React.Key[]) => {
                     setOrgTreeExpanded(uiKey, keys.map((k) => Number(k)))
                   }}
-                  selectedKeys={[activeOrgId]}
+                  selectedKeys={activeOrgId === null ? [] : [activeOrgId]}
                   onSelect={onSelectTree}
                   showLine
                   blockNode
@@ -726,7 +747,9 @@ export default function SchoolOrgOverviewView() {
               />
             </Tooltip>
             <h3 className="panel-card-title">
-              {activeOrg ? `${activeOrg.name}（${activeOrg.code}）` : t('adminOrg.detailTitle')}
+              {activeOrg
+                ? `${activeOrg.name}（${activeOrg.code}）`
+                : t('schoolOrgOverview.selectOrgTitle')}
             </h3>
           </div>
           <div className="approval-toolbar">
@@ -757,9 +780,11 @@ export default function SchoolOrgOverviewView() {
             </Tooltip>
             <Tooltip
               title={
-                canDeleteOrg
-                  ? t('schoolOrgOverview.deleteOrgHint')
-                  : t('schoolOrgOverview.rootDeleteHint')
+                activeOrg === null
+                  ? t('schoolOrgOverview.selectOrgFirstHint')
+                  : canDeleteOrg
+                    ? t('schoolOrgOverview.deleteOrgHint')
+                    : t('schoolOrgOverview.rootDeleteHint')
               }
             >
               {/* 禁用按钮不派发鼠标事件，用 span 包裹以便根节点也能展示悬停提示 */}
@@ -781,28 +806,37 @@ export default function SchoolOrgOverviewView() {
           </div>
         </header>
         <div className="panel-card-body">
-          <Table<OrgChildRow>
-            rowKey="id"
-            loading={orgsLoading || statsLoading}
-            columns={columns}
-            dataSource={rows}
-            locale={{
-              emptyText: orgsLoading
-                ? t('common.loading')
-                : t('schoolOrgOverview.emptyChildren'),
-            }}
-            scroll={{ x: 1000 }}
-            onRow={onRow}
-            pagination={{
-              current: page,
-              pageSize: MEMBER_TABLE_PAGE_SIZE,
-              total: rows.length,
-              showSizeChanger: false,
-              showQuickJumper: true,
-              showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
-              onChange: (p: number) => setPage(p),
-            }}
-          />
+          {/* 未选择组织时不展示表格、也不发起统计请求：需先在左侧组织树中选择 */}
+          {activeOrgId === null ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t('schoolOrgOverview.selectOrgPrompt')}
+              style={{ padding: '32px 0' }}
+            />
+          ) : (
+            <Table<OrgChildRow>
+              rowKey="id"
+              loading={orgsLoading || statsLoading}
+              columns={columns}
+              dataSource={rows}
+              locale={{
+                emptyText: orgsLoading
+                  ? t('common.loading')
+                  : t('schoolOrgOverview.emptyChildren'),
+              }}
+              scroll={{ x: 1000 }}
+              onRow={onRow}
+              pagination={{
+                current: page,
+                pageSize: MEMBER_TABLE_PAGE_SIZE,
+                total: rows.length,
+                showSizeChanger: false,
+                showQuickJumper: true,
+                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                onChange: (p: number) => setPage(p),
+              }}
+            />
+          )}
         </div>
       </section>
 

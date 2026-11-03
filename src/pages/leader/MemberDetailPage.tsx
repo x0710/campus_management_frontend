@@ -105,6 +105,7 @@ import {
   hydratePartyScoreRows,
   queryPartyScores,
 } from '../../api/partyScores'
+import { createPartyProfile, updatePartyProfile } from '../../api/partyProfiles'
 import type { PartyScore, PartyScoreDetail } from '../../api/types/partyScores'
 import PartyScoreApprovalRecords from '../../components/PartyScoreApprovalRecords'
 import { getUser } from '../../api/users'
@@ -127,6 +128,7 @@ import type {
 } from '../../api/types/violations'
 import { useCourseDetails } from '../../composables/useCourseNames'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { usePartyProfiles } from '../../composables/usePartyProfiles'
 import { usePositionNames } from '../../composables/usePositionNames'
 import {
   EXAM_TYPE_COLOR,
@@ -161,7 +163,7 @@ import {
 } from '../../config/violation'
 import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
-import { formatDateTime } from '../../utils/datetime'
+import { formatDateOnly, formatDateTime } from '../../utils/datetime'
 import { formatCentsAsYuan, yuanToCents } from '../../utils/money'
 import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 import {
@@ -214,6 +216,12 @@ interface ProfileFormValues {
 interface RewardingFormValues {
   project: string
   amount_yuan: number
+}
+
+/** 党员档案编辑表单值（党员编号 / 入党时间） */
+interface PartyProfileFormValues {
+  party_no: number | null
+  join_time: Dayjs | null
 }
 
 /** 请假列表项：详情 + 由审批步骤推导的状态 */
@@ -511,11 +519,26 @@ function BasicInfoPanel({
   const [orgs, setOrgs] = useState<OrgItem[]>([])
   const [extrasLoading, setExtrasLoading] = useState(false)
   const [extrasError, setExtrasError] = useState<string | null>(null)
+  const { message } = AntdApp.useApp()
+  // 党员档案编辑弹窗：修改党员编号 / 入党时间
+  const [partyEditOpen, setPartyEditOpen] = useState(false)
+  const [partySaving, setPartySaving] = useState(false)
+  const [partyForm] = Form.useForm<PartyProfileFormValues>()
   // 职位详情接口不可用时的兜底映射：编码 → 名称（未命中仍显示编码）
   const positionNames = usePositionNames()
 
   // 仅依赖成员 ID（而非整个 user 对象），避免成员详情重新拉取后因对象引用变化而重复请求
   const memberId = user?.id
+
+  // 党员编号 / 入党时间：展示「党员信息」卡片时按成员 ID 查询党员档案
+  const {
+    profiles: partyProfiles,
+    loading: partyProfilesLoading,
+    notFound: partyProfilesNotFound,
+    refresh: refreshPartyProfiles,
+  } = usePartyProfiles(showPartyInfo && memberId ? [memberId] : [])
+  const partyProfile = memberId ? partyProfiles.get(memberId) : undefined
+  const partyProfileNotFound = memberId ? partyProfilesNotFound.has(memberId) : false
 
   /**
    * 并行加载角色关联与组织任职；单个角色/职位详情失败不影响整体。
@@ -571,12 +594,63 @@ function BasicInfoPanel({
     void loadExtras(reloadSeq > 0)
   }, [loadExtras, reloadSeq])
 
+  /** 打开党员档案编辑弹窗：回填现有党员编号 / 入党时间 */
+  const openPartyProfileEdit = () => {
+    const joinTime = partyProfile?.join_time?.trim()
+      ? dayjs(partyProfile.join_time)
+      : null
+    partyForm.setFieldsValue({
+      party_no: partyProfile?.party_no ?? null,
+      join_time: joinTime?.isValid() ? joinTime : null,
+    })
+    setPartyEditOpen(true)
+  }
+
+  /** 保存党员档案：已有档案走 PATCH，无档案走 POST 创建 */
+  const savePartyProfile = async () => {
+    if (!memberId) return
+    let values: PartyProfileFormValues
+    try {
+      values = await partyForm.validateFields()
+    } catch {
+      return
+    }
+    setPartySaving(true)
+    try {
+      const body = {
+        party_no:
+          values.party_no == null || Number.isNaN(values.party_no)
+            ? null
+            : Number(values.party_no),
+        join_time: values.join_time
+          ? values.join_time.format('YYYY-MM-DD')
+          : null,
+      }
+      if (partyProfile) {
+        await updatePartyProfile(memberId, body)
+      } else {
+        await createPartyProfile({ user_id: memberId, ...body })
+      }
+      message.success(t('partyProfile.saveSuccess'))
+      setPartyEditOpen(false)
+      // 保存后重新查询党员档案，卡片立即展示最新值
+      refreshPartyProfiles()
+    } catch (err) {
+      // 401 由 http 拦截器统一处理登录态，此处不重复提示
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    } finally {
+      setPartySaving(false)
+    }
+  }
+
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />
   if (!user) return <Alert type="info" showIcon title={t('memberDetail.loadUserFailed')} />
 
   // 党员信息（党委支部端 / 学院端 / 学校端）：展示口径与党员端「我的」页一致。
   // 所属支部取第一项任职组织；政治面貌取任职职位名中的党员身份（书记等其他职位忽略）；
-  // 党员编号 / 入党时间后端暂无接口，统一显示「暂无数据」。
+  // 党员编号 / 入党时间取 GET /api/party/profiles。
   const positionNameOf = (uo: OrgItem): string =>
     (uo.positionDetail?.name ?? (uo.position ? positionNames.get(uo.position) : '') ?? '').trim()
   const partyBranch =
@@ -590,7 +664,8 @@ function BasicInfoPanel({
   const orgGroups = groupUserOrganizationsByOrg(orgs)
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* 具备用户管理权限的来源（管理端 / 党委学校端）提供三个独立编辑入口：
           基本信息（资料卡片上方工具栏）、系统角色与组织任职（各自卡片右上角） */}
       {canEdit && (
@@ -645,7 +720,7 @@ function BasicInfoPanel({
               {
                 key: 'birthday',
                 label: t('profile.birthday'),
-                children: user.birthday ?? t('profile.noData'),
+                children: user.birthday ? formatDateOnly(user.birthday) : t('profile.noData'),
               },
               {
                 key: 'created_at',
@@ -664,8 +739,24 @@ function BasicInfoPanel({
 
       {/* 党员信息（党委支部端 / 学院端 / 学校端）：与党员端「我的」页展示一致的党员端扩展信息 */}
       {showPartyInfo && (
-        <Card size="small" title={t('partyProfile.partyInfoTitle')}>
-          {extrasLoading ? (
+        <Card
+          size="small"
+          title={t('partyProfile.partyInfoTitle')}
+          extra={
+            <Tooltip title={t('partyProfile.editHint')}>
+              <Button
+                type="primary"
+                size="small"
+                icon={<EditOutlined />}
+                disabled={partyProfilesLoading}
+                onClick={openPartyProfileEdit}
+              >
+                {t('partyProfile.edit')}
+              </Button>
+            </Tooltip>
+          }
+        >
+          {extrasLoading || partyProfilesLoading ? (
             <Skeleton active paragraph={{ rows: 1 }} />
           ) : (
             <Descriptions
@@ -676,7 +767,11 @@ function BasicInfoPanel({
                 {
                   key: 'member_no',
                   label: t('partyProfile.fieldMemberNo'),
-                  children: t('common.noData'),
+                  children: partyProfileNotFound
+                    ? t('common.notFound')
+                    : partyProfile?.party_no != null
+                      ? String(partyProfile.party_no)
+                      : t('common.noData'),
                 },
                 {
                   key: 'branch',
@@ -691,7 +786,11 @@ function BasicInfoPanel({
                 {
                   key: 'join_date',
                   label: t('partyProfile.fieldJoinDate'),
-                  children: t('common.noData'),
+                  children: partyProfileNotFound
+                    ? t('common.notFound')
+                    : partyProfile?.join_time?.trim()
+                      ? formatDateOnly(partyProfile.join_time)
+                      : t('common.noData'),
                 },
               ]}
             />
@@ -847,7 +946,38 @@ function BasicInfoPanel({
           </Card>
         </>
       )}
-    </Space>
+      </Space>
+
+      {/* 党员档案编辑：仅党委支部端 / 学院端 / 学校端的党员信息卡片展示入口 */}
+      <Modal
+        open={partyEditOpen}
+        title={t('partyProfile.editTitle')}
+        width={420}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
+        confirmLoading={partySaving}
+        onCancel={() => setPartyEditOpen(false)}
+        onOk={() => void savePartyProfile()}
+        destroyOnHidden
+      >
+        <Form form={partyForm} layout="vertical" autoComplete="off">
+          <Form.Item name="party_no" label={t('partyProfile.fieldMemberNo')}>
+            <InputNumber
+              precision={0}
+              style={{ width: '100%' }}
+              placeholder={t('partyProfile.memberNoPlaceholder')}
+            />
+          </Form.Item>
+          <Form.Item name="join_time" label={t('partyProfile.fieldJoinDate')}>
+            <DatePicker
+              style={{ width: '100%' }}
+              format={locale === 'zh' ? 'YYYY年MM月DD日' : 'YYYY-MM-DD'}
+              placeholder={t('partyProfile.joinDatePlaceholder')}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   )
 }
 
@@ -1058,7 +1188,9 @@ function ProfileDetailTab({
             {
               key: 'birth_date',
               label: t('memberDetail.fieldBirthDate'),
-              children: profile.birth_date,
+              children: profile.birth_date
+                ? formatDateOnly(profile.birth_date)
+                : t('profile.noData'),
             },
             {
               key: 'class_id',

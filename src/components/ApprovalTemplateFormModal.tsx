@@ -14,11 +14,13 @@ import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   App as AntdApp,
   Button,
+  Col,
   Descriptions,
   Form,
   Input,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Skeleton,
   Switch,
@@ -550,78 +552,101 @@ export default function ApprovalTemplateFormModal({
                 />
               </Form.Item>
             )}
-            <Form.Item
-              name="code"
-              label={t('approvalTemplate.fieldCode')}
-              rules={[{ required: true, message: t('approvalTemplate.codeRequired') }]}
-              extra={isEdit ? t('approvalTemplate.fieldCodeImmutableHint') : undefined}
-            >
-              <Input
-                maxLength={APPROVAL_TEMPLATE_CODE_MAX_LENGTH}
-                disabled={isEdit}
-                placeholder={t('approvalTemplate.fieldCodePlaceholder')}
-              />
-            </Form.Item>
-            <Form.Item
-              name="name"
-              label={t('approvalTemplate.fieldName')}
-              rules={[{ required: true, message: t('approvalTemplate.nameRequired') }]}
-            >
-              <Input
-                maxLength={APPROVAL_TEMPLATE_NAME_MAX_LENGTH}
-                placeholder={t('approvalTemplate.fieldName')}
-              />
-            </Form.Item>
-            <Form.Item
-              name="business_type"
-              label={t('approvalTemplate.fieldBusinessType')}
-              rules={[{ required: true, message: t('approvalTemplate.businessTypeRequired') }]}
-            >
-              <Select
-                placeholder={t('approvalTemplate.fieldBusinessTypePlaceholder')}
-                options={[
-                  ...APPROVAL_BUSINESS_TYPE_OPTIONS.map((type) => ({
-                    value: type,
-                    label: t(`approvalTemplate.business_${type}`),
-                  })),
-                  {
-                    value: APPROVAL_BUSINESS_TYPE_OTHER,
-                    label: t('approvalTemplate.business_other'),
-                  },
-                ]}
-              />
-            </Form.Item>
+            {/* 编码与名称并排，压缩上半部分高度，给下方「加分细则」留出更多空间 */}
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="code"
+                  label={t('approvalTemplate.fieldCode')}
+                  rules={[{ required: true, message: t('approvalTemplate.codeRequired') }]}
+                  extra={isEdit ? t('approvalTemplate.fieldCodeImmutableHint') : undefined}
+                >
+                  <Input
+                    maxLength={APPROVAL_TEMPLATE_CODE_MAX_LENGTH}
+                    disabled={isEdit}
+                    placeholder={t('approvalTemplate.fieldCodePlaceholder')}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="name"
+                  label={t('approvalTemplate.fieldName')}
+                  rules={[{ required: true, message: t('approvalTemplate.nameRequired') }]}
+                >
+                  <Input
+                    maxLength={APPROVAL_TEMPLATE_NAME_MAX_LENGTH}
+                    placeholder={t('approvalTemplate.fieldName')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+            {/* 业务类型与启用状态并排 */}
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="business_type"
+                  label={t('approvalTemplate.fieldBusinessType')}
+                  rules={[
+                    { required: true, message: t('approvalTemplate.businessTypeRequired') },
+                  ]}
+                >
+                  <Select
+                    placeholder={t('approvalTemplate.fieldBusinessTypePlaceholder')}
+                    options={[
+                      ...APPROVAL_BUSINESS_TYPE_OPTIONS.map((type) => ({
+                        value: type,
+                        label: t(`approvalTemplate.business_${type}`),
+                      })),
+                      {
+                        value: APPROVAL_BUSINESS_TYPE_OTHER,
+                        label: t('approvalTemplate.business_other'),
+                      },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="enabled"
+                  label={t('approvalTemplate.fieldEnabled')}
+                  valuePropName="checked"
+                  extra={t('approvalTemplate.fieldEnabledHint')}
+                >
+                  <Switch
+                    checkedChildren={t('approvalTemplate.enabled_yes')}
+                    unCheckedChildren={t('approvalTemplate.enabled_no')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
             {businessTypeValue === APPROVAL_BUSINESS_TYPE_OTHER && (
-              <Form.Item
-                name="business_type_custom"
-                label={t('approvalTemplate.fieldBusinessType')}
-                rules={[
-                  { required: true, message: t('approvalTemplate.businessTypeCustomRequired') },
-                ]}
-              >
-                <Input
-                  maxLength={APPROVAL_BUSINESS_TYPE_CUSTOM_MAX_LENGTH}
-                  placeholder={t('approvalTemplate.fieldBusinessTypeCustomPlaceholder')}
-                />
-              </Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="business_type_custom"
+                    label={t('approvalTemplate.fieldBusinessType')}
+                    rules={[
+                      {
+                        required: true,
+                        message: t('approvalTemplate.businessTypeCustomRequired'),
+                      },
+                    ]}
+                  >
+                    <Input
+                      maxLength={APPROVAL_BUSINESS_TYPE_CUSTOM_MAX_LENGTH}
+                      placeholder={t('approvalTemplate.fieldBusinessTypeCustomPlaceholder')}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
             )}
-            <Form.Item
-              name="enabled"
-              label={t('approvalTemplate.fieldEnabled')}
-              valuePropName="checked"
-              extra={t('approvalTemplate.fieldEnabledHint')}
-            >
-              <Switch
-                checkedChildren={t('approvalTemplate.enabled_yes')}
-                unCheckedChildren={t('approvalTemplate.enabled_no')}
-              />
-            </Form.Item>
             <Form.Item
               name="description"
               label={t('approvalTemplate.fieldDescription')}
             >
               <Input.TextArea
-                rows={3}
+                rows={5}
                 maxLength={APPROVAL_TEMPLATE_DESC_MAX_LENGTH}
                 showCount
                 placeholder={t('approvalTemplate.fieldDescriptionPlaceholder')}

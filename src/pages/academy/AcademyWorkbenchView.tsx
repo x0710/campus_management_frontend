@@ -1,29 +1,42 @@
 /**
- * 党委学院端：工作台（学院先锋指数总览 / 各支部排名）。
+ * 党委学院端：工作台（学院先锋指数总览 / 各支部排名 / 待办事项）。
  *
  * 已接入真实接口：
- *   全院党员（人）  经 composables/usePortalOrg 定位当前用户所属「学院」组织（组织树深度 1）→
+ *   学院总人数（人）  经 composables/usePortalOrg 定位当前用户所属「学院」组织（组织树深度 1）→
  *                   GET /api/organizations/{id}/member-counts?recursive=true
  *                   按组织统计成员数（含全部下级组织，前端相加得总数）
+ *   党员人数（人）  按职位名称「中共党员」经 GET /api/positions 解析职位编码后，
+ *                   对学院及全部下级组织调用 GET /api/organizations/{id}/members?position=
+ *                   取分页 total 汇总（含全部下级组织）
+ *   预备党员人数（人） 同上，按职位名称「中共预备党员」统计
  *   平均分          GET /api/party/scores/organization-average?organization_id=…&recursive=true
  *   各支部排名       GET /api/organizations/{id}/subsidiaries 获取直接下级支部，
  *                   再逐个调用 GET /api/party/scores/organization-average 后按平均分排序
+ *   待审核申报（条） 与支部端工作台同一口径：GET /api/party-scores + /api/approvals 合成党建加分审批步骤，
+ *                   按 status=waiting / pending 各取一页后合计条数
  *
  * 交互：点击某支部的成绩排名 → 选中该支部并跳转「学院支部管理」（academy_m5），
- * 由该页直接展示该支部的成员列表（选中态与树展开态经 uiState 跨路由传递）。
+ * 由该页直接展示该支部的成员列表（选中态与树展开态经 uiState 跨路由传递）；
+ * 点击待办事项 → 跳转「审核管理」（academy_m3）。
  *
  */
 import { Tooltip } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { listSubsidiaries } from '../../api/organizations'
-import { getPartyScoreOrganizationAverage } from '../../api/partyScores'
+import { getPartyScoreOrganizationAverage, queryPartyScoreApprovals } from '../../api/partyScores'
 import ErrorState from '../../components/ErrorState'
 import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
+import { countOrgMembersByPositionNames } from '../../composables/useOrgPositionMemberCounts'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { ACADEMY_ANCESTOR_DEPTHS, ACADEMY_BRANCH_MODULE_KEY } from '../../config/organization'
+import {
+  PARTY_FULL_MEMBER_STATUS_NAME,
+  PARTY_PROBATIONARY_STATUS_NAME,
+} from '../../config/partyProfile'
+import { PARTY_SCORE_TODO_PAGE_SIZE } from '../../config/partyScoreApproval'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
 import { formatPartyScoreTotalDecimal, formatScoreDecimal, toPartyScoreTotal } from '../../utils/partyScore'
@@ -47,10 +60,16 @@ export default function AcademyWorkbenchView() {
   /** 当前用户所属学院组织 ID（null 表示尚未解析到）：用于跳转时展开到支部节点的祖先链 */
   const [academyOrgId, setAcademyOrgId] = useState<number | null>(null)
 
-  /** 本院党员总数（人）；null 表示未取到（加载中或加载失败） */
+  /** 学院总人数（人）；null 表示未取到（加载中或加载失败） */
   const [members, setMembers] = useState<number | null>(null)
+  /** 本院党员人数（职位为「中共党员」）；null 表示未取到或职位未配置 */
+  const [partyMembers, setPartyMembers] = useState<number | null>(null)
+  /** 本院预备党员人数（职位为「中共预备党员」）；null 表示未取到或职位未配置 */
+  const [probationaryMembers, setProbationaryMembers] = useState<number | null>(null)
   /** 本院党建活动加分平均分（后端为字符串；null 表示无数据或加载失败） */
   const [averageScore, setAverageScore] = useState<string | null>(null)
+  /** 待审核申报条数（waiting + pending，与支部端工作台同一口径） */
+  const [todoApprove, setTodoApprove] = useState<number | null>(null)
   /** 下级支部排名（按平均分从高到低） */
   const [branchRankings, setBranchRankings] = useState<BranchRankingItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,18 +78,39 @@ export default function AcademyWorkbenchView() {
   // 注意：load 内不得在首个 await 之前 setState，否则会触发 react(set-state-in-effect) 告警
   const load = useCallback(async () => {
     try {
-      const { orgId } = await resolvePortalOrg(ACADEMY_ANCESTOR_DEPTHS)
+      // 待办统计与组织解析并行：待办不依赖学院组织，任何情况下都应展示
+      const [{ orgId }, waitingSteps, pendingSteps] = await Promise.all([
+        resolvePortalOrg(ACADEMY_ANCESTOR_DEPTHS),
+        queryPartyScoreApprovals({
+          status: 'waiting',
+          page: 1,
+          page_size: PARTY_SCORE_TODO_PAGE_SIZE,
+        }),
+        queryPartyScoreApprovals({
+          status: 'pending',
+          page: 1,
+          page_size: PARTY_SCORE_TODO_PAGE_SIZE,
+        }),
+      ])
       setAcademyOrgId(orgId)
+      setTodoApprove(waitingSteps.length + pendingSteps.length)
       if (orgId === null) {
         setMembers(0)
+        setPartyMembers(null)
+        setProbationaryMembers(null)
         setAverageScore(null)
         setBranchRankings([])
         return
       }
-      const [memberTotal, average, subsidiaries] = await Promise.all([
+      const [memberTotal, average, subsidiaries, partyCounts] = await Promise.all([
         countOrgMemberTotal(orgId),
         getPartyScoreOrganizationAverage({ organization_id: orgId, recursive: true }),
         listSubsidiaries(orgId),
+        // 党员 / 预备党员人数：按职位名称经成员列表接口统计（含全部下级组织）
+        countOrgMembersByPositionNames(orgId, [
+          PARTY_FULL_MEMBER_STATUS_NAME,
+          PARTY_PROBATIONARY_STATUS_NAME,
+        ]),
       ])
       const branchAverages = await Promise.all(
         subsidiaries.map((branch) =>
@@ -88,6 +128,8 @@ export default function AcademyWorkbenchView() {
             (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY),
         )
       setMembers(memberTotal)
+      setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME] ?? null)
+      setProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME] ?? null)
       setAverageScore(average.average_score)
       setBranchRankings(rankedBranches)
     } catch (err) {
@@ -149,6 +191,9 @@ export default function AcademyWorkbenchView() {
 
   /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
   const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
+  /** 按职位统计的人数：加载中或职位未配置时显示占位符，不误显示为 0 */
+  const positionCountText = (value: number | null) =>
+    loading || value === null ? '—' : String(value)
   // 全院平均分最多保留小数点后 3 位（如 70.035），避免浮点误差产生超长文本
   const averageText = loading ? '—' : formatPartyScoreTotalDecimal(averageScore)
   const maxBranchScore = useMemo(
@@ -177,6 +222,24 @@ export default function AcademyWorkbenchView() {
               <span className="academy-overview-label">{t('academy.statMembers')}</span>
               <span className="academy-overview-value">
                 {statText(members)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
+            {/* 党员人数：按职位「中共党员」统计（含全部下级组织） */}
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">{t('academy.statPartyMembers')}</span>
+              <span className="academy-overview-value">
+                {positionCountText(partyMembers)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
+            {/* 预备党员人数：按职位「中共预备党员」统计（含全部下级组织） */}
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">
+                {t('academy.statProbationaryMembers')}
+              </span>
+              <span className="academy-overview-value">
+                {positionCountText(probationaryMembers)}
                 <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
               </span>
             </div>
@@ -220,6 +283,27 @@ export default function AcademyWorkbenchView() {
             })}
           </div>
 
+        </div>
+      </section>
+
+      {/* 待办事项（与支部端工作台一致：待审核申报 = waiting + pending 条数） */}
+      <section className="panel-card">
+        <header className="panel-card-header">
+          <h3 className="panel-card-title">{t('academy.todoTitle')}</h3>
+        </header>
+        <div className="panel-card-body">
+          <ul className="branch-todo-list">
+            {/* 待审核加分申报 → 审核管理（处理待办审批） */}
+            <li className="branch-todo-item">
+              <Link className="branch-todo-link" to={`/portal/${portalKey}/academy_m3`}>
+                <span className="branch-todo-label">{t('academy.todoApprove')}</span>
+                <span className="branch-todo-count">
+                  {statText(todoApprove)}
+                  <span className="branch-todo-unit">{t('academy.todoUnitItems')}</span>
+                </span>
+              </Link>
+            </li>
+          </ul>
         </div>
       </section>
     </div>

@@ -101,6 +101,14 @@ interface UseMemberSearchOptions {
   /** 当前成员表已渲染的行（可选；命中行渲染后自动滚动到可视区中部） */
   memberRows?: { user_id: number }[]
   /**
+   * 自定义「成员所在页」解析（可选）。
+   * 传入后替代默认的后端分页扫描，适用于宿主在前端过滤 / 排序后自行分页的场景。
+   * @param orgId 目标组织 ID
+   * @param uid 目标成员 UID
+   * @returns 目标页（从 1 开始）；未命中返回 null
+   */
+  resolveMemberPage?: (orgId: number, uid: number) => Promise<number | null> | number | null
+  /**
    * UI 状态记忆 key（可选，如 'leader_m3'）。
    * 传入后搜索框内容、模糊匹配结果与当前定位会保存到视图层会话状态，
    * 点击成员进入详情再返回时继续展示，无需重新搜索。
@@ -175,7 +183,7 @@ export interface MemberSearchController {
  * @param pageSize 每页条数（必填）
  * @returns 命中页码（从 1 开始）；未命中或超出 MEMBER_SEARCH_MAX_PAGES 时返回 null
  */
-async function findMemberPage(
+export async function findMemberPage(
   orgId: number,
   uid: number,
   pageSize: number,
@@ -331,6 +339,7 @@ export function useMemberSearch({
   onLoadPage,
   onClearFilter,
   memberRows,
+  resolveMemberPage,
   persistKey,
 }: UseMemberSearchOptions): MemberSearchController {
   const t = useT()
@@ -377,7 +386,10 @@ export function useMemberSearch({
         return
       }
       // 目标不在第 1 页时，先扫描出其所在页
-      const page = (await findMemberPage(hit.targetId, hit.uid, memberPageSize)) ?? 1
+      // 宿主已在前端过滤 / 排序并自行分页时，用其提供的解析函数计算目标页
+      const page = resolveMemberPage
+        ? ((await resolveMemberPage(hit.targetId, hit.uid)) ?? 1)
+        : ((await findMemberPage(hit.targetId, hit.uid, memberPageSize)) ?? 1)
       setHitUid(hit.uid)
       setLocateTick((n) => n + 1)
       // 无论组织是否变化都清掉名称过滤并展开祖先链，保证组织树能滚动定位到该组织节点
@@ -392,7 +404,7 @@ export function useMemberSearch({
         onSelectOrg(hit.targetId)
       }
     },
-    [activeOrgId, memberPageSize, onLoadPage, onClearFilter, orgs, onSelectOrg],
+    [activeOrgId, memberPageSize, onLoadPage, onClearFilter, orgs, onSelectOrg, resolveMemberPage],
   )
 
   /** 清空姓名搜索结果条与候选页游标（空搜索 / 学号搜索 / 无命中时复用），并退出「只看匹配人员」 */

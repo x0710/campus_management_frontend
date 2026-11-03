@@ -21,6 +21,11 @@ interface PartyScoreApprovalRecordsProps {
   instanceId: number
   /** 强制绕过缓存重新请求（打开详情时传 true，保证展示最新意见） */
   force?: boolean
+  /**
+   * 审批记录加载完成回调（可选）。
+   * 成功时传记录数组，失败时传空数组；供父组件推导申报审核状态（通过 / 驳回 / 审核中）。
+   */
+  onRecordsLoaded?: (records: ApprovalRecordItem[]) => void
 }
 
 /** 审批决定 → 标签文案 key（agree/reject/transfer） */
@@ -44,6 +49,7 @@ const DECISION_TAG_COLOR: Record<ApprovalRecordItem['decision'], string> = {
 export default function PartyScoreApprovalRecords({
   instanceId,
   force = false,
+  onRecordsLoaded,
 }: PartyScoreApprovalRecordsProps) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -59,12 +65,17 @@ export default function PartyScoreApprovalRecords({
     setError(null)
     getApprovalRecords(instanceId, force)
       .then((list) => {
-        if (!cancelled) setRecords(list)
+        if (!cancelled) {
+          setRecords(list)
+          onRecordsLoaded?.(list)
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setRecords([])
           setError(extractErrorReason(err, t))
+          // 审批记录加载失败：向父组件回传空数组，状态按 approved_score 兜底
+          onRecordsLoaded?.([])
         }
       })
       .finally(() => {
@@ -73,7 +84,7 @@ export default function PartyScoreApprovalRecords({
     return () => {
       cancelled = true
     }
-  }, [instanceId, force, retryKey, t])
+  }, [instanceId, force, retryKey, t, onRecordsLoaded])
 
   /** 记录涉及的操作人与转交对象，批量解析姓名 */
   const recordUserIds = useMemo(

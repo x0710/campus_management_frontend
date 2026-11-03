@@ -18,8 +18,14 @@ const AnnouncementDetailPage = lazy(() => import('./pages/main/AnnouncementDetai
 const PartyScoreApprovalDetailPage = lazy(
   () => import('./pages/party/PartyScoreApprovalDetailPage'),
 )
+const PartyScoreDetailPage = lazy(
+  () => import('./pages/party/PartyScoreDetailPage'),
+)
 const FeedbackView = lazy(() => import('./pages/student/FeedbackView'))
 const AnnouncementEditorPage = lazy(() => import('./pages/leader/AnnouncementEditorPage'))
+const ApprovalTemplateDetailPage = lazy(
+  () => import('./pages/leader/ApprovalTemplateDetailPage'),
+)
 const MemberDetailPage = lazy(() => import('./pages/leader/MemberDetailPage'))
 
 
@@ -77,6 +83,15 @@ export default function App() {
           <Route
             path="party-score-approvals/:stepId"
             element={<PartyScoreApprovalDetailPage />}
+          />
+          {/* 党员端成绩申报详情：首页「近期记录」点击进入，
+              沿用同一界面壳与侧栏（?from=<moduleKey>） */}
+          <Route path="party-scores/:id" element={<PartyScoreDetailPage />} />
+          {/* 审批指标（审批模板）详情：党委支部端「指标」列表点击进入，
+              沿用同一界面壳与侧栏（?from=<moduleKey>） */}
+          <Route
+            path="approval-templates/:id"
+            element={<ApprovalTemplateDetailPage />}
           />
           {/* 成员详情：领导端组织概览/老师端班级管理/党委各端支部管理/管理端组织架构/
               学校端组织管理点击成员进入，沿用同一界面壳与侧栏（?from=<moduleKey>） */}

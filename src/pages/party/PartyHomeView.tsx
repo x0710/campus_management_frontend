@@ -8,28 +8,30 @@
  * 加载期间展示骨架屏而非占位符/半成品名称，避免刷新时出现「— → 支部 → 学校」的跳变。
  *
  * 分数与近期记录：经 useMyPartyScores 接真实接口 GET /api/party-scores，
- * 按创建时间倒序取最近 PARTY_RECENT_RECORD_LIMIT 条；点击记录可查看申报详情。
+ * 按创建时间倒序取最近 PARTY_RECENT_RECORD_LIMIT 条。
+ * 近期记录不再直接展示申请分数（避免被误认为已获得成绩），而是展示审核状态
+ * 「审核中 / 申请成功 / 被驳回」；点击记录跳转到独立申报详情页（申请内容 + 审核内容）。
+ *
  * 先锋指数由 computePartyScoreSummary 计算：基础分 70 + 加分项（封顶 30），总分封顶 100，减分固定 0。
  */
-import { Skeleton, Spin } from 'antd'
+import { Skeleton, Spin, Tag } from 'antd'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { queryApprovalTemplates } from '../../api/approvalmodel'
+import { useNavigate, useParams } from 'react-router'
 import { getOrganizationTree } from '../../api/organizations'
 import type { PartyScore } from '../../api/types/partyScores'
 import ErrorState from '../../components/ErrorState'
-import PartyScoreDetailModal from '../../components/PartyScoreDetailModal'
 import PartyScoreSummary from '../../components/PartyScoreSummary'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { useMyPartyScores } from '../../composables/useMyPartyScores'
+import { usePartyScoreApplicationStatuses } from '../../composables/usePartyScoreApplicationStatuses'
+import { usePartyTemplateNames } from '../../composables/usePartyTemplateNames'
 import {
-  PARTY_DECLARATION_PAGE_SIZE,
   PARTY_RECENT_RECORD_LIMIT,
-  PARTY_TEMPLATE_BUSINESS_TYPE,
+  PARTY_SCORE_APPLICATION_STATUS_COLOR,
 } from '../../config/partyDeclaration'
 import { PARTY_HOME_ORG_FALLBACK_NAME } from '../../config/organization'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
-import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 
 /** 近期记录日期标签：月.日（数值型，各语言下通用；时间非法时返回占位符） */
 function formatRecordDate(value: string): string {
@@ -43,6 +45,11 @@ type PartyOrgChain = string[]
 
 export default function PartyHomeView() {
   const t = useT()
+  const navigate = useNavigate()
+  const { portalKey, moduleKey } = useParams<{
+    portalKey: string
+    moduleKey?: string
+  }>()
   const username = useAuthStore((s) => s.username)
   const {
     name,
@@ -51,8 +58,7 @@ export default function PartyHomeView() {
     loading: identityLoading,
   } = useCurrentIdentity()
   const { records, loading, error, refresh } = useMyPartyScores()
-  const [templateNames, setTemplateNames] = useState<Map<number, string>>(new Map())
-  const [detailRecord, setDetailRecord] = useState<PartyScore | null>(null)
+  const templateNames = usePartyTemplateNames()
   /** 首页顶部完整组织链路：组织树返回后一次性写入，避免各级组织分批出现 */
   const [orgChain, setOrgChain] = useState<PartyOrgChain | null>(null)
   /** 组织信息是否仍在解析：为 true 时顶部整体展示骨架屏，避免占位符/半成品名称闪现 */
@@ -112,28 +118,6 @@ export default function PartyHomeView() {
     }
   }, [firstOrganizationId, identityLoading, organizations])
 
-  // 申报类型名称：失败时保持空 Map，列表回退展示模板 ID，不影响其余内容
-  useEffect(() => {
-    let cancelled = false
-    queryApprovalTemplates({
-      business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
-      enabled: true,
-      page: 1,
-      page_size: PARTY_DECLARATION_PAGE_SIZE,
-    })
-      .then((res) => {
-        if (!cancelled) {
-          setTemplateNames(new Map(res.data.map((item) => [item.id, item.name])))
-        }
-      })
-      .catch(() => {
-        /* 名称取不到时回退展示模板 ID */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   /** 近期记录：创建时间倒序后截取固定条数 */
   const recentRecords = useMemo(
     () =>
@@ -145,6 +129,20 @@ export default function PartyHomeView() {
         .slice(0, PARTY_RECENT_RECORD_LIMIT),
     [records],
   )
+
+  // 近期记录审核状态：已核定分数直接判定成功，其余读取审批记录区分「被驳回 / 审核中」
+  const { statuses } = usePartyScoreApplicationStatuses(recentRecords)
+
+  /**
+   * 打开申报详情页：从近期记录跳转到独立路由，携带来源模块以便侧栏高亮与返回。
+   * @param record 当前点击的申报记录（必填）
+   */
+  const openRecordDetail = (record: PartyScore) => {
+    if (!portalKey) return
+    navigate(
+      `/portal/${portalKey}/party-scores/${record.id}?from=${moduleKey ?? 'party_m1'}`,
+    )
+  }
 
   return (
     <div className="party-view">
@@ -189,42 +187,40 @@ export default function PartyHomeView() {
           <p className="party-records-empty">{t('party.recordsEmpty')}</p>
         ) : (
           <ul className="party-records-list">
-            {recentRecords.map((record) => (
-              <li
-                key={record.id}
-                className="party-record-item"
-                style={{ cursor: 'pointer' }}
-                title={t('partyDeclaration.rowClickHint')}
-                onClick={() => setDetailRecord(record)}
-              >
-                <span className="party-record-date">
-                  {formatRecordDate(record.created_at)}
-                </span>
-                <span className="party-record-act">
-                  {record.template_id !== undefined
-                    ? templateNames.get(record.template_id) ?? record.template_id
-                    : t('common.unknown')}
-                </span>
-                <span
-                  className={
-                    isNegativePartyScore(record.requested_score)
-                      ? 'party-record-delta party-score-minus'
-                      : 'party-record-delta'
-                  }
+            {recentRecords.map((record) => {
+              const status = statuses.get(record.id)
+              return (
+                <li
+                  key={record.id}
+                  className="party-record-item"
+                  style={{ cursor: 'pointer' }}
+                  title={t('partyDeclaration.rowClickHint')}
+                  onClick={() => openRecordDetail(record)}
                 >
-                  {formatPartyScore(record.requested_score)}
-                </span>
-              </li>
-            ))}
+                  <span className="party-record-date">
+                    {formatRecordDate(record.created_at)}
+                  </span>
+                  <span className="party-record-act">
+                    {record.template_id !== undefined
+                      ? templateNames.get(record.template_id) ?? record.template_id
+                      : t('common.unknown')}
+                  </span>
+                  {/* 近期记录只展示审核状态，不展示申请分数，避免被误认为已获得成绩 */}
+                  <span className="party-record-status">
+                    {status ? (
+                      <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
+                        {t(`partyDeclaration.applicationStatus_${status}`)}
+                      </Tag>
+                    ) : (
+                      <Spin size="small" />
+                    )}
+                  </span>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
-
-      <PartyScoreDetailModal
-        record={detailRecord}
-        templateNames={templateNames}
-        onClose={() => setDetailRecord(null)}
-      />
     </div>
   )
 }

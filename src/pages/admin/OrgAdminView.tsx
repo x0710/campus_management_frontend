@@ -53,7 +53,7 @@ import type {
   OrganizationMember,
 } from '../../api/types/organizations'
 import { queryPositions } from '../../api/positions'
-import { getPartyScoreTotals } from '../../api/partyScores'
+import { getPartyScoreOrganizationAverage, getPartyScoreTotals } from '../../api/partyScores'
 import { resetUserPassword } from '../../api/users'
 import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
@@ -61,16 +61,17 @@ import ErrorState from '../../components/ErrorState'
 import MatchedMembersTable from '../../components/MatchedMembersTable'
 import MemberSearchModeToggle from '../../components/MemberSearchModeToggle'
 import MemberSearchNav from '../../components/MemberSearchNav'
+import MultiSelectHeaderFilter from '../../components/MultiSelectHeaderFilter'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
-import { useMemberSearch } from '../../composables/useMemberSearch'
+import { findMemberPage, useMemberSearch } from '../../composables/useMemberSearch'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
-import { formatPartyScoreTotal } from '../../utils/partyScore'
+import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../../utils/partyScore'
 import {
   groupOrganizationMembers,
   uniqueUserOrganizations,
@@ -159,6 +160,13 @@ export default function OrgAdminView({
   /** 成员「先锋等级」列：当前页成员 uid → 党建加分总计（无记录按 0 分处理） */
   const [partyScores, setPartyScores] = useState<Map<number, string>>(new Map())
   const [partyScoresLoading, setPartyScoresLoading] = useState(false)
+  /** 党委学校端：职位筛选选中的职位编码（空数组表示不过滤） */
+  const [positionFilter, setPositionFilter] = useState<string[]>([])
+  /** 党委学校端：先锋等级排序方向（null 表示不排序） */
+  const [scoreSort, setScoreSort] = useState<'ascend' | 'descend' | null>(null)
+  /** 当前组织平均成绩（后端 DecimalText；仅党委学校端展示） */
+  const [orgAverageScore, setOrgAverageScore] = useState<string | null>(null)
+  const [orgAverageLoading, setOrgAverageLoading] = useState(false)
 
   const [positions, setPositions] = useState<PositionDetail[]>([])
 
@@ -227,6 +235,22 @@ export default function OrgAdminView({
     async (orgId: number, page: number, force?: boolean) => {
       setMembersLoading(true)
       try {
+        if (partyScoreColumns) {
+          // 党委学校端：职位筛选与分数排序需要覆盖全量成员，循环取完该组织全部分页
+          const all: OrganizationMember[] = []
+          for (let current = 1; ; current += 1) {
+            const res = await queryOrgMembers(
+              orgId,
+              { page: current, page_size: MEMBER_PAGE_SIZE },
+              force,
+            )
+            all.push(...res.data)
+            if (current >= res.total_pages || res.data.length < MEMBER_PAGE_SIZE) break
+          }
+          setMembers(all)
+          setMemberTotal(all.length)
+          return
+        }
         const res = await queryOrgMembers(
           orgId,
           { page, page_size: MEMBER_PAGE_SIZE },
@@ -240,13 +264,120 @@ export default function OrgAdminView({
         setMembersLoading(false)
       }
     },
-    [reportError],
+    [partyScoreColumns, reportError],
   )
 
   // 成员表展示行：同一成员在当前组织有多个职位时合并为一行（避免出现两个一样的人）
   const memberRows = useMemo(() => groupOrganizationMembers(members), [members])
-  // 当前成员页内的用户 ID（按展示行去重）→ 姓名 / 任职组织 / 先锋等级
-  const memberIds = useMemo(() => memberRows.map((m) => m.user_id), [memberRows])
+  // 全量成员用户 ID（按展示行去重）→ 先锋等级（排序需覆盖全部成员）
+  const allMemberIds = useMemo(() => memberRows.map((m) => m.user_id), [memberRows])
+  // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
+  const positionNames = usePositionNames()
+
+  /** 党委学校端职位筛选可选项：当前组织全量成员中实际出现的职位 */
+  const memberPositionOptions = useMemo(() => {
+    const codes = new Set<string>()
+    for (const member of members) {
+      const code = member.position?.trim()
+      if (code) codes.add(code)
+    }
+    return [...codes]
+      .map((code) => ({ value: code, label: positionNames.get(code) ?? code }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
+  }, [members, positionNames])
+
+  /**
+   * 党委学校端：职位筛选 + 分数排序后的全量成员行；
+   * 其余门户保持服务端分页的当前页数据。
+   */
+  const filteredRows = useMemo(() => {
+    if (!partyScoreColumns) return memberRows
+    let rows = memberRows
+    if (positionFilter.length > 0) {
+      rows = rows.filter((row) =>
+        row.positions.some((code) => positionFilter.includes(code)),
+      )
+    }
+    if (scoreSort === null) return rows
+    const scoreOf = (uid: number) => {
+      const value = Number(partyScores.get(uid) ?? 0)
+      return Number.isFinite(value) ? value : 0
+    }
+    return [...rows].sort((a, b) => {
+      const diff = scoreOf(a.user_id) - scoreOf(b.user_id)
+      return scoreSort === 'ascend' ? diff : -diff
+    })
+  }, [partyScoreColumns, memberRows, positionFilter, scoreSort, partyScores])
+
+  // 表格分页总数：党委学校端取筛选后的行数，其余模式沿用接口总数
+  const displayTotal = partyScoreColumns ? filteredRows.length : memberTotal
+
+  // 当前页展示行：党委学校端由前端切片；其余模式接口已按页返回
+  const visibleRows = useMemo(() => {
+    if (!partyScoreColumns) return memberRows
+    const start = (memberPage - 1) * MEMBER_PAGE_SIZE
+    return filteredRows.slice(start, start + MEMBER_PAGE_SIZE)
+  }, [partyScoreColumns, memberRows, filteredRows, memberPage])
+
+  // 当前页用户 ID：姓名 / 任职组织仅需解析当前展示页
+  const visibleMemberIds = useMemo(
+    () => visibleRows.map((m) => m.user_id),
+    [visibleRows],
+  )
+
+  /** 前端分页下定位成员所在页（供搜索命中后跳转到目标页） */
+  const resolveMemberPage = useCallback(
+    async (orgId: number, uid: number) => {
+      if (orgId !== selectedId) return findMemberPage(orgId, uid, MEMBER_PAGE_SIZE)
+      const index = memberRows.findIndex((row) => row.user_id === uid)
+      return index === -1 ? null : Math.floor(index / MEMBER_PAGE_SIZE) + 1
+    },
+    [memberRows, selectedId],
+  )
+
+  // 切换组织时清空职位筛选与排序：不同组织的职位集合不同
+  useEffect(() => {
+    setPositionFilter([])
+    setScoreSort(null)
+  }, [selectedId])
+
+  // 当前组织平均成绩：随选中组织切换重新查询（仅党委学校端展示）
+  useEffect(() => {
+    if (!partyScoreColumns || selectedId === null) {
+      setOrgAverageScore(null)
+      setOrgAverageLoading(false)
+      return
+    }
+    let cancelled = false
+    setOrgAverageLoading(true)
+    getPartyScoreOrganizationAverage({ organization_id: selectedId, recursive: true })
+      .then((res) => {
+        if (!cancelled) setOrgAverageScore(res.average_score)
+      })
+      .catch(() => {
+        if (!cancelled) setOrgAverageScore(null)
+      })
+      .finally(() => {
+        if (!cancelled) setOrgAverageLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [partyScoreColumns, selectedId])
+
+  // 筛选后总页数变少时把页码收敛到末页（加载中不收敛，避免覆盖搜索目标页）
+  useEffect(() => {
+    if (!partyScoreColumns || membersLoading) return
+    const maxPage = Math.max(1, Math.ceil(displayTotal / MEMBER_PAGE_SIZE))
+    if (memberPage > maxPage) setMemberPage(uiKey, maxPage)
+  }, [
+    partyScoreColumns,
+    membersLoading,
+    displayTotal,
+    memberPage,
+    uiKey,
+    setMemberPage,
+  ])
 
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
   const search = useMemberSearch({
@@ -259,7 +390,9 @@ export default function OrgAdminView({
       setMemberPage(uiKey, page)
       void loadMembers(orgId, page)
     },
-    memberRows,
+    memberRows: visibleRows,
+    // 党委学校端在前端过滤 / 排序 / 分页，搜索命中后按当前行序计算目标页
+    resolveMemberPage: partyScoreColumns ? resolveMemberPage : undefined,
     // 搜索状态按模块 key 记忆：进入成员详情再返回后继续展示上一次的模糊匹配结果
     persistKey: uiKey,
   })
@@ -328,24 +461,22 @@ export default function OrgAdminView({
   )
 
   // 当前成员页内的用户 ID → 姓名 / 任职组织（均走会话缓存，相同 ID 不重复请求）
-  const memberNames = useUserNames(memberIds)
-  const memberOrgs = useUserOrganizations(memberIds)
-  // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
-  const positionNames = usePositionNames()
+  const memberNames = useUserNames(visibleMemberIds)
+  const memberOrgs = useUserOrganizations(visibleMemberIds)
 
-  // 成员列表「先锋等级」列：按当前页成员批量查询党建加分总计（口径与支部端支部管理一致）
+  // 成员列表「先锋等级」列：批量查询全量成员党建加分总计（排序需覆盖全部成员）
   useEffect(() => {
-    if (!partyScoreColumns || memberIds.length === 0) {
+    if (!partyScoreColumns || allMemberIds.length === 0) {
       setPartyScores(new Map())
       setPartyScoresLoading(false)
       return
     }
     let cancelled = false
     setPartyScoresLoading(true)
-    getPartyScoreTotals(memberIds)
+    getPartyScoreTotals(allMemberIds)
       .then((items) => {
         if (cancelled) return
-        const next = new Map<number, string>(memberIds.map((uid) => [uid, '0']))
+        const next = new Map<number, string>(allMemberIds.map((uid) => [uid, '0']))
         for (const [uid, score] of items) next.set(uid, score)
         setPartyScores(next)
       })
@@ -358,7 +489,7 @@ export default function OrgAdminView({
     return () => {
       cancelled = true
     }
-  }, [memberIds, partyScoreColumns])
+  }, [allMemberIds, partyScoreColumns])
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
     // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
@@ -532,6 +663,9 @@ export default function OrgAdminView({
             title: t('branch.colPioneerLevel'),
             key: 'pioneer_level',
             width: 140,
+            // 点击表头切换正序 / 倒序（实际排序在前端完成，见 filteredRows）
+            sorter: true,
+            sortOrder: scoreSort,
             render: (_, record) => {
               if (partyScoresLoading) {
                 return <span className="cell-sub">{t('common.loading')}</span>
@@ -547,7 +681,7 @@ export default function OrgAdminView({
             render: (_, record) =>
               record.workplaces.length > 0 ? record.workplaces.join('、') : '—',
           },
-    [partyScoreColumns, t, partyScores, partyScoresLoading],
+    [partyScoreColumns, t, partyScores, partyScoresLoading, scoreSort],
   )
 
   const memberColumns = useMemo<ColumnsType<UserMemberRow>>(
@@ -596,7 +730,21 @@ export default function OrgAdminView({
         },
       },
       {
-        title: t('adminOrg.colPosition'),
+        // 党委学校端：点击「职位」表头弹出当前组织的全部职位，可多选筛选
+        title: partyScoreColumns ? (
+          <MultiSelectHeaderFilter
+            title={t('adminOrg.colPosition')}
+            allLabel={t('common.all')}
+            options={memberPositionOptions}
+            value={positionFilter}
+            onChange={(next) => {
+              setPositionFilter(next)
+              setMemberPage(uiKey, 1)
+            }}
+          />
+        ) : (
+          t('adminOrg.colPosition')
+        ),
         key: 'position',
         width: 200,
         // 同一组织多个职位：职位栏并列展示全部职位（映射失败时回退编码），悬停展示原始编码
@@ -672,11 +820,16 @@ export default function OrgAdminView({
       memberOrgs,
       positionNames,
       selectedId,
+      partyScoreColumns,
       openMemberDetail,
       workplaceOrScoreColumn,
       showResetPassword,
       openResetPassword,
       removeMember,
+      memberPositionOptions,
+      positionFilter,
+      setMemberPage,
+      uiKey,
     ],
   )
 
@@ -763,6 +916,18 @@ export default function OrgAdminView({
                   ? `${selectedOrg.name}（${selectedOrg.code}）`
                   : t('adminOrg.detailTitle')}
             </h3>
+            {/* 当前组织的平均成绩（含下级组织） */}
+            {partyScoreColumns && selectedId !== null && !search.matchOnly && (
+              <span className="org-average-score">
+                {t('orgExplorer.orgAverageScore')}
+                <strong>
+                  {orgAverageLoading
+                    ? '—'
+                    : formatPartyScoreTotalDecimal(orgAverageScore)}
+                </strong>
+                <em>{t('party.scoreUnit')}</em>
+              </span>
+            )}
           </div>
           {/* 「单独查看匹配人员」模式下表格不再属于某个组织，隐藏组织维度的操作按钮 */}
           {selectedOrg && !search.matchOnly && (
@@ -815,7 +980,14 @@ export default function OrgAdminView({
               width={320}
               value={search.query}
               onChange={search.setQuery}
-              onSearch={search.run}
+              onSearch={(value: string) => {
+                // 搜索面向全组织成员：先清空职位筛选与排序，避免目标人员被过滤掉
+                if (partyScoreColumns) {
+                  setPositionFilter([])
+                  setScoreSort(null)
+                }
+                search.run(value)
+              }}
               loading={search.searching}
             />
             {/* 姓名模糊匹配到多人时：紧邻搜索框展示匹配总数 + 上一个 / 下一个，不遮挡成员表 */}
@@ -861,7 +1033,7 @@ export default function OrgAdminView({
                 rowKey={(r: UserMemberRow) => String(r.user_id)}
                 loading={membersLoading}
                 columns={memberColumns}
-                dataSource={memberRows}
+                dataSource={visibleRows}
                 // 搜索命中的成员所在行高亮（夜间配色见 index.css 的 .org-member-row-hit）
                 rowClassName={(record: UserMemberRow) =>
                   record.user_id === search.hitUid ? 'org-member-row-hit' : ''
@@ -878,18 +1050,35 @@ export default function OrgAdminView({
                   title: t('memberDetail.rowClickHint'),
                   style: { cursor: 'pointer' },
                 })}
+                onChange={(pagination, _filters, sorter) => {
+                  const nextPage = pagination.current ?? 1
+                  const order =
+                    (Array.isArray(sorter) ? sorter[0]?.order : sorter.order) ?? null
+                  if (partyScoreColumns) {
+                    // 排序变化：重置到第 1 页，按前端重新排序后的数据切片
+                    if (order !== scoreSort) {
+                      setScoreSort(order)
+                      setMemberPage(uiKey, 1)
+                      return
+                    }
+                    // 仅翻页：前端已加载全量数据，直接切换页码
+                    if (nextPage !== memberPage) setMemberPage(uiKey, nextPage)
+                    return
+                  }
+                  // 服务端分页模式：翻页时重新请求该页
+                  if (nextPage !== memberPage) {
+                    setMemberPage(uiKey, nextPage)
+                    void loadMembers(selectedOrg.id, nextPage)
+                  }
+                }}
                 pagination={{
                   current: memberPage,
                   pageSize: MEMBER_PAGE_SIZE,
-                  total: memberTotal,
+                  total: displayTotal,
                   showSizeChanger: false,
                   showQuickJumper: true,
                   showTotal: (n: number) =>
                     `${t('common.total')} ${n} ${t('common.items')}`,
-                  onChange: (p: number) => {
-                    setMemberPage(uiKey, p)
-                    void loadMembers(selectedOrg.id, p)
-                  },
                 }}
               />
             </>

@@ -4,6 +4,8 @@
  * 后端分数为 DecimalText（JSON 字符串，如 "5" / "-2.5"），前端统一按字符串承接并原样透传，
  * 只在展示 / 判断正负时转成数值，避免 number 与 string 混用以及浮点精度丢失。
  */
+import type { ApprovalRecordItem } from '../api/types/approvals'
+import type { ApprovalStep } from '../api/types/approvalmodel'
 import type { PartyScore } from '../api/types/partyScores'
 import {
   PARTY_GRADE_DEMONSTRATION_MIN,
@@ -13,6 +15,7 @@ import {
   PARTY_SCORE_DEDUCTION,
   PARTY_SCORE_MAX_BONUS,
   PARTY_SCORE_MAX_TOTAL,
+  type PartyScoreApplicationStatus,
 } from '../config/partyDeclaration'
 
 /**
@@ -36,6 +39,60 @@ export function isNegativePartyScore(score: string | null | undefined): boolean 
   if (score === null || score === undefined || score.trim() === '') return false
   const numeric = Number(score)
   return Number.isFinite(numeric) && numeric < 0
+}
+
+/**
+ * 判断申报是否已核定分数（即审批已通过并写入 approved_score）。
+ *
+ * @param score 申报记录（至少包含 approved_score；必填）
+ * @returns true 表示已核定分数；null / undefined / 空白字符串均视为未核定
+ */
+export function hasApprovedPartyScore(
+  score: Pick<PartyScore, 'approved_score'>,
+): boolean {
+  const approved = score.approved_score
+  return approved !== null && approved !== undefined && approved.trim() !== ''
+}
+
+/**
+ * 推导单条成绩申报的审核状态。
+ *
+ * 判定顺序：
+ * 1. 审批记录中存在驳回决定 → 被驳回（驳回后审批实例终止，不再继续流转）；
+ * 2. 能拿到模板审批步骤时：每个步骤（step_no）都必须有对应的「同意」记录才算申请成功，
+ *    只有部分步骤通过（例如两步审批只完成一步）仍为审核中；
+ * 3. 模板步骤获取失败（旧数据 / 权限不足）时回退 `approved_score`：已核定分数 → 申请成功；
+ * 4. 其余情况 → 审核中。
+ *
+ * @param score 申报记录（至少包含 approved_score；必填）
+ * @param approvalRecords 该申报审批实例的审批意见记录；为空或未加载时为 undefined/null
+ * @param steps 该申报模板的审批步骤（用于判断是否所有环节都已完成）；未知时为 undefined/null
+ * @returns PartyScoreApplicationStatus 审核状态
+ */
+export function resolvePartyScoreApplicationStatus(
+  score: Pick<PartyScore, 'approved_score'>,
+  approvalRecords?: ApprovalRecordItem[] | null,
+  steps?: Pick<ApprovalStep, 'step_no'>[] | null,
+): PartyScoreApplicationStatus {
+  if (approvalRecords?.some((record) => record.decision === 'reject')) {
+    return 'rejected'
+  }
+
+  // 模板步骤已知：必须每个环节都存在实际的「同意」记录，避免首个环节通过就误判申请成功
+  const requiredStepNos = steps?.map((step) => step.step_no) ?? []
+  if (requiredStepNos.length > 0) {
+    const agreedStepNos = new Set(
+      (approvalRecords ?? [])
+        .filter((record) => record.decision === 'agree')
+        .map((record) => record.step_order),
+    )
+    return requiredStepNos.every((stepNo) => agreedStepNos.has(stepNo))
+      ? 'approved'
+      : 'pending'
+  }
+
+  // 模板步骤不可用时只能回退后端核定分数，保证旧数据仍能正常展示
+  return hasApprovedPartyScore(score) ? 'approved' : 'pending'
 }
 
 /**

@@ -71,12 +71,14 @@ export default function PortalWorkspace() {
       return undefined
     }
     const third = segments[2]
-    // 详情类子路由（公告详情/编辑、成员详情、党建加分审批详情）不在模块列表中，
-    // 通过 ?from=<moduleKey> 让侧栏仍高亮来源模块
+    // 详情类子路由（公告详情/编辑、成员详情、党建加分审批详情、成绩申报详情、审批指标详情）
+    // 不在模块列表中，通过 ?from=<moduleKey> 让侧栏仍高亮来源模块
     if (
       third === 'announcements' ||
       third === 'organization-members' ||
-      third === 'party-score-approvals'
+      third === 'party-score-approvals' ||
+      third === 'party-scores' ||
+      third === 'approval-templates'
     ) {
       const from = new URLSearchParams(location.search).get('from')
       if (from && [...readyModules, ...previewModules].some((m) => m.key === from)) return from

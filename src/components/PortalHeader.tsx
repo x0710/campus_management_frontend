@@ -1,6 +1,5 @@
 /** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
 import {
-  AppstoreOutlined,
   DownOutlined,
   KeyOutlined,
   LogoutOutlined,
@@ -84,7 +83,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const [realName, setRealName] = useState<string | null>(null)
   // 当前用户可访问的门户 key：由角色查询结果映射而来
   const [portalKeys, setPortalKeys] = useState<PortalKey[]>([])
-  // 是否为超级管理员：仅超管显示左上角门户选择按钮
+  // 是否为超级管理员：超管保留全部门户切换入口（与原先行为一致）
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   // 「重置密码」弹窗：本人改密（需旧密码校验）
   const [resetOpen, setResetOpen] = useState(false)
@@ -110,7 +109,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     getMyRoles()
       .then((roles) => {
         if (cancelled) return
-        // 按角色过滤门户：党员端始终可选，支部端 / 学院端 / 学校端仅对应书记角色可见
+        // 按角色解析可访问门户：党员端始终可选，支部端 / 学院端 / 学校端仅对应书记角色可见
         setIsSuperAdmin(roles.some(isSuperAdminRole))
         setPortalKeys(getAccessiblePortalKeys(roles))
       })
@@ -136,16 +135,31 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const currentPortalName = currentPortal ? t(`portal.${currentPortal.key}_name`) : t('portal.selectPortal')
 
   /**
-   * 左上角门户切换菜单：固定平铺列出全部门户端，不做角色可访问性过滤；
-   * 已停用的门户（学生端 / 教师端 / 领导端）不展示入口。
+   * 左上角门户切换入口的可选门户：
+   * - 超级管理员保留全部门户（与原先的左上角切换行为一致）；
+   * - 普通用户只列出角色可访问的门户（与原先头像菜单一致）。
    */
-  const portalSwitchItems = useMemo<MenuProps['items']>(() => {
-    return PORTALS.filter((portal) => !isPortalDisabled(portal.key)).map((portal) => ({
-      key: `portal:${portal.key}`,
-      icon: portal.icon,
-      label: t(`portal.${portal.key}_name`),
-    }))
-  }, [t])
+  const switcherPortalKeys = useMemo<PortalKey[]>(
+    () =>
+      isSuperAdmin
+        ? PORTALS.filter((portal) => !isPortalDisabled(portal.key)).map(
+            (portal) => portal.key,
+          )
+        : portalKeys,
+    [isSuperAdmin, portalKeys],
+  )
+  /** 左上角门户切换菜单：只列可选门户 */
+  const portalSwitchItems = useMemo<MenuProps['items']>(
+    () =>
+      switcherPortalKeys.map((portalKey) => ({
+        key: `portal:${portalKey}`,
+        icon: getPortal(portalKey)?.icon,
+        label: t(`portal.${portalKey}_name`),
+      })),
+    [switcherPortalKeys, t],
+  )
+  /** 可切换门户达到 2 个时才展示切换入口（只有 1 个门户无需展示） */
+  const showPortalSwitcher = switcherPortalKeys.length > 1
 
   /** 当前门户的「我的」模块：存在时在头像菜单中提供入口 */
   const profileModuleKey = currentPortalKey ? PORTAL_PROFILE_MODULE_KEYS[currentPortalKey] : undefined
@@ -155,16 +169,10 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       : undefined
 
   /**
-   * 右上角用户菜单：先展示「我的」（党员端 / 支部端 / 学院端 / 学校端）与「门户选择」，
-   * 「门户选择」点击后再展开本次角色可访问的门户列表，
-   * 避免点击头像就直接跳出一串门户（子菜单展开方式设为 click，见下方 Dropdown）。
+   * 右上角用户菜单：仅保留「我的」与「重置密码」；
+   * 门户切换统一由左上角门户选择完成，不再在头像菜单中重复提供。
    */
   const userMenuItems = useMemo<MenuProps['items']>(() => {
-    const portalItems = portalKeys.map((portalKey) => ({
-      key: `portal:${portalKey}`,
-      icon: getPortal(portalKey)?.icon,
-      label: t(`portal.${portalKey}_name`),
-    }))
     // 「我的」不再占用侧栏入口，改从头像菜单进入
     const myProfileItems: NonNullable<MenuProps['items']> =
       profileModuleKey
@@ -180,22 +188,12 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     return [
       ...myProfileItems,
       {
-        key: 'portal-select',
-        icon: <AppstoreOutlined />,
-        label: t('portal.selectPortal'),
-        children:
-          portalItems.length > 0
-            ? portalItems
-            : [{ key: 'no-portal', label: t('portal.noRole'), disabled: true }],
-      },
-      { type: 'divider' },
-      {
         key: 'reset-password',
         icon: <KeyOutlined />,
         label: t('password.menuLabel'),
       },
     ]
-  }, [portalKeys, t, profileModuleKey])
+  }, [t, profileModuleKey])
 
   /** 下拉展开时强制刷新角色，避免后端角色变更后仍显示旧菜单 */
   const refreshPortalKeys = async () => {
@@ -265,9 +263,13 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           </span>
           <span className="header-brand-name">{t('common.appName')}</span>
         </div>
-        {isSuperAdmin && (
+        {showPortalSwitcher && (
           <Dropdown
             trigger={['click']}
+            onOpenChange={(open) => {
+              // 展开时刷新角色，避免后端角色变更后门户列表仍是旧数据
+              if (open) void refreshPortalKeys()
+            }}
             menu={{
               items: portalSwitchItems,
               selectable: true,
@@ -313,9 +315,6 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
 
         <Dropdown
           trigger={['click']}
-          onOpenChange={(open) => {
-            if (open) void refreshPortalKeys()
-          }}
           menu={{
             items: localeItems,
             selectable: true,
@@ -332,14 +331,8 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           trigger={['click']}
           menu={{
             items: userMenuItems,
-            /* 子菜单（门户选择）改为点击展开，而不是悬停即展开 */
-            triggerSubMenuAction: 'click',
             selectedKeys:
-              profilePath && location.pathname === profilePath
-                ? ['my-profile']
-                : currentPortalKey
-                  ? [`portal:${currentPortalKey}`]
-                  : [],
+              profilePath && location.pathname === profilePath ? ['my-profile'] : [],
             onClick: ({ key }: { key: string }) => {
               if (key === 'my-profile') {
                 if (profilePath) navigate(profilePath)
@@ -347,11 +340,6 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
               }
               if (key === 'reset-password') {
                 openResetPassword()
-                return
-              }
-              const portalKey = key.replace('portal:', '')
-              if (getPortal(portalKey)) {
-                navigate(`/portal/${portalKey}`)
               }
             },
           }}

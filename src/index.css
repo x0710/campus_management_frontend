@@ -1130,6 +1130,48 @@ h3 {
   }
 }
 
+/*
+ * 成绩申报详情（党员端首页近期记录进入）：
+ * 左栏申请内容略宽，右栏审核内容保证审批意见的可读宽度；窄屏上下堆叠。
+ */
+.party-score-detail-layout {
+  grid-template-columns: minmax(0, 1.3fr) minmax(340px, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .party-score-detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 审核状态提示条：与上方审核信息保持间距 */
+.party-score-status-alert {
+  margin-top: 14px;
+}
+
+/*
+ * 审批指标详情：左栏指标信息 + 加分细则，右栏审批步骤表格；
+ * 步骤表格需要横向空间，故右栏略宽，窄屏上下堆叠。
+ */
+.approval-template-detail-layout {
+  grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.15fr);
+}
+
+@media (max-width: 1100px) {
+  .approval-template-detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 指标信息卡片内联编辑：最后一项贴底，加分细则文本域允许纵向拉伸 */
+.approval-template-info-form .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+.approval-template-info-form .ant-form-item:last-child textarea {
+  resize: vertical;
+}
+
 /* 左栏审批内容分区：基础信息 / 审批流转 / 附件材料 */
 .party-approval-section + .party-approval-section {
   margin-top: 20px;
@@ -1642,8 +1684,30 @@ h3 {
 .org-members-title {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   min-width: 0;
+}
+
+/* 成员列表：当前组织平均成绩（含下级组织） */
+.org-average-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.org-average-score strong {
+  margin-left: 4px;
+  font-size: 16px;
+  color: #cf1322;
+}
+
+.org-average-score em {
+  font-style: normal;
 }
 
 /* 成员表头部操作区：按 ID 搜索框 + 刷新按钮 */
@@ -3048,14 +3112,13 @@ h3 {
   color: var(--ink);
 }
 
-.party-record-delta {
-  font-size: 15px;
-  font-weight: 600;
-  color: #389e0d;
-}
-
-:root[data-theme='dark'] .party-record-delta {
-  color: #73d13d;
+/* 近期记录审核状态：固定宽度右对齐，加载中也保持布局稳定 */
+.party-record-status {
+  flex: none;
+  width: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 /* 通用：表头多选筛选触发器 */
@@ -3368,38 +3431,39 @@ h3 {
   margin-top: 8px;
 }
 
-/* 党委支部端：本支部概况 */
+/* 党委支部端：本支部概况（红色背景统计区，与学院端工作台保持一致） */
 .branch-overview {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 24px 40px;
+  padding: 18px 24px;
+  border-radius: 10px;
+  background: #fdecec;
 }
 
 .branch-overview-item {
-  padding: 18px 20px;
-  border-radius: 10px;
-  background: var(--card-bg);
-  border: 1px solid var(--line);
+  min-width: 0;
 }
 
 .branch-overview-label {
   font-size: 13px;
-  color: var(--ink-secondary);
+  color: #8c8c8c;
   margin-bottom: 8px;
 }
 
 .branch-overview-value {
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1;
-  color: var(--brand);
+  color: #cf1322;
 }
 
 .branch-overview-unit {
   font-size: 14px;
-  font-weight: 400;
-  margin-left: 6px;
-  color: var(--ink-secondary);
+  font-weight: 600;
+  font-style: normal;
+  margin-left: 2px;
+  color: inherit;
 }
 
 /* 党委支部端：等级分布（横向柱状图） */
@@ -3461,7 +3525,7 @@ h3 {
   color: var(--ink);
 }
 
-/* 党委支部端：待办事项 */
+/* 党委支部端 / 党委学院端：待办事项 */
 .branch-todo-list {
   margin: 0;
   padding: 0;
@@ -3488,16 +3552,21 @@ h3 {
   text-decoration: none;
 }
 
-/* 概况卡片可点击态（党员总数卡片跳转支部管理） */
+/* 概况卡片可点击态（支部总人数卡片跳转支部管理） */
 .branch-overview-link {
   display: block;
+  border-radius: 6px;
   color: inherit;
   text-decoration: none;
 }
 
-/* 可点击卡片 hover / 键盘聚焦反馈：提亮边框并加投影，提示可点击 */
+/* 概况卡片 hover / 键盘聚焦反馈：给红色统计区内的可点击项加浅色底提示可点击 */
 .branch-overview-link:hover,
-.branch-overview-link:focus-visible,
+.branch-overview-link:focus-visible {
+  background: rgba(207, 19, 34, 0.06);
+}
+
+/* 待办项 hover / 键盘聚焦反馈：提亮边框并加投影，提示可点击 */
 .branch-todo-item:hover,
 .branch-todo-item:focus-within {
   border-color: var(--brand-light);
@@ -3549,7 +3618,8 @@ h3 {
 
 .academy-overview {
   display: flex;
-  gap: 56px;
+  flex-wrap: wrap;
+  gap: 20px 56px;
   padding: 18px 24px;
   margin-bottom: 26px;
   border-radius: 10px;
@@ -3560,6 +3630,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 120px;
 }
 
 .academy-overview-label {
@@ -3648,6 +3719,7 @@ h3 {
   color: var(--ink);
 }
 
+:root[data-theme='dark'] .branch-overview,
 :root[data-theme='dark'] .academy-overview {
   background: rgba(207, 19, 34, 0.16);
 }

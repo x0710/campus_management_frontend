@@ -2,21 +2,25 @@
  * 党委支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
  *
  * 已接入真实接口：
- *   党员总数（人）  经 composables/usePortalOrg 定位当前用户所属支部 →
+ *   支部总人数（人）  经 composables/usePortalOrg 定位当前用户所属支部 →
  *                   GET /api/organizations/{id}/member-counts?recursive=true
  *                   按组织统计成员数（含全部下级组织，前端相加得总数）
+ *   党员人数（人）  按职位名称「中共党员」经 GET /api/positions 解析职位编码后，
+ *                   对支部及全部下级组织调用 GET /api/organizations/{id}/members?position=
+ *                   取分页 total 汇总（含全部下级组织）
+ *   预备党员人数（人） 同上，按职位名称「中共预备党员」统计
  *   待审核申报（条） 前端用 GET /api/party-scores + /api/approvals 合成党建加分审批步骤，
  *                   按 status=waiting / pending 各取一页后合计条数；
  *                   底层接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
  *   平均分          GET /api/party/scores/organization-average?organization_id=…&recursive=true
  *   等级分布        前端拉取支部成员 uid，再经 GET /api/party/scores 批量查询分数后按等级统计
  *
- * 卡片跳转：党员总数 → 支部管理（branch_m5），待审核申报 → 审核管理（branch_m3）。
+ * 卡片跳转：支部总人数 → 支部管理（branch_m5），待审核申报 → 审核管理（branch_m3）。
  */
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { listSubsidiaries, queryOrgMembers } from '../../api/organizations'
+import { queryOrgMembers } from '../../api/organizations'
 import {
   getPartyScoreOrganizationAverage,
   getPartyScoreTotals,
@@ -25,17 +29,23 @@ import {
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
+import {
+  countOrgMembersByPositionNames,
+  listOrgSelfAndDescendantIds,
+} from '../../composables/useOrgPositionMemberCounts'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
+import {
+  PARTY_FULL_MEMBER_STATUS_NAME,
+  PARTY_PROBATIONARY_STATUS_NAME,
+} from '../../config/partyProfile'
+import { PARTY_SCORE_TODO_PAGE_SIZE } from '../../config/partyScoreApproval'
 import { useT } from '../../i18n'
 import {
   formatPartyScoreTotalDecimal,
   getPartyScoreGrade,
   toPartyScoreTotal,
 } from '../../utils/partyScore'
-
-/** 待审核申报统计单页条数：底层审批步骤接口无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
-const APPROVAL_TODO_PAGE_SIZE = 100
 
 /** 支部成员单页拉取条数 */
 const BRANCH_MEMBER_PAGE_SIZE = 100
@@ -52,22 +62,6 @@ const GRADE_DISTRIBUTION_ITEMS: Omit<GradeDistributionItem, 'count'>[] = [
   { key: 'branch.grade_progress', tone: 'progress' },
   { key: 'branch.grade_warning', tone: 'warning' },
 ]
-
-/** 收集组织及其全部下级组织 ID */
-async function collectOrgIds(rootId: number): Promise<number[]> {
-  const ids = [rootId]
-  const queue = [rootId]
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (current === undefined) continue
-    const children = await listSubsidiaries(current)
-    for (const child of children) {
-      ids.push(child.id)
-      queue.push(child.id)
-    }
-  }
-  return ids
-}
 
 /** 收集多个组织下的去重成员 uid */
 async function collectMemberIds(orgIds: number[]): Promise<number[]> {
@@ -87,7 +81,7 @@ async function collectMemberIds(orgIds: number[]): Promise<number[]> {
 
 /** 前端根据成员党建活动加分计算等级分布 */
 async function buildGradeDistribution(orgId: number): Promise<GradeDistributionItem[]> {
-  const orgIds = await collectOrgIds(orgId)
+  const orgIds = await listOrgSelfAndDescendantIds(orgId)
   const memberIds = await collectMemberIds(orgIds)
   const batchScores = await getPartyScoreTotals(memberIds)
   const scoreMap = new Map<number, string>()
@@ -114,8 +108,12 @@ export default function BranchWorkbenchView() {
   const t = useT()
   const { portalKey } = useParams<{ portalKey: string }>()
 
-  /** 本支部党员总数（人）；null 表示未取到（加载中或加载失败） */
+  /** 本支部总人数（人）；null 表示未取到（加载中或加载失败） */
   const [members, setMembers] = useState<number | null>(null)
+  /** 本支部党员人数（职位为「中共党员」）；null 表示未取到或职位未配置 */
+  const [partyMembers, setPartyMembers] = useState<number | null>(null)
+  /** 本支部预备党员人数（职位为「中共预备党员」）；null 表示未取到或职位未配置 */
+  const [probationaryMembers, setProbationaryMembers] = useState<number | null>(null)
   /** 待审核申报条数（waiting + pending） */
   const [todoApprove, setTodoApprove] = useState<number | null>(null)
   /** 本支部党建活动加分平均分（后端为字符串；null 表示无数据或加载失败） */
@@ -129,20 +127,36 @@ export default function BranchWorkbenchView() {
   const load = useCallback(async () => {
     try {
       const { orgId } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
-      const [memberTotal, waitingSteps, pendingSteps, average, gradeDistribution] = await Promise.all([
+      const [
+        memberTotal,
+        waitingSteps,
+        pendingSteps,
+        average,
+        gradeDistribution,
+        partyCounts,
+      ] = await Promise.all([
         orgId === null
           ? Promise.resolve(0)
           : countOrgMemberTotal(orgId),
-        queryPartyScoreApprovals({ status: 'waiting', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
-        queryPartyScoreApprovals({ status: 'pending', page: 1, page_size: APPROVAL_TODO_PAGE_SIZE }),
+        queryPartyScoreApprovals({ status: 'waiting', page: 1, page_size: PARTY_SCORE_TODO_PAGE_SIZE }),
+        queryPartyScoreApprovals({ status: 'pending', page: 1, page_size: PARTY_SCORE_TODO_PAGE_SIZE }),
         orgId === null
           ? Promise.resolve({ average_score: null } as const)
           : getPartyScoreOrganizationAverage({ organization_id: orgId, recursive: true }),
         orgId === null
           ? Promise.resolve([])
           : buildGradeDistribution(orgId),
+        // 党员 / 预备党员人数：按职位名称经成员列表接口统计（含全部下级组织）
+        orgId === null
+          ? Promise.resolve<Record<string, number | null>>({})
+          : countOrgMembersByPositionNames(orgId, [
+              PARTY_FULL_MEMBER_STATUS_NAME,
+              PARTY_PROBATIONARY_STATUS_NAME,
+            ]),
       ])
       setMembers(memberTotal)
+      setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME] ?? null)
+      setProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME] ?? null)
       setTodoApprove(waitingSteps.length + pendingSteps.length)
       setAverageScore(average.average_score)
       setDistribution(gradeDistribution)
@@ -171,6 +185,9 @@ export default function BranchWorkbenchView() {
   const maxCount = Math.max(0, ...distribution.map((item) => item.count))
   /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
   const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
+  /** 按职位统计的人数：加载中或职位未配置时显示占位符，不误显示为 0 */
+  const positionCountText = (value: number | null) =>
+    loading || value === null ? '—' : String(value)
   // 支部平均分同样最多保留小数点后 3 位（与学校端 / 学院端口径一致）
   const averageText = loading ? '—' : formatPartyScoreTotalDecimal(averageScore)
 
@@ -183,14 +200,14 @@ export default function BranchWorkbenchView() {
         />
       )}
 
-      {/* 本支部概况 */}
+      {/* 本支部概况（红色背景统计区，与学院端工作台保持一致） */}
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('branch.overviewTitle')}</h3>
         </header>
         <div className="panel-card-body">
           <div className="branch-overview">
-            {/* 党员总数 → 支部管理（查看本支部及下级组织成员） */}
+            {/* 支部总人数 → 支部管理（查看本支部及下级组织成员） */}
             <Link
               className="branch-overview-item branch-overview-link"
               to={`/portal/${portalKey}/branch_m5`}
@@ -201,6 +218,22 @@ export default function BranchWorkbenchView() {
                 <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
               </div>
             </Link>
+            {/* 党员人数：按职位「中共党员」统计（含全部下级组织） */}
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('branch.statPartyMembers')}</div>
+              <div className="branch-overview-value">
+                {positionCountText(partyMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
+            {/* 预备党员人数：按职位「中共预备党员」统计（含全部下级组织） */}
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('branch.statProbationaryMembers')}</div>
+              <div className="branch-overview-value">
+                {positionCountText(probationaryMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
             <div className="branch-overview-item">
               <div className="branch-overview-label">{t('branch.statAvgScore')}</div>
               <div className="branch-overview-value">

@@ -41,7 +41,8 @@ interface UiState {
   setOrgTreeCollapsed: (moduleKey: string, collapsed: boolean) => void
   /**
    * 各组织视图左侧组织树已展开的节点 ID，按模块 key 记忆（跨路由切换保留，刷新后重置）。
-   * 缺省（undefined）表示用户未手动调整过，此时按默认「仅展开根节点」渲染。
+   * 缺省（undefined）表示用户未手动调整过，此时由各页面按自身默认值渲染
+   * （如组织成员管理默认展开根节点、组织概览默认全部折叠，需先选择组织再查询）。
    */
   expandedOrgTreeKeys: Partial<Record<string, number[]>>
   setOrgTreeExpanded: (moduleKey: string, keys: number[]) => void

@@ -18,6 +18,24 @@ export const PARTY_DECLARATION_MAX_FILES = 10
 /** 党员端首页「近期记录」展示条数（取最近的若干条成绩申报） */
 export const PARTY_RECENT_RECORD_LIMIT = 5
 
+/**
+ * 成绩申报审核状态：
+ * - pending：审核中（审批尚未产生最终结果）
+ * - approved：申请成功（已核定分数）
+ * - rejected：被驳回（审批记录中存在驳回决定）
+ */
+export type PartyScoreApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+/** 成绩申报审核状态 → antd Tag 配色（亮色 / 夜间模式均使用预设语义色） */
+export const PARTY_SCORE_APPLICATION_STATUS_COLOR: Record<
+  PartyScoreApplicationStatus,
+  string
+> = {
+  pending: 'processing',
+  approved: 'success',
+  rejected: 'error',
+}
+
 /** 「我的-消息通知」单页条数（代码要求 12：单页最多 100 条） */
 export const PARTY_NOTICE_PAGE_SIZE = 10
 

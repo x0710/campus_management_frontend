@@ -7,6 +7,14 @@ import type { ApprovalStepStatus } from '../api/types/approvals'
 /** 审核列表每页条数（代码要求 12：单页最多 100 行） */
 export const PARTY_SCORE_APPROVAL_PAGE_SIZE = 20
 
+/**
+ * 工作台「待办事项」统计待审核申报时单次拉取条数。
+ *
+ * 审批步骤接口不返回分页 total，只能按返回条数合计；取单页上限 100，
+ * 尽量接近真实待办数（代码要求 12：单页最多 100 行）。
+ */
+export const PARTY_SCORE_TODO_PAGE_SIZE = 100
+
 /** 转交对象搜索一次拉取的条数 */
 export const PARTY_SCORE_TRANSFER_USER_PAGE_SIZE = 20
 

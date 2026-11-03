@@ -16,6 +16,22 @@ export function formatDateTime(value: string | null, locale: Locale): string {
   })
 }
 
+/**
+ * 仅格式化日期（如生日、出生日期）：输出 YYYY-MM-DD，不带时分。
+ * 优先从 ISO 字符串中截取日期段，避免 new Date('2007-04-09T00:00:00Z') 在部分时区被移到前一天；
+ * 非标准格式时才回退到本地时间解析。
+ */
+export function formatDateOnly(value: string | null): string {
+  if (!value) return '—'
+  const matched = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim())
+  if (matched) return matched[1]
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`
+}
+
 /** 月份标签：zh → 2026年9月；en → September 2026（用于日历看板标题） */
 export function formatMonthLabel(value: Dayjs, locale: Locale): string {
   if (locale === 'zh') return `${value.year()}年${value.month() + 1}月`

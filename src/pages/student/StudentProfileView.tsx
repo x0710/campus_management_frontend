@@ -24,7 +24,7 @@ import type { Gender, UserDetail } from '../../api/types/users'
 import { extractErrorReason } from '../../api/common'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
-import { formatDateTime } from '../../utils/datetime'
+import { formatDateOnly, formatDateTime } from '../../utils/datetime'
 
 const { Text } = Typography
 
@@ -184,7 +184,7 @@ export default function StudentProfileView() {
                     {user.phone ?? t('profile.noData')}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('profile.birthday')}>
-                    {user.birthday ?? t('profile.noData')}
+                    {user.birthday ? formatDateOnly(user.birthday) : t('profile.noData')}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('profile.createdAt')}>
                     {formatDateTime(user.created_at, locale)}
