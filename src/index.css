@@ -3489,31 +3489,28 @@ h3 {
   color: var(--ink);
 }
 
+/* 排名条形轨道：只承载条形，宽度由父级 flex 平均分配，保证每行可用宽度一致 */
 .academy-rank-track {
-  display: flex;
-  align-items: center;
   flex: 1;
   min-width: 0;
 }
 
+/* 所有成绩条形统一红色，不再按名次区分颜色 */
 .academy-rank-bar {
-  flex: 0 1 auto;
   height: 14px;
   border-radius: 3px;
+  background: #cf1322;
 }
 
-.academy-rank-bar--high {
-  background: #1677ff;
-}
-
-.academy-rank-bar--low {
-  background: #fa8c16;
-}
-
+/* 分数文本独立成列并右对齐、定宽 + 等宽数字：
+   分数位数不同（如 70.035 与 70）时也不会挤压条形宽度 */
 .academy-rank-score {
   flex: none;
+  width: 76px;
   margin-left: 12px;
+  text-align: right;
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--ink);
 }
@@ -3590,31 +3587,28 @@ h3 {
   color: var(--ink);
 }
 
+/* 排名条形轨道：只承载条形，宽度由父级 flex 平均分配，保证每行可用宽度一致 */
 .school-rank-track {
-  display: flex;
-  align-items: center;
   flex: 1;
   min-width: 0;
 }
 
+/* 所有成绩条形统一红色，不再按名次区分颜色 */
 .school-rank-bar {
-  flex: 0 1 auto;
   height: 14px;
   border-radius: 3px;
-}
-
-.school-rank-bar--top {
   background: #cf1322;
 }
 
-.school-rank-bar--normal {
-  background: #1677ff;
-}
-
+/* 分数文本独立成列并右对齐、定宽 + 等宽数字：
+   分数位数不同（如 70.035 与 70）时也不会挤压条形宽度 */
 .school-rank-score {
   flex: none;
+  width: 76px;
   margin-left: 12px;
+  text-align: right;
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--ink);
 }

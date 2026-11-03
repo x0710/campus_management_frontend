@@ -28,7 +28,11 @@ import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
-import { formatPartyScoreTotal, getPartyScoreGrade, toPartyScoreTotal } from '../../utils/partyScore'
+import {
+  formatPartyScoreTotalDecimal,
+  getPartyScoreGrade,
+  toPartyScoreTotal,
+} from '../../utils/partyScore'
 
 /** 待审核申报统计单页条数：底层审批步骤接口无 total，按返回条数合计（代码要求 12：单页最多 100 条） */
 const APPROVAL_TODO_PAGE_SIZE = 100
@@ -167,7 +171,8 @@ export default function BranchWorkbenchView() {
   const maxCount = Math.max(0, ...distribution.map((item) => item.count))
   /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
   const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
-  const averageText = loading ? '—' : formatPartyScoreTotal(averageScore)
+  // 支部平均分同样最多保留小数点后 3 位（与学校端 / 学院端口径一致）
+  const averageText = loading ? '—' : formatPartyScoreTotalDecimal(averageScore)
 
   return (
     <div className="party-view">

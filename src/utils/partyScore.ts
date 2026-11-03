@@ -62,6 +62,29 @@ export function formatPartyScoreTotal(score: string | null | undefined): string 
   return total === null ? '—' : String(total)
 }
 
+/** 统计类分数（平均分等）展示时最多保留的小数位数 */
+export const SCORE_MAX_FRACTION_DIGITS = 3
+
+/**
+ * 已换算党建总分（number）的展示文本：最多保留小数点后 3 位，并去掉末尾多余的 0。
+ * 用于各组织平均分等带小数的统计值（避免浮点误差产生 70.03499999999999 这类长文本）。
+ * @param value 已换算的总分（可为空）
+ * @returns 展示文本（如 "70.035" / "70"；空值返回 "—"）
+ */
+export function formatScoreDecimal(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  return String(Number(value.toFixed(SCORE_MAX_FRACTION_DIGITS)))
+}
+
+/**
+ * 后端加分 DecimalText 换算为党建总分后的展示文本（最多保留小数点后 3 位）。
+ * @param score 后端项目加分 DecimalText（字符串）或空值
+ * @returns 党建总分文本（如 "70.035" / "75"；空值返回 "—"）
+ */
+export function formatPartyScoreTotalDecimal(score: string | null | undefined): string {
+  return formatScoreDecimal(toPartyScoreTotal(score))
+}
+
 /** 党员先锋指数汇总结果 */
 export interface PartyScoreSummary {
   /** 总分（基础分 + 加分项，最高不超过上限） */

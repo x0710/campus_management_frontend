@@ -20,7 +20,7 @@ import ErrorState from '../../components/ErrorState'
 import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { SCHOOL_COLLEGE_PARENT_ORG_ID } from '../../config/organization'
 import { useT } from '../../i18n'
-import { formatPartyScoreTotal, toPartyScoreTotal } from '../../utils/partyScore'
+import { formatPartyScoreTotalDecimal, formatScoreDecimal, toPartyScoreTotal } from '../../utils/partyScore'
 
 interface CommitteeRankingItem {
   id: number
@@ -95,7 +95,8 @@ export default function SchoolOverviewView() {
 
   /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
   const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
-  const averageText = loading ? '—' : formatPartyScoreTotal(averageScore)
+  // 全校平均分最多保留小数点后 3 位（如 70.035），避免浮点误差产生超长文本
+  const averageText = loading ? '—' : formatPartyScoreTotalDecimal(averageScore)
   const maxCommitteeScore = useMemo(
     () => Math.max(0, ...committeeRankings.map((item) => item.score ?? 0)),
     [committeeRankings],
@@ -145,13 +146,14 @@ export default function SchoolOverviewView() {
                   <span className="school-rank-name">
                     {index + 1}. {item.name}
                   </span>
+                  {/* 条形只按分数比例占宽，分数文本独立成列（固定宽度），
+                      避免「70.035」比「70」更宽时挤压条形，导致分数高的条形反而更短 */}
                   <div className="school-rank-track">
-                    <div
-                      className={`school-rank-bar school-rank-bar--${index < 2 ? 'top' : 'normal'}`}
-                      style={{ width: barWidth }}
-                    />
-                    <span className="school-rank-score">{item.score ?? '—'}</span>
+                    <div className="school-rank-bar" style={{ width: barWidth }} />
                   </div>
+                  <span className="school-rank-score">
+                    {loading ? '—' : formatScoreDecimal(item.score)}
+                  </span>
                 </div>
               )
             })}

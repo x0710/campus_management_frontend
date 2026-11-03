@@ -81,7 +81,7 @@ import type {
 import { getPosition, queryPositions } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getRole, queryRoles, queryUserRoleRelations } from '../../api/rbac'
-import type { RoleInfo } from '../../api/types/rbac'
+import type { RoleInfo, UserRoleRelation } from '../../api/types/rbac'
 import {
   getScore,
   listAllScoresForUser,
@@ -134,6 +134,7 @@ import {
 import {
   MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES,
   MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES,
+  MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES,
   MEMBER_DETAIL_PAGE_SIZE,
   MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES,
   MEMBER_DETAIL_READONLY_FROM_MODULES,
@@ -241,6 +242,8 @@ export default function MemberDetailPage() {
   // 党委支部端 / 学院端 / 学校端：不展示「详细信息」，并把「成绩信息」替换为
   // 「获得加分总数（基础分 70 + 党建活动加分）+ 该成员全部加分申请」
   const partyScoreView = MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES.includes(fromModuleKey)
+  // 党委支部端 / 学院端：基本信息不再展示「系统角色」「组织任职」两块卡片
+  const hideRoleOrgCards = MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES.includes(fromModuleKey)
   const userId = Number(uid)
 
   const [user, setUser] = useState<UserDetail | null>(null)
@@ -375,6 +378,7 @@ export default function MemberDetailPage() {
                     t={t}
                     canEdit={canEditBasic}
                     showPartyInfo={partyScoreView}
+                    showRoleOrgCards={!hideRoleOrgCards}
                     reloadSeq={extrasReloadSeq}
                     onEdit={(section) => void openEdit(section)}
                   />
@@ -463,7 +467,11 @@ export default function MemberDetailPage() {
   )
 }
 
-/** 基本信息面板：用户资料 + 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载） */
+/**
+ * 基本信息面板：用户资料 + 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载）。
+ * 党委支部端 / 学院端来源不展示「系统角色」「组织任职」两张卡片（showRoleOrgCards=false），
+ * 此时跳过角色请求，组织任职仍加载以供「党员信息」卡片使用。
+ */
 function BasicInfoPanel({
   user,
   loading,
@@ -472,6 +480,7 @@ function BasicInfoPanel({
   t,
   canEdit,
   showPartyInfo,
+  showRoleOrgCards,
   reloadSeq,
   onEdit,
 }: {
@@ -484,6 +493,8 @@ function BasicInfoPanel({
   canEdit: boolean
   /** 是否展示「党员信息」卡片（党委支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） */
   showPartyInfo: boolean
+  /** 是否展示「系统角色」「组织任职」两张卡片（党委支部端 / 学院端为 false） */
+  showRoleOrgCards: boolean
   /** 角色 / 组织任职重载令牌：保存后自增，强制绕过缓存重新请求最新关联数据（代码要求 25） */
   reloadSeq: number
   /** 打开指定区块的编辑弹窗（复用 admin/UserEditPanel；一次只编辑一个部分） */
@@ -501,6 +512,7 @@ function BasicInfoPanel({
 
   /**
    * 并行加载角色关联与组织任职；单个角色/职位详情失败不影响整体。
+   * 不展示「系统角色」卡片时跳过角色请求（组织任职仍需加载：党员信息卡片依赖它）。
    * @param force 是否绕过会话缓存强制重新请求（必填否，默认 false；保存后刷新传 true）
    */
   const loadExtras = useCallback(
@@ -510,7 +522,9 @@ function BasicInfoPanel({
       setExtrasError(null)
       try {
         const [relations, userOrgs] = await Promise.all([
-          queryUserRoleRelations(memberId, force),
+          showRoleOrgCards
+            ? queryUserRoleRelations(memberId, force)
+            : Promise.resolve([] as UserRoleRelation[]),
           listUserOrganizations(memberId, force),
         ])
         const roleItems = await Promise.all(
@@ -542,7 +556,7 @@ function BasicInfoPanel({
         setExtrasLoading(false)
       }
     },
-    [memberId, t],
+    [memberId, t, showRoleOrgCards],
   )
 
   useEffect(() => {
@@ -675,128 +689,133 @@ function BasicInfoPanel({
         </Card>
       )}
 
-      {/* 系统角色（编辑入口置于卡片右上角） */}
-      <Card
-        size="small"
-        title={
-          <Space>
-            <TeamOutlined />
-            {t('profile.rolesTitle')}
-          </Space>
-        }
-        extra={
-          canEdit ? (
-            <Tooltip title={t('memberDetail.editRolesHint')}>
-              <Button
-                type="primary"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => onEdit('roles')}
-              >
-                {t('memberDetail.editRoles')}
-              </Button>
-            </Tooltip>
-          ) : undefined
-        }
-      >
-        {extrasError ? (
-          <ErrorState message={extrasError} />
-        ) : extrasLoading ? (
-          <Skeleton active paragraph={{ rows: 1 }} />
-        ) : roles.length === 0 ? (
-          <Text type="secondary">{t('profile.noData')}</Text>
-        ) : (
-          <Space size={[8, 8]} wrap>
-            {roles.map((role) => (
-              <Tag key={role.id} color="blue">
-                {role.name}
-                {role.description ? (
-                  <Text type="secondary" style={{ marginLeft: 4 }}>
-                    ({role.description})
-                  </Text>
-                ) : null}
-              </Tag>
-            ))}
-          </Space>
-        )}
-      </Card>
+      {/* 系统角色 / 组织任职：党委支部端 / 学院端不展示（见 MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES） */}
+      {showRoleOrgCards && (
+        <>
+          {/* 系统角色（编辑入口置于卡片右上角） */}
+          <Card
+            size="small"
+            title={
+              <Space>
+                <TeamOutlined />
+                {t('profile.rolesTitle')}
+              </Space>
+            }
+            extra={
+              canEdit ? (
+                <Tooltip title={t('memberDetail.editRolesHint')}>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => onEdit('roles')}
+                  >
+                    {t('memberDetail.editRoles')}
+                  </Button>
+                </Tooltip>
+              ) : undefined
+            }
+          >
+            {extrasError ? (
+              <ErrorState message={extrasError} />
+            ) : extrasLoading ? (
+              <Skeleton active paragraph={{ rows: 1 }} />
+            ) : roles.length === 0 ? (
+              <Text type="secondary">{t('profile.noData')}</Text>
+            ) : (
+              <Space size={[8, 8]} wrap>
+                {roles.map((role) => (
+                  <Tag key={role.id} color="blue">
+                    {role.name}
+                    {role.description ? (
+                      <Text type="secondary" style={{ marginLeft: 4 }}>
+                        ({role.description})
+                      </Text>
+                    ) : null}
+                  </Tag>
+                ))}
+              </Space>
+            )}
+          </Card>
 
-      {/* 组织任职（组织 + 职位 + 工作地点；编辑入口置于卡片右上角） */}
-      <Card
-        size="small"
-        title={
-          <Space>
-            <BankOutlined />
-            {t('profile.orgsTitle')}
-          </Space>
-        }
-        extra={
-          canEdit ? (
-            <Tooltip title={t('memberDetail.editOrgsHint')}>
-              <Button
-                type="primary"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => onEdit('organizations')}
-              >
-                {t('memberDetail.editOrgs')}
-              </Button>
-            </Tooltip>
-          ) : undefined
-        }
-      >
-        {extrasError ? (
-          <ErrorState message={extrasError} />
-        ) : extrasLoading ? (
-          <Skeleton active paragraph={{ rows: 2 }} />
-        ) : orgs.length === 0 ? (
-          <Text type="secondary">{t('profile.noData')}</Text>
-        ) : (
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            {orgs.map((uo) => (
-              <Card key={uo.id} size="small" bordered style={{ background: 'transparent' }}>
-                <Descriptions
-                  column={2}
-                  size="small"
-                  items={[
-                    {
-                      key: 'organization',
-                      label: t('profile.organization'),
-                      children: uo.organization_name,
-                    },
-                    {
-                      key: 'position',
-                      label: t('profile.position'),
-                      children: uo.positionDetail ? (
-                        <Space>
-                          <Tag color="geekblue">{uo.positionDetail.name}</Tag>
-                          {uo.positionDetail.description ? (
-                            <Text type="secondary" style={{ marginLeft: 4 }}>
-                              {uo.positionDetail.description}
-                            </Text>
-                          ) : null}
-                        </Space>
-                      ) : uo.position ? (
-                        <Tag color="default">
-                          {positionNames.get(uo.position) ?? uo.position}
-                        </Tag>
-                      ) : (
-                        t('profile.noData')
-                      ),
-                    },
-                    {
-                      key: 'workplace',
-                      label: t('profile.workplace'),
-                      span: 2,
-                      children: uo.workplace ?? t('profile.noData'),
-                    },
-                  ]}
-                />
-              </Card>
-            ))}
-          </Space>
-        )}
-      </Card>
+          {/* 组织任职（组织 + 职位 + 工作地点；编辑入口置于卡片右上角） */}
+          <Card
+            size="small"
+            title={
+              <Space>
+                <BankOutlined />
+                {t('profile.orgsTitle')}
+              </Space>
+            }
+            extra={
+              canEdit ? (
+                <Tooltip title={t('memberDetail.editOrgsHint')}>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => onEdit('organizations')}
+                  >
+                    {t('memberDetail.editOrgs')}
+                  </Button>
+                </Tooltip>
+              ) : undefined
+            }
+          >
+            {extrasError ? (
+              <ErrorState message={extrasError} />
+            ) : extrasLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : orgs.length === 0 ? (
+              <Text type="secondary">{t('profile.noData')}</Text>
+            ) : (
+              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                {orgs.map((uo) => (
+                  <Card key={uo.id} size="small" bordered style={{ background: 'transparent' }}>
+                    <Descriptions
+                      column={2}
+                      size="small"
+                      items={[
+                        {
+                          key: 'organization',
+                          label: t('profile.organization'),
+                          children: uo.organization_name,
+                        },
+                        {
+                          key: 'position',
+                          label: t('profile.position'),
+                          children: uo.positionDetail ? (
+                            <Space>
+                              <Tag color="geekblue">{uo.positionDetail.name}</Tag>
+                              {uo.positionDetail.description ? (
+                                <Text type="secondary" style={{ marginLeft: 4 }}>
+                                  {uo.positionDetail.description}
+                                </Text>
+                              ) : null}
+                            </Space>
+                          ) : uo.position ? (
+                            <Tag color="default">
+                              {positionNames.get(uo.position) ?? uo.position}
+                            </Tag>
+                          ) : (
+                            t('profile.noData')
+                          ),
+                        },
+                        {
+                          key: 'workplace',
+                          label: t('profile.workplace'),
+                          span: 2,
+                          children: uo.workplace ?? t('profile.noData'),
+                        },
+                      ]}
+                    />
+                  </Card>
+                ))}
+              </Space>
+            )}
+          </Card>
+        </>
+      )}
     </Space>
   )
 }

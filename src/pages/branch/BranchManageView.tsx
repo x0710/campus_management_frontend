@@ -18,6 +18,8 @@
  *
  * 复用说明（代码要求 1）：组织树、成员分页表格与「点击成员进入详情页」全部复用公共组件
  * OrgMembersExplorer（showOrgTree=false 时隐藏组织树、以 orgs[0] 为唯一组织）；
+ * 成员列表列头统一启用 partyScoreColumns（支部端 / 学院端均以「先锋等级」列代替「工作地点」列，
+ * 数据口径为党建加分总分，与支部端「支部管理」一致）；
  * 成员详情页经 ?from={fromModuleKey} 让侧栏高亮本模块，并在该来源下隐藏编辑入口。
  * 所有组织/成员查询均走会话缓存（cachedGet），退出登录由 invalidate() 统一清空。
  */
@@ -134,7 +136,7 @@ export default function BranchManageView({
       showOrgTree={showOrgTree}
       autoSelectFirst={showOrgTree}
       autoSelectFirstWithMembers
-      partyScoreColumns={fromModuleKey === 'branch_m5'}
+      partyScoreColumns
     />
   )
 }

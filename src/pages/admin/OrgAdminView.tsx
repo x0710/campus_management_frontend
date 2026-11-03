@@ -1,4 +1,5 @@
 import {
+  CloseOutlined,
   DeleteOutlined,
   EditOutlined,
   MenuFoldOutlined,
@@ -32,6 +33,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
 } from 'react'
@@ -50,6 +52,8 @@ import type {
   OrganizationMember,
 } from '../../api/types/organizations'
 import { queryPositions } from '../../api/positions'
+import { getPartyScoreTotals } from '../../api/partyScores'
+import { resetUserPassword } from '../../api/users'
 import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
@@ -64,6 +68,7 @@ import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
+import { formatPartyScoreTotal } from '../../utils/partyScore'
 
 /** 组织成员表每页条数（代码要求 12：表格每页最多 100 行） */
 const MEMBER_PAGE_SIZE = 100
@@ -85,12 +90,30 @@ interface OrgAdminViewProps {
    * 未传时按顶级组织（parent_id=null）建树；党委学校端传入 2，只展示「学院党委」及其下级。
    */
   rootOrgId?: number
+  /**
+   * 成员列表以「先锋等级」（党建活动加分总分）代替「工作地点」列。
+   * 党委学校端「组织管理」开启，口径与支部端「支部管理」成员列表一致；
+   * 管理端「组织架构」保持原「工作地点」列。
+   */
+  partyScoreColumns?: boolean
+  /**
+   * 成员列表操作列提供「重置密码」（复用管理端「用户与账户」的重置逻辑）。
+   * 仅党委学校端「组织管理」开启。
+   */
+  showResetPassword?: boolean
 }
 
-/** 管理端：组织架构（组织树 + 组织 CRUD + 成员任职管理，成员详情跳转共用领导端成员详情页） */
+/**
+ * 管理端：组织架构（组织树 + 组织 CRUD + 成员任职管理，成员详情跳转共用领导端成员详情页）。
+ * 搜索成员后组织树自动滚动到命中组织；搜索状态按 uiKey 记忆，进入成员详情再返回后
+ * 仍可继续查看上一次的模糊匹配结果与当前定位；表头提供「结束匹配」按钮恢复普通浏览。
+ * 党委学校端复用本页时开启 partyScoreColumns（先锋等级列）与 showResetPassword（重置密码操作）。
+ */
 export default function OrgAdminView({
   uiKey = 'admin_m3',
   rootOrgId,
+  partyScoreColumns = false,
+  showResetPassword = false,
 }: OrgAdminViewProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
@@ -116,9 +139,17 @@ export default function OrgAdminView({
 
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
-  const [memberPage, setMemberPage] = useState(1)
+  // 成员表页码按模块 key 记忆：进入成员详情再返回时仍停留在搜索命中的那一页
+  const memberPage = useUiStateStore((s) => s.memberPages[uiKey] ?? 1)
+  const setMemberPage = useUiStateStore((s) => s.setMemberPage)
+  // 首次加载组织时沿用上次页码（返回后恢复命中页）；之后切换组织默认回到第 1 页
+  const initialMemberPageRef = useRef(memberPage)
+  const firstOrgLoadRef = useRef(true)
   const [memberTotal, setMemberTotal] = useState(0)
   const [actingKey, setActingKey] = useState<string | null>(null)
+  /** 成员「先锋等级」列：当前页成员 uid → 党建加分总计（无记录按 0 分处理） */
+  const [partyScores, setPartyScores] = useState<Map<number, string>>(new Map())
+  const [partyScoresLoading, setPartyScoresLoading] = useState(false)
 
   const [positions, setPositions] = useState<PositionDetail[]>([])
 
@@ -136,6 +167,13 @@ export default function OrgAdminView({
   const [addingMember, setAddingMember] = useState(false)
   /** 新增成员弹窗开关（成员操作收进弹窗，避免与表头上方的搜索框混在一起） */
   const [addModalOpen, setAddModalOpen] = useState(false)
+
+  /** 重置密码弹窗：可指定新密码（留空则由后端生成随机密码） */
+  const [resetUid, setResetUid] = useState<number | null>(null)
+  const [resetRunning, setResetRunning] = useState(false)
+  /** 重置成功后返回的明文密码；非空时展示结果弹窗，关闭后不可再次查看 */
+  const [resetResult, setResetResult] = useState<string | null>(null)
+  const [resetPwdForm] = Form.useForm<{ password?: string }>()
 
   const reportError = useErrorFeedback()
 
@@ -221,10 +259,12 @@ export default function OrgAdminView({
     onSelectOrg: (orgId: number) => setSelectedId(uiKey, orgId),
     onClearFilter: () => setOrgSearch(''),
     onLoadPage: (orgId: number, page: number) => {
-      setMemberPage(page)
+      setMemberPage(uiKey, page)
       void loadMembers(orgId, page)
     },
     memberRows: members,
+    // 搜索状态按模块 key 记忆：进入成员详情再返回后继续展示上一次的模糊匹配结果
+    persistKey: uiKey,
   })
   const { consumePendingPage } = search
 
@@ -239,17 +279,19 @@ export default function OrgAdminView({
     [search.focusKeys, storedExpandedKeys, rootKeys],
   )
 
-  // 切换组织后加载成员：默认回到第 1 页；若为搜索命中则按目标页加载
+  // 切换组织后加载成员：默认回到第 1 页；搜索命中按目标页；首次进入沿用上次页码（跨路由返回恢复）
   useEffect(() => {
     if (selectedId !== null) {
-      const targetPage = consumePendingPage()
-      setMemberPage(targetPage)
+      const pending = consumePendingPage()
+      const targetPage = pending ?? (firstOrgLoadRef.current ? initialMemberPageRef.current : 1)
+      firstOrgLoadRef.current = false
+      setMemberPage(uiKey, targetPage)
       void loadMembers(selectedId, targetPage)
     } else {
       setMembers([])
       setMemberTotal(0)
     }
-  }, [selectedId, loadMembers, consumePendingPage])
+  }, [selectedId, loadMembers, consumePendingPage, uiKey, setMemberPage])
 
   // parent_id -> children 组树（搜索关键词仅前端过滤名称/编码）
   const treeData = useMemo<TreeProps['treeData']>(() => {
@@ -293,6 +335,18 @@ export default function OrgAdminView({
     return build(roots)
   }, [orgsInTree, orgSearch, rootOrgId])
 
+  // 搜索定位到成员后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
+  useEffect(() => {
+    if (treeCollapsed || search.matchOnly || search.hitUid === null || selectedId === null) return
+    // 等组织树完成展开动画并渲染出选中节点后再滚动，避免定位到尚未挂载的节点
+    const timer = window.setTimeout(() => {
+      document
+        .querySelector('.org-tree-card .ant-tree-treenode-selected')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [treeCollapsed, search.matchOnly, search.hitUid, search.locateTick, selectedId, treeData])
+
   const parentOptions = useMemo(
     () =>
       orgsInTree.map((o) => ({
@@ -318,6 +372,33 @@ export default function OrgAdminView({
   const memberOrgs = useUserOrganizations(memberIds)
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
   const positionNames = usePositionNames()
+
+  // 成员列表「先锋等级」列：按当前页成员批量查询党建加分总计（口径与支部端支部管理一致）
+  useEffect(() => {
+    if (!partyScoreColumns || memberIds.length === 0) {
+      setPartyScores(new Map())
+      setPartyScoresLoading(false)
+      return
+    }
+    let cancelled = false
+    setPartyScoresLoading(true)
+    getPartyScoreTotals(memberIds)
+      .then((items) => {
+        if (cancelled) return
+        const next = new Map<number, string>(memberIds.map((uid) => [uid, '0']))
+        for (const [uid, score] of items) next.set(uid, score)
+        setPartyScores(next)
+      })
+      .catch(() => {
+        if (!cancelled) setPartyScores(new Map())
+      })
+      .finally(() => {
+        if (!cancelled) setPartyScoresLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [memberIds, partyScoreColumns])
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
     // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
@@ -427,6 +508,77 @@ export default function OrgAdminView({
     }
   }
 
+  /**
+   * 打开重置密码弹窗（复用管理端「用户与账户」的重置逻辑）。
+   * 调用前需在操作列先经 Popconfirm 二次确认，避免误触直接改掉成员密码。
+   * @param uid 目标成员用户 ID（必填）
+   */
+  const openResetPassword = useCallback(
+    (uid: number) => {
+      resetPwdForm.resetFields()
+      setResetUid(uid)
+    },
+    [resetPwdForm],
+  )
+
+  /**
+   * 重置密码目标标识：优先展示「姓名（学号）」（如「李同学（123456789）」），
+   * 姓名尚未解析到时回退为 #学号，便于确认操作对象。
+   */
+  const resetTargetLabel = useMemo(() => {
+    if (resetUid === null) return ''
+    return memberNames.has(resetUid)
+      ? `${memberNames.get(resetUid)}（${resetUid}）`
+      : `#${resetUid}`
+  }, [resetUid, memberNames])
+
+  /** 提交重置密码：填写了新密码则重置为指定值，留空则由后端生成随机密码并回显 */
+  const doResetPassword = async () => {
+    if (resetUid === null) return
+    const raw = resetPwdForm.getFieldValue('password')
+    const newPassword = typeof raw === 'string' ? raw.trim() : ''
+    setResetRunning(true)
+    try {
+      const res = await resetUserPassword(resetUid, newPassword || undefined)
+      setResetResult(res.new_password)
+      setResetUid(null)
+      resetPwdForm.resetFields()
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setResetRunning(false)
+    }
+  }
+
+  /**
+   * 成员列表「工作地点 / 先锋等级」列。
+   * 党委学校端开启 partyScoreColumns 时改为党建活动加分总分（与支部端「支部管理」一致），
+   * 其余场景保持原「工作地点」列。
+   */
+  const workplaceOrScoreColumn = useMemo<ColumnsType<OrganizationMember>[number]>(
+    () =>
+      partyScoreColumns
+        ? {
+            title: t('branch.colPioneerLevel'),
+            key: 'pioneer_level',
+            width: 140,
+            render: (_, record) => {
+              if (partyScoresLoading) {
+                return <span className="cell-sub">{t('common.loading')}</span>
+              }
+              const score = partyScores.get(record.user_id) ?? '0'
+              return <Tag color="green">{formatPartyScoreTotal(score)}</Tag>
+            },
+          }
+        : {
+            title: t('adminOrg.colWorkplace'),
+            dataIndex: 'workplace',
+            key: 'workplace',
+            render: (v: string | null) => v || '—',
+          },
+    [partyScoreColumns, t, partyScores, partyScoresLoading],
+  )
+
   const memberColumns = useMemo<ColumnsType<OrganizationMember>>(
     () => [
       {
@@ -483,16 +635,12 @@ export default function OrgAdminView({
           </Tooltip>
         ),
       },
-      {
-        title: t('adminOrg.colWorkplace'),
-        dataIndex: 'workplace',
-        key: 'workplace',
-        render: (v: string | null) => v || '—',
-      },
+      // 「工作地点 / 先锋等级」列：党委学校端改为先锋等级（党建加分总分）
+      workplaceOrScoreColumn,
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: 140,
+        width: showResetPassword ? 210 : 140,
         render: (_, record) => (
           <div className="approval-actions">
             <Tooltip title={t('adminOrg.viewUser')}>
@@ -504,6 +652,23 @@ export default function OrgAdminView({
                 {t('adminOrg.viewUser')}
               </Button>
             </Tooltip>
+            {showResetPassword && (
+              // 重置密码属高风险操作：先弹二次确认（与「移除成员」一致），确认后再打开密码弹窗
+              <Popconfirm
+                title={t('adminOrg.memberResetConfirm', {
+                  name: memberNames.has(record.user_id)
+                    ? `${memberNames.get(record.user_id)}（${record.user_id}）`
+                    : `#${record.user_id}`,
+                })}
+                okText={t('adminUsers.resetPassword')}
+                cancelText={t('approval.cancel')}
+                onConfirm={() => openResetPassword(record.user_id)}
+              >
+                <Button type="link" size="small">
+                  {t('adminUsers.resetPassword')}
+                </Button>
+              </Popconfirm>
+            )}
             <Popconfirm
               title={t('adminOrg.memberRemoveConfirm')}
               okText={t('adminOrg.remove')}
@@ -522,7 +687,18 @@ export default function OrgAdminView({
         ),
       },
     ],
-    [t, actingKey, memberNames, memberOrgs, positionNames, selectedId, openMemberDetail],
+    [
+      t,
+      actingKey,
+      memberNames,
+      memberOrgs,
+      positionNames,
+      selectedId,
+      openMemberDetail,
+      workplaceOrScoreColumn,
+      showResetPassword,
+      openResetPassword,
+    ],
   )
 
   return (
@@ -674,6 +850,14 @@ export default function OrgAdminView({
               onPrev={search.showPrev}
               onNext={search.showNext}
             />
+            {/* 结束本次匹配：清除搜索词、匹配结果与高亮，恢复普通组织浏览（代码要求 10：悬停提示） */}
+            {search.hasActive && (
+              <Tooltip title={t('orgExplorer.endMatchHint')}>
+                <Button size="small" icon={<CloseOutlined />} onClick={search.clear}>
+                  {t('orgExplorer.endMatch')}
+                </Button>
+              </Tooltip>
+            )}
             {/* 右对齐：切换「单独查看匹配人员 / 在组织里面查看匹配人员」 */}
             <MemberSearchModeToggle
               matchOnly={search.matchOnly}
@@ -724,7 +908,7 @@ export default function OrgAdminView({
                   showTotal: (n: number) =>
                     `${t('common.total')} ${n} ${t('common.items')}`,
                   onChange: (p: number) => {
-                    setMemberPage(p)
+                    setMemberPage(uiKey, p)
                     void loadMembers(selectedOrg.id, p)
                   },
                 }}
@@ -830,6 +1014,54 @@ export default function OrgAdminView({
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 重置密码弹窗（复用管理端「用户与账户」的重置逻辑）：留空则由后端生成随机密码 */}
+      {showResetPassword && (
+        <>
+          <Modal
+            open={resetUid !== null}
+            // 标题写明操作对象：如「重置密码：李同学（123456789）」，避免只显示学号
+            title={resetUid !== null ? t('adminUsers.resetTarget', { target: resetTargetLabel }) : ''}
+            width={420}
+            okText={t('adminUsers.resetPassword')}
+            cancelText={t('approval.cancel')}
+            confirmLoading={resetRunning}
+            onCancel={() => setResetUid(null)}
+            onOk={() => void doResetPassword()}
+            destroyOnHidden
+          >
+            <Form form={resetPwdForm} layout="vertical">
+              <Form.Item
+                name="password"
+                label={t('adminUsers.newPassword')}
+                extra={t('adminUsers.passwordHint')}
+              >
+                <Input.Password maxLength={64} placeholder={t('adminUsers.passwordHint')} />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          {/* 重置成功后的明文密码回显：关闭后不可再次查看，需提醒管理员及时告知成员 */}
+          <Modal
+            open={resetResult !== null}
+            title={t('adminUsers.resetDoneTitle')}
+            footer={null}
+            onCancel={() => setResetResult(null)}
+          >
+            <Alert
+              type="warning"
+              showIcon
+              title={t('adminUsers.resetDoneHint')}
+              style={{ marginBottom: 12 }}
+            />
+            <Input.TextArea
+              readOnly
+              rows={2}
+              value={resetResult ? `${t('adminUsers.newPassword')}: ${resetResult}` : ''}
+            />
+          </Modal>
+        </>
+      )}
     </div>
   )
 }

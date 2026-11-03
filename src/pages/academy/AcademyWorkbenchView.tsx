@@ -20,7 +20,7 @@ import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { ACADEMY_ANCESTOR_DEPTHS } from '../../config/organization'
 import { useT } from '../../i18n'
-import { formatPartyScoreTotal, toPartyScoreTotal } from '../../utils/partyScore'
+import { formatPartyScoreTotalDecimal, formatScoreDecimal, toPartyScoreTotal } from '../../utils/partyScore'
 
 interface BranchRankingItem {
   id: number
@@ -96,7 +96,8 @@ export default function AcademyWorkbenchView() {
 
   /** 加载中显示占位符，避免先闪出 0 再跳变为真实值 */
   const statText = (value: number | null) => (loading ? '—' : String(value ?? 0))
-  const averageText = loading ? '—' : formatPartyScoreTotal(averageScore)
+  // 全院平均分最多保留小数点后 3 位（如 70.035），避免浮点误差产生超长文本
+  const averageText = loading ? '—' : formatPartyScoreTotalDecimal(averageScore)
   const maxBranchScore = useMemo(
     () => Math.max(0, ...branchRankings.map((branch) => branch.score ?? 0)),
     [branchRankings],
@@ -146,13 +147,14 @@ export default function AcademyWorkbenchView() {
                   <span className="academy-rank-name">
                     {index + 1}. {branch.name}
                   </span>
+                  {/* 条形只按分数比例占宽，分数文本独立成列（固定宽度），
+                      避免「70.035」比「70」更宽时挤压条形，导致分数高的条形反而更短 */}
                   <div className="academy-rank-track">
-                    <div
-                      className={`academy-rank-bar academy-rank-bar--${index < 2 ? 'high' : 'low'}`}
-                      style={{ width: barWidth }}
-                    />
-                    <span className="academy-rank-score">{branch.score ?? '—'}</span>
+                    <div className="academy-rank-bar" style={{ width: barWidth }} />
                   </div>
+                  <span className="academy-rank-score">
+                    {loading ? '—' : formatScoreDecimal(branch.score)}
+                  </span>
                 </div>
               )
             })}

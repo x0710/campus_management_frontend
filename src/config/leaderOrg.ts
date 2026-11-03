@@ -63,3 +63,14 @@ export const MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES: string[] = [
   'academy_m5',
   'school_m2',
 ]
+
+/**
+ * 成员详情页「基本信息」隐藏「系统角色」「组织任职」卡片的来源模块 key：
+ * 党委支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5 的成员详情
+ * 只需展示成员资料与党员信息，不再展示系统角色与组织任职（标题与内容整体不渲染）。
+ * 注：组织任职数据仍会请求，因为「党员信息」卡片（所属支部 / 政治面貌）依赖它。
+ */
+export const MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES: string[] = [
+  'branch_m5',
+  'academy_m5',
+]

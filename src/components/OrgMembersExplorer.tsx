@@ -13,10 +13,17 @@
  * GET /api/organization-members?uids= 定位其所属组织 → 展开组织树到该组织并选中
  * （无组织树时固定选中唯一组织）→ 高亮该成员所在行；目标不在第 1 页时自动跳到其所在页。
  *
+ * 搜索定位与状态记忆：
+ * - 命中组织节点在组织树中自动滚动到可视区中部（等展开动画结束后定位，树很长也能直接看到）；
+ * - 搜索状态按模块 key 保存在会话 store，点击成员进入详情再返回后继续展示上一次的模糊匹配结果、
+ *   当前定位下标与命中页；
+ * - 表头提供「结束匹配」按钮，可清空搜索词 / 高亮 / 匹配结果与树定位展开，恢复普通组织浏览。
+ *
  * 组织数据由父组件加载后传入（不同门户数据范围不同），本组件只负责组织树渲染、
  * 成员分页查询与跳转；成员查询走会话缓存，刷新传 force=true 绕过缓存（代码要求 5）。
  */
 import {
+  CloseOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ReloadOutlined,
@@ -26,7 +33,7 @@ import { Alert, Button, Input, Spin, Table, Tag, Tooltip, Tree } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
 import axios from 'axios'
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
@@ -88,6 +95,7 @@ interface OrgMembersExplorerProps {
   /**
    * 支部端「支部管理」成员列模式。
    * 开启后把「职位」列改为「身份」，移除「工作地点」，新增「先锋等级」列
+   * （支部端「支部管理」、学院端「学院支部管理」均开启）
    * （通过 GET /api/party/scores 批量查询成员党建加分）。
    */
   partyScoreColumns?: boolean
@@ -121,7 +129,12 @@ export default function OrgMembersExplorer({
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState<string | null>(null)
-  const [memberPage, setMemberPage] = useState(1)
+  // 成员表页码按模块 key 记忆：进入成员详情再返回时仍停留在搜索命中的那一页
+  const memberPage = useUiStateStore((s) => s.memberPages[fromModuleKey] ?? 1)
+  const setMemberPage = useUiStateStore((s) => s.setMemberPage)
+  // 首次加载组织时沿用上次页码（返回后恢复命中页）；之后切换组织默认回到第 1 页
+  const initialMemberPageRef = useRef(memberPage)
+  const firstOrgLoadRef = useRef(true)
   const [memberTotal, setMemberTotal] = useState(0)
   /** 支部管理「先锋等级」列：uid → 党建加分总计（无记录按 0 分处理） */
   const [partyScores, setPartyScores] = useState<Map<number, string>>(new Map())
@@ -206,10 +219,12 @@ export default function OrgMembersExplorer({
     onSelectOrg: (orgId: number) => setSelectedId(fromModuleKey, orgId),
     onClearFilter: () => setOrgSearch(''),
     onLoadPage: (orgId: number, page: number) => {
-      setMemberPage(page)
+      setMemberPage(fromModuleKey, page)
       void loadMembers(orgId, page)
     },
     memberRows: members,
+    // 搜索状态按模块 key 记忆：进入成员详情再返回后继续展示上一次的模糊匹配结果
+    persistKey: fromModuleKey,
   })
 
   // 组织树默认只展开根节点（进入页面不全量展开，避免树过长铺满；深层分支点击再展开）
@@ -225,17 +240,25 @@ export default function OrgMembersExplorer({
   // 解构出稳定引用（useCallback），避免把每次渲染都新建的 search 对象放进 effect 依赖
   const { consumePendingPage } = search
 
-  // 切换组织后加载成员：默认回到第 1 页；若为搜索命中则按目标页加载
+  // 切换组织后加载成员：默认回到第 1 页；搜索命中按目标页；首次进入沿用上次页码（跨路由返回恢复）
   useEffect(() => {
     if (activeOrgId === null) {
       setMembers([])
       setMemberTotal(0)
       return
     }
-    const targetPage = consumePendingPage()
-    setMemberPage(targetPage)
+    const pending = consumePendingPage()
+    const targetPage = pending ?? (firstOrgLoadRef.current ? initialMemberPageRef.current : 1)
+    firstOrgLoadRef.current = false
+    setMemberPage(fromModuleKey, targetPage)
     void loadMembers(activeOrgId, targetPage)
-  }, [activeOrgId, loadMembers, consumePendingPage])
+  }, [
+    activeOrgId,
+    loadMembers,
+    consumePendingPage,
+    fromModuleKey,
+    setMemberPage,
+  ])
 
   // parent_id -> children 建树；搜索关键词仅前端过滤名称/编码，并保留匹配节点的祖先链
   const treeData = useMemo<TreeProps['treeData']>(() => {
@@ -272,6 +295,26 @@ export default function OrgMembersExplorer({
       }))
     return build(byParent.get(null))
   }, [orgs, orgSearch])
+
+  // 搜索定位到成员后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
+  useEffect(() => {
+    if (
+      !showOrgTree ||
+      treeCollapsed ||
+      search.matchOnly ||
+      search.hitUid === null ||
+      selectedId === null
+    ) {
+      return
+    }
+    // 等组织树完成展开动画并渲染出选中节点后再滚动，避免定位到尚未挂载的节点
+    const timer = window.setTimeout(() => {
+      document
+        .querySelector('.org-tree-card .ant-tree-treenode-selected')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [showOrgTree, treeCollapsed, search.matchOnly, search.hitUid, search.locateTick, selectedId, treeData])
 
   const selectedOrg = useMemo(
     () => orgs.find((o) => o.id === activeOrgId) ?? null,
@@ -350,11 +393,11 @@ export default function OrgMembersExplorer({
           title: t('branch.colPioneerLevel'),
           key: 'pioneer_level',
           width: 140,
-        render: (_, record) => {
-          if (partyScoresLoading) return t('common.loading')
-          const score = partyScores.get(record.user_id) ?? '0'
-          return <Tag color="green">{formatPartyScoreTotal(score)}</Tag>
-        },
+          render: (_, record) => {
+            if (partyScoresLoading) return t('common.loading')
+            const score = partyScores.get(record.user_id) ?? '0'
+            return <Tag color="green">{formatPartyScoreTotal(score)}</Tag>
+          },
         },
         {
           title: t('approval.colAction'),
@@ -523,6 +566,18 @@ export default function OrgMembersExplorer({
               onPrev={search.showPrev}
               onNext={search.showNext}
             />
+            {/* 结束本次匹配：清除搜索词、匹配结果与高亮，恢复普通组织浏览（代码要求 10：悬停提示） */}
+            {search.hasActive && (
+              <Tooltip title={t('orgExplorer.endMatchHint')}>
+                <Button
+                  size="small"
+                  icon={<CloseOutlined />}
+                  onClick={search.clear}
+                >
+                  {t('orgExplorer.endMatch')}
+                </Button>
+              </Tooltip>
+            )}
             {/* 右对齐：切换「单独查看匹配人员 / 在组织里面查看匹配人员」 */}
             <MemberSearchModeToggle
               matchOnly={search.matchOnly}
@@ -591,7 +646,7 @@ export default function OrgMembersExplorer({
                 showQuickJumper: true,
                 showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
                 onChange: (p: number) => {
-                  setMemberPage(p)
+                  setMemberPage(fromModuleKey, p)
                   void loadMembers(selectedOrg.id, p)
                 },
               }}

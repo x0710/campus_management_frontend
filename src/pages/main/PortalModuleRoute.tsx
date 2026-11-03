@@ -58,9 +58,15 @@ const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
 /**
  * 党委学校端「组织管理」：复用管理端组织架构页面（组织树 + 组织 CRUD + 成员任职管理），
  * 接真实组织/成员接口；用独立 uiKey 隔离选中态，避免与管理端串用。
+ * 成员列表以「先锋等级」列代替「工作地点」，操作列额外提供「重置密码」（与管理端用户与账户一致）。
  */
 const SchoolOrgAdminView = () => (
-  <OrgAdminView uiKey="school_m2" rootOrgId={SCHOOL_COLLEGE_PARENT_ORG_ID} />
+  <OrgAdminView
+    uiKey="school_m2"
+    rootOrgId={SCHOOL_COLLEGE_PARENT_ORG_ID}
+    partyScoreColumns
+    showResetPassword
+  />
 )
 
 /**

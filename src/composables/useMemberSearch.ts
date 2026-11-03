@@ -19,7 +19,7 @@
  * matchIndex / hasPrev / hasNext，由宿主的搜索框旁结果条展示「共匹配 N 人 · 第 X 人」并提供
  * 上一个 / 下一个按钮——不使用弹窗，定位时仍能同时查看当前组织的其他成员。
  *
- * 宿主在「切换组织」的 effect 中应调用 consumePendingPage() 取待跳转页（缺省为 1），
+ * 宿主在「切换组织」的 effect 中应调用 consumePendingPage() 取待跳转页（null 表示无待跳转页），
  * 使「搜索命中 → 切换组织 → 按目标页加载」不会与「切换组织回到第 1 页」抢着发请求。
  *
  * 查看方式（matchOnly）：
@@ -27,6 +27,11 @@
  *   - 切换为 true：单独查看匹配人员——一次性汇总全部匹配人员（见 resolveAllMatches），
  *     由宿主的「匹配人员表」展示，不再切换组织；上一个 / 下一个只在匹配人员之间移动。
  *   两种模式共用同一份匹配结果（matches），模式切换时由宿主决定渲染哪张表。
+ *
+ * 状态记忆与结束匹配：
+ *   - 传入 persistKey（通常为模块 key）后，搜索框内容、匹配结果、当前定位下标与树展开节点会保存到
+ *     视图层会话状态（store/uiState），点击成员进入详情再返回时继续展示上一次的模糊匹配结果；
+ *   - 调用 clear() 可结束匹配状态（清空搜索词 / 高亮 / 匹配结果 / 树定位），恢复普通组织浏览。
  */
 import { App as AntdApp } from 'antd'
 import axios from 'axios'
@@ -45,6 +50,7 @@ import {
   MEMBER_SEARCH_MAX_PAGES,
 } from '../config/organization'
 import { useT } from '../i18n'
+import { useUiStateStore } from '../store/uiState'
 import { isUidTerm } from '../utils/personSearch'
 import { useErrorFeedback } from './useErrorFeedback'
 
@@ -93,6 +99,12 @@ interface UseMemberSearchOptions {
   onClearFilter?: () => void
   /** 当前成员表已渲染的行（可选；命中行渲染后自动滚动到可视区中部） */
   memberRows?: { user_id: number }[]
+  /**
+   * UI 状态记忆 key（可选，如 'leader_m3'）。
+   * 传入后搜索框内容、模糊匹配结果与当前定位会保存到视图层会话状态，
+   * 点击成员进入详情再返回时继续展示，无需重新搜索。
+   */
+  persistKey?: string
 }
 
 /** useMemberSearch 返回的搜索状态与操作 */
@@ -107,10 +119,15 @@ export interface MemberSearchController {
   /** 命中后需要展开的组织树节点（null 表示默认全展开） */
   focusKeys: Key[] | null
   setFocusKeys: (keys: Key[]) => void
+  /**
+   * 定位计数：每成功定位一次成员自增。
+   * 宿主可用它触发「组织树滚动到命中组织」等定位副作用（重复搜索同一成员也能重新定位）。
+   */
+  locateTick: number
   /** 触发搜索（回车 / 点击搜索；可传入输入框当前值，缺省取 query） */
   run: (value?: string) => void
-  /** 读取并清空「命中后待跳转页」（缺省 1） */
-  consumePendingPage: () => number
+  /** 读取并清空「命中后待跳转页」（null 表示无待跳转页） */
+  consumePendingPage: () => number | null
   /** 姓名搜索的匹配总数（后端 total；学号搜索或无搜索结果为 0） */
   resultTotal: number
   /** 目前已解析出的命中项（姓名搜索按候选页顺序懒加载追加） */
@@ -143,6 +160,10 @@ export interface MemberSearchController {
   toggleMatchOnly: (relocateCurrent?: boolean) => void
   /** 是否正在汇总全部匹配人员（切换到「单独查看匹配人员」后的一次性加载） */
   matchesLoading: boolean
+  /** 是否处于匹配状态（有搜索词 / 匹配结果 / 高亮成员），宿主据此展示「结束匹配」按钮 */
+  hasActive: boolean
+  /** 结束匹配：清空搜索词、高亮、结果条与树定位展开，并清除已保存的搜索状态 */
+  clear: () => void
 }
 
 /**
@@ -317,7 +338,7 @@ async function resolveAllMatches(
  * 组织成员「按学号 / 姓名搜索」控制器。
  *
  * @param options 宿主上下文（必填，见 UseMemberSearchOptions）
- * @returns 搜索状态与操作（query / run / hitUid / focusKeys / resultTotal / showPrev / showNext 等）
+ * @returns 搜索状态与操作（query / run / hitUid / focusKeys / resultTotal / showPrev / showNext / clear 等）
  */
 export function useMemberSearch({
   orgs,
@@ -327,29 +348,35 @@ export function useMemberSearch({
   onLoadPage,
   onClearFilter,
   memberRows,
+  persistKey,
 }: UseMemberSearchOptions): MemberSearchController {
   const t = useT()
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
+  const setMemberSearchState = useUiStateStore((s) => s.setMemberSearchState)
 
-  const [query, setQuery] = useState('')
-  const [hitUid, setHitUid] = useState<number | null>(null)
+  // 跨路由返回（如从成员详情页返回组织架构）时恢复上一次的搜索状态
+  const saved = persistKey ? useUiStateStore.getState().memberSearchStates[persistKey] : undefined
+
+  const [query, setQuery] = useState(saved?.query ?? '')
+  const [hitUid, setHitUid] = useState<number | null>(saved?.hitUid ?? null)
+  const [locateTick, setLocateTick] = useState(0)
   const [searching, setSearching] = useState(false)
-  const [focusKeys, setFocusKeys] = useState<Key[] | null>(null)
+  const [focusKeys, setFocusKeys] = useState<Key[] | null>(saved?.focusKeys ?? null)
   /** 命中后待跳转的目标页，由宿主的组织切换 effect 消费一次 */
   const pendingPageRef = useRef<number | null>(null)
 
   /** 姓名搜索：后端匹配总数、已解析命中项、当前下标与候选页游标 */
-  const [resultTotal, setResultTotal] = useState(0)
-  const [matches, setMatches] = useState<MemberSearchHit[]>([])
-  const [matchIndex, setMatchIndex] = useState(0)
-  const [candidatePage, setCandidatePage] = useState(1)
-  const [candidatePages, setCandidatePages] = useState(1)
+  const [resultTotal, setResultTotal] = useState(saved?.resultTotal ?? 0)
+  const [matches, setMatches] = useState<MemberSearchHit[]>(saved?.matches ?? [])
+  const [matchIndex, setMatchIndex] = useState(saved?.matchIndex ?? 0)
+  const [candidatePage, setCandidatePage] = useState(saved?.candidatePage ?? 1)
+  const [candidatePages, setCandidatePages] = useState(saved?.candidatePages ?? 1)
   /** 当前姓名搜索关键词（懒加载后续候选页时复用） */
-  const keywordRef = useRef('')
+  const keywordRef = useRef(saved?.keyword ?? '')
   /** 「单独查看匹配人员」模式；用 ref 让 locate 等回调读取最新值而不必重建 */
-  const [matchOnly, setMatchOnly] = useState(false)
-  const matchOnlyRef = useRef(false)
+  const [matchOnly, setMatchOnly] = useState(saved?.matchOnly ?? false)
+  const matchOnlyRef = useRef(saved?.matchOnly ?? false)
   /** 是否正在汇总全部匹配人员（切换到单独查看时的一次性加载） */
   const [matchesLoading, setMatchesLoading] = useState(false)
   /** 匹配人员汇总请求的版本号：新搜索 / 退出模式时作废旧请求，避免旧结果覆盖新状态 */
@@ -369,13 +396,15 @@ export function useMemberSearch({
       // 目标不在第 1 页时，先扫描出其所在页
       const page = (await findMemberPage(hit.targetId, hit.uid, memberPageSize)) ?? 1
       setHitUid(hit.uid)
+      setLocateTick((n) => n + 1)
+      // 无论组织是否变化都清掉名称过滤并展开祖先链，保证组织树能滚动定位到该组织节点
+      onClearFilter?.()
+      setFocusKeys(orgAncestorKeys(orgs, hit.targetId))
       if (hit.targetId === activeOrgId) {
         // 组织未变化（含单组织模式）：直接按目标页加载
         onLoadPage(hit.targetId, page)
       } else {
-        // 组织变化：清掉组织名称过滤、展开并选中目标组织，由切换 effect 按目标页加载
-        onClearFilter?.()
-        setFocusKeys(orgAncestorKeys(orgs, hit.targetId))
+        // 组织变化：由宿主的切换 effect 按目标页加载并选中目标组织
         pendingPageRef.current = page
         onSelectOrg(hit.targetId)
       }
@@ -592,11 +621,61 @@ export function useMemberSearch({
     void loadNextPage()
   }, [matchIndex, matches.length, showAt, loadNextPage])
 
-  const consumePendingPage = useCallback((): number => {
-    const page = pendingPageRef.current ?? 1
+  const consumePendingPage = useCallback((): number | null => {
+    const page = pendingPageRef.current
     pendingPageRef.current = null
     return page
   }, [])
+
+  /**
+   * 保存当前搜索状态（persistKey 存在时），供「点击成员进入详情 → 返回组织架构」后恢复；
+   * 无任何匹配状态时删除该模块的记录（相当于结束匹配）。
+   */
+  useEffect(() => {
+    if (!persistKey) return
+    const active = query.trim() !== '' || matches.length > 0 || hitUid !== null || matchOnly
+    if (!active) {
+      setMemberSearchState(persistKey, null)
+      return
+    }
+    setMemberSearchState(persistKey, {
+      query,
+      keyword: keywordRef.current,
+      resultTotal,
+      matches,
+      matchIndex,
+      candidatePage,
+      candidatePages,
+      hitUid,
+      focusKeys: focusKeys ? focusKeys.map((k) => Number(k)) : null,
+      matchOnly,
+    })
+  }, [
+    persistKey,
+    setMemberSearchState,
+    query,
+    resultTotal,
+    matches,
+    matchIndex,
+    candidatePage,
+    candidatePages,
+    hitUid,
+    focusKeys,
+    matchOnly,
+  ])
+
+  /**
+   * 结束匹配状态：清空搜索框、高亮、结果条与组织树定位展开，并清除已保存的搜索状态，
+   * 使页面恢复为普通的组织成员浏览。
+   */
+  const clear = useCallback(() => {
+    keywordRef.current = ''
+    setQuery('')
+    setHitUid(null)
+    setFocusKeys(null)
+    resetNameResult()
+    if (persistKey) setMemberSearchState(persistKey, null)
+  }, [persistKey, resetNameResult, setMemberSearchState])
 
   // 命中行渲染出来后自动滚动到可视区中部：目标成员可能位于长列表底部，
   // 逐行手动滚动成本高，这里等表格行（.org-member-row-hit）真正挂载后再滚。
@@ -620,6 +699,7 @@ export function useMemberSearch({
     hitUid,
     focusKeys,
     setFocusKeys,
+    locateTick,
     run,
     consumePendingPage,
     resultTotal,
@@ -635,5 +715,7 @@ export function useMemberSearch({
     matchOnly,
     toggleMatchOnly,
     matchesLoading,
+    hasActive: query.trim() !== '' || matches.length > 0 || hitUid !== null,
+    clear,
   }
 }
