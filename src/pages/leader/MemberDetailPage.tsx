@@ -27,6 +27,8 @@
  * - 表格每页最多 100 行，支持页码跳转与总数展示（要求 12）；
  * - 点击表格行查看详细信息（要求 14），编辑保存后刷新表格（要求 13）；
  * - 资料 / 系统角色 / 组织任职保存后强制重新请求最新数据，无需手动刷新（要求 25）；
+ * - 组织任职按组织合并展示：同一组织存在多个职位时只显示一张卡片，职位栏并列展示全部职位
+ *   （接口返回粒度是「一条记录 = 一个职位」，见 utils/userOrganization）；
  * - 错误提示经 extractErrorReason 附带 HTTP 状态码与中文原因（要求 9），按钮/选项带悬停提示（要求 10）；
  * - 常量集中在 config/，文案走 i18n。
  */
@@ -162,6 +164,11 @@ import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import { formatCentsAsYuan, yuanToCents } from '../../utils/money'
 import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
+import {
+  groupUserOrganizationsByOrg,
+  uniquePositionCodes,
+  uniqueWorkplaces,
+} from '../../utils/userOrganization'
 import ErrorState from '../../components/ErrorState'
 import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
 
@@ -579,6 +586,9 @@ function BasicInfoPanel({
     .map(positionNameOf)
     .find((name) => PARTY_POLITICAL_STATUS_NAMES.includes(name))
 
+  // 组织任职卡片按组织合并：同一组织有多个职位时只展示一张卡片，职位栏并列展示全部职位
+  const orgGroups = groupUserOrganizationsByOrg(orgs)
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* 具备用户管理权限的来源（管理端 / 党委学校端）提供三个独立编辑入口：
@@ -766,51 +776,72 @@ function BasicInfoPanel({
               <ErrorState message={extrasError} />
             ) : extrasLoading ? (
               <Skeleton active paragraph={{ rows: 2 }} />
-            ) : orgs.length === 0 ? (
+            ) : orgGroups.length === 0 ? (
               <Text type="secondary">{t('profile.noData')}</Text>
             ) : (
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                {orgs.map((uo) => (
-                  <Card key={uo.id} size="small" bordered style={{ background: 'transparent' }}>
-                    <Descriptions
-                      column={2}
+                {orgGroups.map((group) => {
+                  // 同一组织可能有多个职位记录：按职位编码去重后并列展示，工作地点同样去重合并
+                  const positionCodes = uniquePositionCodes(group.items)
+                  const workplaces = uniqueWorkplaces(group.items)
+                  return (
+                    <Card
+                      key={group.organization_id}
                       size="small"
-                      items={[
-                        {
-                          key: 'organization',
-                          label: t('profile.organization'),
-                          children: uo.organization_name,
-                        },
-                        {
-                          key: 'position',
-                          label: t('profile.position'),
-                          children: uo.positionDetail ? (
-                            <Space>
-                              <Tag color="geekblue">{uo.positionDetail.name}</Tag>
-                              {uo.positionDetail.description ? (
-                                <Text type="secondary" style={{ marginLeft: 4 }}>
-                                  {uo.positionDetail.description}
-                                </Text>
-                              ) : null}
-                            </Space>
-                          ) : uo.position ? (
-                            <Tag color="default">
-                              {positionNames.get(uo.position) ?? uo.position}
-                            </Tag>
-                          ) : (
-                            t('profile.noData')
-                          ),
-                        },
-                        {
-                          key: 'workplace',
-                          label: t('profile.workplace'),
-                          span: 2,
-                          children: uo.workplace ?? t('profile.noData'),
-                        },
-                      ]}
-                    />
-                  </Card>
-                ))}
+                      bordered
+                      style={{ background: 'transparent' }}
+                    >
+                      <Descriptions
+                        column={2}
+                        size="small"
+                        items={[
+                          {
+                            key: 'organization',
+                            label: t('profile.organization'),
+                            children: group.organization_name,
+                          },
+                          {
+                            key: 'position',
+                            label: t('profile.position'),
+                            children:
+                              positionCodes.length > 0 ? (
+                                <Space wrap size={[12, 4]}>
+                                  {positionCodes.map((code) => {
+                                    const detail = group.items.find(
+                                      (item) => item.position === code,
+                                    )?.positionDetail
+                                    return (
+                                      <Space key={code} size={4}>
+                                        <Tag color={detail ? 'geekblue' : 'default'}>
+                                          {detail?.name ?? positionNames.get(code) ?? code}
+                                        </Tag>
+                                        {detail?.description ? (
+                                          <Text type="secondary" style={{ marginLeft: 4 }}>
+                                            {detail.description}
+                                          </Text>
+                                        ) : null}
+                                      </Space>
+                                    )
+                                  })}
+                                </Space>
+                              ) : (
+                                t('profile.noData')
+                              ),
+                          },
+                          {
+                            key: 'workplace',
+                            label: t('profile.workplace'),
+                            span: 2,
+                            children:
+                              workplaces.length > 0
+                                ? workplaces.join('、')
+                                : t('profile.noData'),
+                          },
+                        ]}
+                      />
+                    </Card>
+                  )
+                })}
               </Space>
             )}
           </Card>

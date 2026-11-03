@@ -51,6 +51,7 @@ import {
 } from '../config/organization'
 import { useT } from '../i18n'
 import { useUiStateStore } from '../store/uiState'
+import { listOrgChainIds } from '../utils/orgTree'
 import { isUidTerm } from '../utils/personSearch'
 import { useErrorFeedback } from './useErrorFeedback'
 
@@ -164,24 +165,6 @@ export interface MemberSearchController {
   hasActive: boolean
   /** 结束匹配：清空搜索词、高亮、结果条与树定位展开，并清除已保存的搜索状态 */
   clear: () => void
-}
-
-/**
- * 目标组织在组织树上的祖先链（含自身），用于命中后展开到该节点。
- *
- * @param orgs 当前展示的组织列表（必填；含 parent_id）
- * @param targetId 目标组织 ID（必填）
- * @returns 从目标组织到根的 ID 数组；目标不在列表中时返回空数组
- */
-function orgAncestorKeys(orgs: MemberSearchOrg[], targetId: number): number[] {
-  const keys: number[] = []
-  let cur = orgs.find((o) => o.id === targetId)
-  while (cur) {
-    keys.push(cur.id)
-    const parentId = cur.parent_id
-    cur = parentId != null ? orgs.find((x) => x.id === parentId) : undefined
-  }
-  return keys
 }
 
 /**
@@ -399,7 +382,7 @@ export function useMemberSearch({
       setLocateTick((n) => n + 1)
       // 无论组织是否变化都清掉名称过滤并展开祖先链，保证组织树能滚动定位到该组织节点
       onClearFilter?.()
-      setFocusKeys(orgAncestorKeys(orgs, hit.targetId))
+      setFocusKeys(listOrgChainIds(orgs, hit.targetId))
       if (hit.targetId === activeOrgId) {
         // 组织未变化（含单组织模式）：直接按目标页加载
         onLoadPage(hit.targetId, page)

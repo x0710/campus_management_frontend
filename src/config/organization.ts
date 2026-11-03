@@ -38,19 +38,32 @@ export const SCHOOL_ANCESTOR_DEPTHS: readonly number[] = [0]
  */
 export const SCHOOL_COLLEGE_PARENT_ORG_ID = 2
 
-/**
- * 党员端首页顶部组织路径的截止节点 ID。
- *
- * 与学校端排名一致，该节点为 ID=2 的「学院党委」容器；首页只展示该节点之前
- * （即更靠近根节点）的组织名称，并用 `|` 拼接，避免显示班级等过细的任职组织。
- */
-export const PARTY_HOME_ORG_PATH_STOP_ID = 2
+/** 党委学校端「组织成员管理」模块 key（组织概览的「查看详细」跳转目标） */
+export const SCHOOL_ORG_ADMIN_MODULE_KEY = 'school_m2'
+
+/** 党委学校端「组织概览」模块 key（同时用作会话状态 key，记忆选中组织与树展开态） */
+export const SCHOOL_ORG_OVERVIEW_MODULE_KEY = 'school_m6'
 
 /**
- * 党员端首页组织路径无法查询到组织树时的兜底名称。
+ * 党委学院端「学院支部管理」模块 key。
+ * 学院工作台点击各支部成绩排名时，按该 key 写入选中支部并跳转，展示该支部成员列表。
+ */
+export const ACADEMY_BRANCH_MODULE_KEY = 'academy_m5'
+
+/**
+ * 组织概览按下级组织统计时的并发上限。
  *
- * 普通党员 / 学生可能没有 `organization.read` 权限，但首页仍需展示「组织 2 之前」的
- * 根组织名称；该校组织树根节点固定为井冈山大学。
+ * 党员人数（member-counts）与先锋指数平均分（organization-average）各需一次请求；
+ * 预备党员人数需按职位编码逐个下级组织查询，设上限避免一次性打出过多请求。
+ */
+export const ORG_OVERVIEW_STATS_CONCURRENCY = 8
+
+/**
+ * 党员端首页顶部组织链路无法查询到组织树时的兜底根组织名称。
+ *
+ * 普通党员 / 学生可能没有 `organization.read` 权限，但首页仍需展示组织链路；
+ * 此时链路回退为「根组织 + 已解析出的任职组织」，支部名称不会丢失。
+ * 该校组织树根节点固定为井冈山大学。
  */
 export const PARTY_HOME_ORG_FALLBACK_NAME = '井冈山大学'
 

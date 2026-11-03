@@ -22,11 +22,12 @@ import {
   InputNumber,
   Modal,
   Select,
+  Spin,
   Table,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { queryApprovalTemplates } from '../../api/approvalmodel'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { getApprovalTemplateDetail, queryApprovalTemplates } from '../../api/approvalmodel'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import {
@@ -66,6 +67,18 @@ interface DeclarationFormValues {
   files?: number[]
 }
 
+/** 已选模板的加分细则状态 */
+interface TemplateRulesState {
+  /** 模板 ID */
+  templateId: number
+  /** 加分细则（模板 description；未配置时为 null） */
+  description: string | null
+  /** 详情接口是否加载中 */
+  loading: boolean
+  /** 详情接口错误文案（加载失败时展示重试） */
+  error: string | null
+}
+
 /** 党员端：成绩申报（表单 + 本人申报记录） */
 export default function PartyDeclarationView() {
   const t = useT()
@@ -86,6 +99,10 @@ export default function PartyDeclarationView() {
   /** 申报类型可选模板（审批模板，business_type='party'） */
   const [templates, setTemplates] = useState<ApprovalTemplate[]>([])
   const [templatesError, setTemplatesError] = useState<string | null>(null)
+  /** 已选模板的加分细则（选择申报类型后从模板详情接口加载） */
+  const [rules, setRules] = useState<TemplateRulesState | null>(null)
+  /** 加分细则请求序号：快速切换模板时丢弃过期响应 */
+  const rulesReqRef = useRef(0)
 
   /** 加载成绩申报可用的审批模板；失败时在表单区展示错误与重试（代码要求 9） */
   const loadTemplates = useCallback(async () => {
@@ -106,6 +123,41 @@ export default function PartyDeclarationView() {
   useEffect(() => {
     void loadTemplates()
   }, [loadTemplates])
+
+  /**
+   * 加载所选模板的加分细则：先用列表里的 description 即时展示，再用模板详情接口
+   * （GET /api/approvals/templates/{id}）返回的 description 覆盖，保证以详情为准。
+   * 快速切换模板时按请求序号丢弃过期响应。
+   * @param templateId 模板 ID（必填）
+   * @param force 是否绕过会话缓存（可选，默认 false；点击重试时传 true）
+   */
+  const loadRules = useCallback(
+    async (templateId: number, force = false) => {
+      const reqId = rulesReqRef.current + 1
+      rulesReqRef.current = reqId
+      const fallback = templates.find((item) => item.id === templateId)?.description ?? null
+      setRules({ templateId, description: fallback, loading: true, error: null })
+      try {
+        const detail = await getApprovalTemplateDetail(templateId, force)
+        if (rulesReqRef.current !== reqId) return
+        setRules({
+          templateId,
+          description: detail.description?.trim() ? detail.description : null,
+          loading: false,
+          error: null,
+        })
+      } catch (err) {
+        if (rulesReqRef.current !== reqId) return
+        setRules({
+          templateId,
+          description: null,
+          loading: false,
+          error: extractErrorReason(err, t),
+        })
+      }
+    },
+    [t, templates],
+  )
 
   /** 获取当前登录用户：提交时作为 user_id */
   useEffect(() => {
@@ -254,6 +306,9 @@ export default function PartyDeclarationView() {
       })
       message.success(t('partyDeclaration.createSuccess'))
       form.resetFields()
+      setRules(null)
+      // 使仍在途的加分细则请求失效，避免提交后右侧闪现旧模板细则
+      rulesReqRef.current += 1
       if (page === 1) refresh()
       else setPage(1)
     } catch (err) {
@@ -273,65 +328,109 @@ export default function PartyDeclarationView() {
           {templatesError ? (
             <ErrorState message={templatesError} onRetry={() => void loadTemplates()} />
           ) : (
-            <Form<DeclarationFormValues>
-              form={form}
-              layout="vertical"
-              requiredMark={false}
-              onFinish={onFinish}
-              disabled={myUid === null}
-            >
-              <Form.Item
-                name="template_id"
-                label={t('partyDeclaration.fieldType')}
-                rules={[{ required: true, message: t('partyDeclaration.typeRequired') }]}
+            <div className="party-declaration-layout">
+              <Form<DeclarationFormValues>
+                form={form}
+                layout="vertical"
+                requiredMark={false}
+                onFinish={onFinish}
+                disabled={myUid === null}
               >
-                <Select
-                  style={{ maxWidth: 360 }}
-                  placeholder={t('partyDeclaration.typeRequired')}
-                  options={templates.map((item) => ({
-                    value: item.id,
-                    label: item.name,
-                    title: item.description || item.name,
-                  }))}
-                />
-              </Form.Item>
+                {/* 申报类型与申请加分并排（申请加分置于右侧），申请理由独占整行 */}
+                <div className="party-declaration-row">
+                  <Form.Item
+                    name="template_id"
+                    label={t('partyDeclaration.fieldType')}
+                    rules={[{ required: true, message: t('partyDeclaration.typeRequired') }]}
+                  >
+                    <Select
+                      placeholder={t('partyDeclaration.typeRequired')}
+                      options={templates.map((item) => ({
+                        value: item.id,
+                        label: item.name,
+                        title: item.description || item.name,
+                      }))}
+                      // 选择模板后立即加载并展示该模板的加分细则（代码要求 14）
+                      onChange={(value: number) => void loadRules(value)}
+                    />
+                  </Form.Item>
 
-              <Form.Item
-                name="requested_score"
-                label={t('partyDeclaration.fieldScore')}
-                rules={[{ required: true, message: t('partyDeclaration.scoreRequired') }]}
-              >
-                {/* 后端分数为 DecimalText（字符串），用 stringMode 采集并原样提交 */}
-                <InputNumber style={{ width: 180 }} stringMode step="1" />
-              </Form.Item>
+                  <Form.Item
+                    name="requested_score"
+                    label={t('partyDeclaration.fieldScore')}
+                    rules={[{ required: true, message: t('partyDeclaration.scoreRequired') }]}
+                  >
+                    {/* 后端分数为 DecimalText（字符串），用 stringMode 采集并原样提交 */}
+                    <InputNumber stringMode step="1" />
+                  </Form.Item>
+                </div>
 
-              <Form.Item
-                name="reason"
-                label={t('partyDeclaration.fieldReason')}
-                rules={[{ required: true, message: t('partyDeclaration.reasonRequired') }]}
-              >
-                <Input.TextArea
-                  rows={4}
-                  maxLength={200}
-                  showCount
-                  placeholder={t('partyDeclaration.reasonPlaceholder')}
-                />
-              </Form.Item>
+                <Form.Item
+                  name="reason"
+                  label={t('partyDeclaration.fieldReason')}
+                  rules={[{ required: true, message: t('partyDeclaration.reasonRequired') }]}
+                >
+                  <Input.TextArea
+                    rows={8}
+                    maxLength={200}
+                    showCount
+                    placeholder={t('partyDeclaration.reasonPlaceholder')}
+                  />
+                </Form.Item>
 
-              <Form.Item
-                name="files"
-                label={t('partyDeclaration.fieldFiles')}
-                extra={t('partyDeclaration.filesHint')}
-              >
-                <AttachmentUploader maxCount={PARTY_DECLARATION_MAX_FILES} />
-              </Form.Item>
+                <Form.Item
+                  name="files"
+                  label={t('partyDeclaration.fieldFiles')}
+                  extra={t('partyDeclaration.filesHint')}
+                >
+                  <AttachmentUploader maxCount={PARTY_DECLARATION_MAX_FILES} />
+                </Form.Item>
 
-              <Form.Item className="leave-submit-item">
-                <Button type="primary" htmlType="submit" loading={submitting}>
-                  {t('partyDeclaration.submit')}
-                </Button>
-              </Form.Item>
-            </Form>
+                <Form.Item className="leave-submit-item">
+                  <Button type="primary" htmlType="submit" loading={submitting}>
+                    {t('partyDeclaration.submit')}
+                  </Button>
+                </Form.Item>
+              </Form>
+
+              {/* 右侧加分细则：数据来自模板详情接口的 description（未选择模板时给出提示） */}
+              <aside className="party-declaration-rules" aria-live="polite">
+                <div className="party-declaration-rules-title">
+                  {t('partyDeclaration.rulesTitle')}
+                </div>
+                {rules === null ? (
+                  <p className="party-declaration-rules-hint">
+                    {t('partyDeclaration.rulesHint')}
+                  </p>
+                ) : (
+                  <>
+                    <div className="party-declaration-rules-name">
+                      {templates.find((item) => item.id === rules.templateId)?.name ??
+                        rules.templateId}
+                    </div>
+                    {rules.loading && rules.description?.trim() ? (
+                      // 列表已带回加分细则时先展示，详情接口返回后再覆盖
+                      <p className="party-declaration-rules-text">{rules.description}</p>
+                    ) : rules.loading ? (
+                      <span className="party-declaration-rules-loading">
+                        <Spin size="small" /> {t('common.loading')}
+                      </span>
+                    ) : rules.error ? (
+                      <ErrorState
+                        message={rules.error}
+                        onRetry={() => void loadRules(rules.templateId, true)}
+                      />
+                    ) : rules.description?.trim() ? (
+                      <p className="party-declaration-rules-text">{rules.description}</p>
+                    ) : (
+                      <p className="party-declaration-rules-hint">
+                        {t('partyDeclaration.rulesNone')}
+                      </p>
+                    )}
+                  </>
+                )}
+              </aside>
+            </div>
           )}
         </div>
       </section>

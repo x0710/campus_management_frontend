@@ -232,6 +232,8 @@ function ApprovalGuide() {
   const [reloadSeq, setReloadSeq] = useState(0)
   // 已加载的步骤详情：模板 ID → 步骤列表
   const [stepsByTemplate, setStepsByTemplate] = useState<Record<number, ApprovalStep[]>>({})
+  // 模板详情中的「加分细则」（模板 description；列表可能未返回，以详情为准）
+  const [rulesByTemplate, setRulesByTemplate] = useState<Record<number, string | null>>({})
   // 正在请求步骤的模板 ID
   const [stepsLoading, setStepsLoading] = useState<number[]>([])
   // 步骤加载失败的模板 ID → 错误文案
@@ -303,6 +305,11 @@ function ApprovalGuide() {
       ])
       if (detailResult.status === 'fulfilled') {
         setStepsByTemplate((prev) => ({ ...prev, [templateId]: detailResult.value.steps ?? [] }))
+        // 模板详情中的 description 即「加分细则」，与审批流程一并展示
+        setRulesByTemplate((prev) => ({
+          ...prev,
+          [templateId]: detailResult.value.description?.trim() ? detailResult.value.description : null,
+        }))
       } else {
         setStepsError((prev) => ({ ...prev, [templateId]: extractErrorReason(detailResult.reason, t) }))
       }
@@ -446,9 +453,23 @@ function ApprovalGuide() {
           ),
           children: (
             <div className="party-guide-body">
-              {template.description?.trim() ? (
-                <p className="party-guide-desc">{template.description}</p>
-              ) : null}
+              {/* 加分细则：优先使用模板详情接口返回的 description（列表可能未返回该字段） */}
+              {(() => {
+                const rules =
+                  template.id in rulesByTemplate
+                    ? rulesByTemplate[template.id]
+                    : template.description
+                return (
+                  <div className="party-guide-rules">
+                    <div className="party-guide-rules-title">
+                      {t('partyProfile.guideRulesTitle')}
+                    </div>
+                    <p className="party-guide-rules-text">
+                      {rules?.trim() ? rules : t('partyProfile.guideRulesNone')}
+                    </p>
+                  </div>
+                )
+              })()}
               {renderSteps(template)}
             </div>
           ),

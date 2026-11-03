@@ -7,6 +7,7 @@
  * - 响应体 `enabled` 后端为 i8（1 启用 / 0 停用），JSON 中是**数字**；
  *   而请求体（创建/更新）后端为 `Option<bool>`，提交时必须传布尔值，切勿把响应的数字回填后原样提交；
  * - 响应体 `description` 后端为 String（可能为空串），展示时用 `|| '—'` 兜底；
+ *   模板级 `description` 为「加分细则」（成绩申报类模板），需在审批指南模板详情与成绩申报页展示；
  * - 步骤请求体的 position / assignee_value / description 后端均为 Option，故可选；
  * - 步骤 `position` 落库为职位编码，approval_template_step 表对其有外键约束
  *   （REFERENCES position(code)），故只允许填系统中已存在的职位编码。
@@ -21,7 +22,7 @@ import type { PageQuery } from './common'
  * @property name 模板名称（必填）
  * @property business_type 业务类型（必填，后端为自由字符串）
  * @property enabled 是否启用（后端 i8：1 启用 / 0 停用，JSON 为数字，展示时按真值判断）
- * @property description 描述（后端可能为空串）
+ * @property description 描述（后端可能为空串；成绩申报类模板中为「加分细则」）
  * @property created_at 创建时间（RFC3339）
  * @property updated_at 更新时间（RFC3339）
  */
@@ -43,7 +44,7 @@ export interface ApprovalTemplate {
  * @property step_no 步骤编号（必填）
  * @property assignee_value 审批人参数（后端可为空）
  * @property position 审批人角色（后端可为空；落库为职位编码，须存在于 position 表，assignee_value 为空时启用）
- * @property description 描述（后端可能为空串）
+ * @property description 步骤说明（审批层级，如「党总支」「所在学院党委」；后端可能为空串）
  * @property created_at 创建时间（RFC3339）
  * @property updated_at 更新时间（RFC3339）
  */
@@ -71,6 +72,7 @@ export interface ApprovalTemplateDetail {
   business_type: string
   /** 是否启用（后端 i8：1 启用 / 0 停用，JSON 为数字） */
   enabled: number
+  /** 描述（后端可能为空串；成绩申报类模板中为「加分细则」，以详情接口为准） */
   description: string | null
   steps: ApprovalStep[] | null
   created_at: string

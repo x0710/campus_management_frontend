@@ -21,6 +21,9 @@
  *
  * 组织数据由父组件加载后传入（不同门户数据范围不同），本组件只负责组织树渲染、
  * 成员分页查询与跳转；成员查询走会话缓存，刷新传 force=true 绕过缓存（代码要求 5）。
+ *
+ * 成员表按 user_id 合并（groupOrganizationMembers）：同一成员在当前组织有多个职位时
+ * 只展示一行，职位 / 工作地点并列展示全部取值，避免列表出现两个仅职位不同的相同人员。
  */
 import {
   CloseOutlined,
@@ -29,7 +32,7 @@ import {
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Input, Spin, Table, Tag, Tooltip, Tree } from 'antd'
+import { Alert, Button, Input, Space, Spin, Table, Tag, Tooltip, Tree } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
 import axios from 'axios'
@@ -46,6 +49,7 @@ import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
 import { useUiStateStore } from '../store/uiState'
 import { formatPartyScoreTotal } from '../utils/partyScore'
+import { groupOrganizationMembers, type UserMemberRow } from '../utils/userOrganization'
 import ErrorState from './ErrorState'
 import MatchedMembersTable from './MatchedMembersTable'
 import MemberSearchModeToggle from './MemberSearchModeToggle'
@@ -99,6 +103,12 @@ interface OrgMembersExplorerProps {
    * （通过 GET /api/party/scores 批量查询成员党建加分）。
    */
   partyScoreColumns?: boolean
+  /**
+   * 跨页跳转定位的目标组织 ID（可选，默认 null）。
+   * 从工作台点击组织成绩排名后跳转本页时传入：组织树挂载后滚动到该节点
+   * （与成员搜索命中的滚动定位一致）；用户再点选其他组织后不再滚动。
+   */
+  focusOrgId?: number | null
 }
 
 export default function OrgMembersExplorer({
@@ -112,6 +122,7 @@ export default function OrgMembersExplorer({
   autoSelectFirstWithMembers = false,
   showOrgTree = true,
   partyScoreColumns = false,
+  focusOrgId = null,
 }: OrgMembersExplorerProps) {
   const t = useT()
   const navigate = useNavigate()
@@ -296,17 +307,12 @@ export default function OrgMembersExplorer({
     return build(byParent.get(null))
   }, [orgs, orgSearch])
 
-  // 搜索定位到成员后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
+  // 搜索定位到成员 / 从工作台跳转定位到组织后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
   useEffect(() => {
-    if (
-      !showOrgTree ||
-      treeCollapsed ||
-      search.matchOnly ||
-      search.hitUid === null ||
-      selectedId === null
-    ) {
-      return
-    }
+    if (!showOrgTree || treeCollapsed || search.matchOnly || selectedId === null) return
+    const fromSearch = search.hitUid !== null
+    const fromJump = focusOrgId !== null && focusOrgId === selectedId
+    if (!fromSearch && !fromJump) return
     // 等组织树完成展开动画并渲染出选中节点后再滚动，避免定位到尚未挂载的节点
     const timer = window.setTimeout(() => {
       document
@@ -314,14 +320,25 @@ export default function OrgMembersExplorer({
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 150)
     return () => window.clearTimeout(timer)
-  }, [showOrgTree, treeCollapsed, search.matchOnly, search.hitUid, search.locateTick, selectedId, treeData])
+  }, [
+    showOrgTree,
+    treeCollapsed,
+    search.matchOnly,
+    search.hitUid,
+    search.locateTick,
+    focusOrgId,
+    selectedId,
+    treeData,
+  ])
 
   const selectedOrg = useMemo(
     () => orgs.find((o) => o.id === activeOrgId) ?? null,
     [orgs, activeOrgId],
   )
 
-  const memberIds = useMemo(() => members.map((m) => m.user_id), [members])
+  // 成员表展示行：同一成员在当前组织有多个职位时合并为一行（避免出现两个一样的人）
+  const memberRows = useMemo(() => groupOrganizationMembers(members), [members])
+  const memberIds = useMemo(() => memberRows.map((m) => m.user_id), [memberRows])
   // 姓名（真实姓名，GET /users/{id}）解析
   const memberNames = useUserNames(memberIds)
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
@@ -364,7 +381,7 @@ export default function OrgMembersExplorer({
     [navigate, portalKey, fromModuleKey],
   )
 
-  const memberColumns = useMemo<ColumnsType<OrganizationMember>>(() => {
+  const memberColumns = useMemo<ColumnsType<UserMemberRow>>(() => {
     if (partyScoreColumns) {
       return [
         { title: t('memberDetail.fieldUid'), dataIndex: 'user_id', key: 'user_id', width: 90 },
@@ -379,15 +396,21 @@ export default function OrgMembersExplorer({
         },
         {
           title: t('branch.colIdentity'),
-          dataIndex: 'position',
           key: 'position',
-          width: 160,
-          // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
-          render: (v: string) => (
-            <Tooltip title={v}>
-              <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
-            </Tooltip>
-          ),
+          width: 200,
+          // 同一组织多个职位：身份栏并列展示全部职位（映射失败时回退编码），悬停展示原始编码
+          render: (_, record) =>
+            record.positions.length === 0 ? (
+              '—'
+            ) : (
+              <Space wrap size={[8, 4]}>
+                {record.positions.map((code) => (
+                  <Tooltip key={code} title={code}>
+                    <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+                  </Tooltip>
+                ))}
+              </Space>
+            ),
         },
         {
           title: t('branch.colPioneerLevel'),
@@ -427,21 +450,27 @@ export default function OrgMembersExplorer({
       },
       {
         title: t('adminOrg.colPosition'),
-        dataIndex: 'position',
         key: 'position',
-        width: 160,
-        // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
-        render: (v: string) => (
-          <Tooltip title={v}>
-            <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
-          </Tooltip>
-        ),
+        width: 200,
+        // 同一组织多个职位：职位栏并列展示全部职位（映射失败时回退编码）
+        render: (_, record) =>
+          record.positions.length === 0 ? (
+            '—'
+          ) : (
+            <Space wrap size={[8, 4]}>
+              {record.positions.map((code) => (
+                <Tooltip key={code} title={code}>
+                  <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+                </Tooltip>
+              ))}
+            </Space>
+          ),
       },
       {
         title: t('adminOrg.colWorkplace'),
-        dataIndex: 'workplace',
         key: 'workplace',
-        render: (v: string | null) => v || '—',
+        render: (_, record) =>
+          record.workplaces.length > 0 ? record.workplaces.join('、') : '—',
       },
       {
         title: t('approval.colAction'),
@@ -617,18 +646,18 @@ export default function OrgMembersExplorer({
               onRetry={() => void loadMembers(selectedOrg.id, memberPage, true)}
             />
           ) : (
-            <Table<OrganizationMember>
-              rowKey={(r: OrganizationMember) => String(r.id)}
+            <Table<UserMemberRow>
+              rowKey={(r: UserMemberRow) => String(r.user_id)}
               loading={membersLoading}
               columns={memberColumns}
-              dataSource={members}
+              dataSource={memberRows}
               // 搜索命中的成员所在行高亮（夜间配色见 index.css 的 .org-member-row-hit）
-              rowClassName={(record: OrganizationMember) =>
+              rowClassName={(record: UserMemberRow) =>
                 record.user_id === search.hitUid ? 'org-member-row-hit' : ''
               }
               locale={{ emptyText: t('common.noData') }}
               scroll={{ x: 860 }}
-              onRow={(record: OrganizationMember) => ({
+              onRow={(record: UserMemberRow) => ({
                 onClick: (e: React.MouseEvent) => {
                   // 点击按钮/链接时不触发行点击
                   const target = e.target as HTMLElement

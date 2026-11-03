@@ -1338,6 +1338,86 @@ h3 {
   color: var(--ink);
 }
 
+/* 党员端成绩申报：左侧表单 + 右侧加分细则（选择模板后展示，未选择时给出提示） */
+.party-declaration-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* 成绩申报表单：申报类型 + 申请加分 并排（申请加分固定窄宽，置于右侧） */
+.party-declaration-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+  align-items: start;
+  /* 与下方「申请理由」保持适度间距（不远不近，较默认 24px 略收紧） */
+  margin-bottom: 16px;
+}
+
+/* 行内两项取消表单默认下间距，改由行容器统一控制 */
+.party-declaration-row .ant-form-item {
+  margin-bottom: 0;
+}
+
+/* 行内控件撑满各自列宽 */
+.party-declaration-row .ant-select,
+.party-declaration-row .ant-input-number {
+  width: 100%;
+}
+
+.party-declaration-rules {
+  padding: 16px 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.party-declaration-rules-title {
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.party-declaration-rules-name {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0.85;
+}
+
+.party-declaration-rules-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.party-declaration-rules-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+  opacity: 0.6;
+}
+
+.party-declaration-rules-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+:root[data-theme='dark'] .party-declaration-rules {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 /* 右栏操作按钮：取消 / 驳回 / 确认通过统一右对齐 */
 .party-approval-form-actions {
   display: flex;
@@ -1617,6 +1697,12 @@ h3 {
   grid-column: 1 / -1;
 }
 
+/* 组织概览/组织成员管理表头的操作按钮：窄屏时换行，避免按钮被压缩到不可读 */
+.org-member-header .approval-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 /* 管理端/学校端组织成员搜索行：按学号/姓名搜索 + 结果条 */
 .org-member-actions {
   display: flex;
@@ -1831,6 +1917,13 @@ h3 {
     grid-template-columns: 1fr;
   }
   .user-post-row {
+    grid-template-columns: 1fr;
+  }
+  .party-declaration-layout {
+    grid-template-columns: 1fr;
+  }
+  /* 窄屏下申报类型与申请加分改为上下排列，避免两列各自过窄 */
+  .party-declaration-row {
     grid-template-columns: 1fr;
   }
 }
@@ -3107,11 +3200,33 @@ h3 {
   color: var(--ink);
 }
 
-.party-guide-desc {
+/* 我的/审批指南：模板详情中的「加分细则」（内容来自模板详情接口的 description） */
+.party-guide-rules {
   margin: 0 0 16px;
-  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.party-guide-rules-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ink);
   opacity: 0.75;
+}
+
+.party-guide-rules-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+:root[data-theme='dark'] .party-guide-rules {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .party-guide-loading {
@@ -3477,9 +3592,27 @@ h3 {
   display: flex;
   align-items: center;
   gap: 16px;
+  width: 100%;
   padding: 10px 18px;
+  border: 0;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.03);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+/* 排名行可点击：悬停/键盘聚焦给出可跳转的反馈（点击跳转学院支部管理并定位该支部） */
+.academy-rank-row:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.academy-rank-row:focus-visible {
+  /* 学院端主色 */
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
 }
 
 .academy-rank-name {
@@ -3495,11 +3628,11 @@ h3 {
   min-width: 0;
 }
 
-/* 所有成绩条形统一红色，不再按名次区分颜色 */
+/* 学院端各支部排名条形统一蓝色（与党委学校端总览一致），不按名次区分颜色 */
 .academy-rank-bar {
   height: 14px;
   border-radius: 3px;
-  background: #cf1322;
+  background: #1677ff;
 }
 
 /* 分数文本独立成列并右对齐、定宽 + 等宽数字：
@@ -3521,6 +3654,10 @@ h3 {
 
 :root[data-theme='dark'] .academy-rank-row {
   background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme='dark'] .academy-rank-row:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* 党委学校端：总览 */
@@ -3575,9 +3712,27 @@ h3 {
   display: flex;
   align-items: center;
   gap: 16px;
+  width: 100%;
   padding: 10px 18px;
+  border: 0;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.03);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+/* 排名行可点击：悬停/键盘聚焦给出可跳转的反馈（点击跳转组织概览定位该党委） */
+.school-rank-row:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.school-rank-row:focus-visible {
+  /* 学校端主色（与门户 accent 一致） */
+  outline: 2px solid #08979c;
+  outline-offset: 2px;
 }
 
 .school-rank-name {
@@ -3593,11 +3748,11 @@ h3 {
   min-width: 0;
 }
 
-/* 所有成绩条形统一红色，不再按名次区分颜色 */
+/* 学校端各二级党委排名条形统一蓝色，不按名次区分颜色 */
 .school-rank-bar {
   height: 14px;
   border-radius: 3px;
-  background: #cf1322;
+  background: #1677ff;
 }
 
 /* 分数文本独立成列并右对齐、定宽 + 等宽数字：
@@ -3619,4 +3774,8 @@ h3 {
 
 :root[data-theme='dark'] .school-rank-row {
   background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme='dark'] .school-rank-row:hover {
+  background: rgba(255, 255, 255, 0.12);
 }

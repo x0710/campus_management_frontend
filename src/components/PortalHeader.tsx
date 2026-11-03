@@ -29,7 +29,16 @@ import { invalidate } from '../api/cache'
 import { changeMyPassword, getCurrentUser, getMyRoles } from '../api/auth'
 import { getMyProfile } from '../api/users'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
-import { getAccessiblePortalKeys, getPortal, PORTAL_PROFILE_MODULE_KEYS, PORTALS, type PortalKey, type PortalRole } from '../config/portals'
+import {
+  getAccessiblePortalKeys,
+  getPortal,
+  isPortalDisabled,
+  PARTY_PORTAL_KEY,
+  PORTAL_PROFILE_MODULE_KEYS,
+  PORTALS,
+  type PortalKey,
+  type PortalRole,
+} from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
@@ -126,9 +135,12 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const currentPortal = useMemo(() => getPortal(currentPortalKey), [currentPortalKey])
   const currentPortalName = currentPortal ? t(`portal.${currentPortal.key}_name`) : t('portal.selectPortal')
 
-  /** 左上角门户切换菜单：固定平铺列出全部门户端，不做角色可访问性过滤 */
+  /**
+   * 左上角门户切换菜单：固定平铺列出全部门户端，不做角色可访问性过滤；
+   * 已停用的门户（学生端 / 教师端 / 领导端）不展示入口。
+   */
   const portalSwitchItems = useMemo<MenuProps['items']>(() => {
-    return PORTALS.map((portal) => ({
+    return PORTALS.filter((portal) => !isPortalDisabled(portal.key)).map((portal) => ({
       key: `portal:${portal.key}`,
       icon: portal.icon,
       label: t(`portal.${portal.key}_name`),
@@ -284,7 +296,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             type="primary"
             className="feedback-nav-btn"
             icon={<QuestionCircleOutlined />}
-            onClick={() => navigate(`/portal/${currentPortalKey ?? 'student'}/feedback`)}
+            onClick={() => navigate(`/portal/${currentPortalKey ?? PARTY_PORTAL_KEY}/feedback`)}
           >
             {t('common.reportIssue')}
           </Button>

@@ -66,6 +66,8 @@ export async function createApprovalTemplate(
 
 /**
  * GET /api/approvals/templates/{id} 获取审批模板详情（含步骤列表）
+ * 说明：响应体的模板级 `description` 即「加分细则」（成绩申报类模板），
+ * 审批指南的模板详情与成绩申报右侧均以该字段展示，故以详情接口为准。
  * @param id 模板 ID（必填，必须为正数；无效时直接拒绝，避免请求 templates/undefined）
  * @param force 是否绕过会话缓存（可选，默认 false）
  * @returns Promise<ApprovalTemplateDetail> 模板详情（必返回）

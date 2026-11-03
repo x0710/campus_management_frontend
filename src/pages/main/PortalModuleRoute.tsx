@@ -12,6 +12,7 @@ import { Tag } from 'antd'
 import { getPortal, type PortalKey, type PortalModule } from '../../config/portals'
 import {
   ACADEMY_ANCESTOR_DEPTHS,
+  ACADEMY_BRANCH_MODULE_KEY,
   BRANCH_ANCESTOR_DEPTHS,
   SCHOOL_COLLEGE_PARENT_ORG_ID,
 } from '../../config/organization'
@@ -48,6 +49,7 @@ const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
 const BranchManageView = lazy(() => import('../branch/BranchManageView'))
 const AcademyWorkbenchView = lazy(() => import('../academy/AcademyWorkbenchView'))
 const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
+const SchoolOrgOverviewView = lazy(() => import('../school/SchoolOrgOverviewView'))
 
 /**
  * （可查看全部公告、删除任意公告，编辑仅限本人发布的公告）。
@@ -56,7 +58,7 @@ const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
 const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
 
 /**
- * 党委学校端「组织管理」：复用管理端组织架构页面（组织树 + 组织 CRUD + 成员任职管理），
+ * 党委学校端「组织成员管理」：复用管理端组织架构页面（组织树 + 组织 CRUD + 成员任职管理），
  * 接真实组织/成员接口；用独立 uiKey 隔离选中态，避免与管理端串用。
  * 成员列表以「先锋等级」列代替「工作地点」，操作列额外提供「重置密码」（与管理端用户与账户一致）。
  */
@@ -82,7 +84,10 @@ const BranchManageModule = () => (
  * 展示「学院党委 + 下属全部支部」的组织树；未命中学院深度时回退第一个任职组织。
  */
 const AcademyBranchManageModule = () => (
-  <BranchManageView fromModuleKey="academy_m5" ancestorDepths={ACADEMY_ANCESTOR_DEPTHS} />
+  <BranchManageView
+    fromModuleKey={ACADEMY_BRANCH_MODULE_KEY}
+    ancestorDepths={ACADEMY_ANCESTOR_DEPTHS}
+  />
 )
 
 /**
@@ -112,7 +117,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   // 党委学院端「学院支部管理」：与支部端同一支部判定逻辑（所属支部 + 下级组织成员）
   'academy:academy_m5': AcademyBranchManageModule,
   'school:school_m1': SchoolOverviewView,
-  // 党委学校端「组织管理」：复用管理端「组织架构」页面（接真实组织/成员接口）
+  // 党委学校端「组织成员管理」：复用管理端「组织架构」页面（接真实组织/成员接口）
   'school:school_m2': SchoolOrgAdminView,
   // 党委学校端「系统权限管理」：与管理端「角色权限」复用同一页面（接真实 RBAC 接口）
   'school:school_m3': RolesAdminView,
@@ -120,6 +125,8 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'school:school_m4': PartyProfileView,
   // 党委学校端「岗位管理」：复用管理端「岗位管理」页面（接真实职位接口）
   'school:school_m5': PositionsAdminView,
+  // 党委学校端「组织概览」：左侧组织树 + 右侧下级组织统计（党员 / 预备党员人数、先锋指数平均分）
+  'school:school_m6': SchoolOrgOverviewView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

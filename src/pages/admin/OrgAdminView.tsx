@@ -19,6 +19,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Space,
   Spin,
   Table,
   Tag,
@@ -68,7 +69,13 @@ import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
+import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 import { formatPartyScoreTotal } from '../../utils/partyScore'
+import {
+  groupOrganizationMembers,
+  uniqueUserOrganizations,
+  type UserMemberRow,
+} from '../../utils/userOrganization'
 
 /** 组织成员表每页条数（代码要求 12：表格每页最多 100 行） */
 const MEMBER_PAGE_SIZE = 100
@@ -108,6 +115,8 @@ interface OrgAdminViewProps {
  * 搜索成员后组织树自动滚动到命中组织；搜索状态按 uiKey 记忆，进入成员详情再返回后
  * 仍可继续查看上一次的模糊匹配结果与当前定位；表头提供「结束匹配」按钮恢复普通浏览。
  * 党委学校端复用本页时开启 partyScoreColumns（先锋等级列）与 showResetPassword（重置密码操作）。
+ * 成员列表按 user_id 合并：同一成员在同一组织有多个职位时只展示一行（职位栏并列展示全部职位），
+ * 「所属组织」标签按组织去重；移除成员时会一并删除该成员在该组织的全部职位记录。
  */
 export default function OrgAdminView({
   uiKey = 'admin_m3',
@@ -177,28 +186,11 @@ export default function OrgAdminView({
 
   const reportError = useErrorFeedback()
 
-  /** 左侧组织树实际展示的组织范围；传入 rootOrgId 时只保留该节点及其全部下级 */
-  const orgsInTree = useMemo(() => {
-    if (rootOrgId === undefined) return orgs
-
-    const byParent = new Map<number, OrganizationInfo[]>()
-    for (const org of orgs) {
-      if (org.parent_id == null) continue
-      const siblings = byParent.get(org.parent_id)
-      if (siblings) siblings.push(org)
-      else byParent.set(org.parent_id, [org])
-    }
-
-    const result: OrganizationInfo[] = []
-    const walk = (id: number) => {
-      const org = orgs.find((item) => item.id === id)
-      if (!org) return
-      result.push(org)
-      for (const child of byParent.get(id) ?? []) walk(child.id)
-    }
-    walk(rootOrgId)
-    return result
-  }, [orgs, rootOrgId])
+  /** 左侧组织树实际展示的组织范围；传入 rootOrgId 时只保留该节点及其全部下级（见 utils/orgTree） */
+  const orgsInTree = useMemo(
+    () => collectOrgSubtree(orgs, rootOrgId),
+    [orgs, rootOrgId],
+  )
 
   const loadOrgs = useCallback(async (force?: boolean) => {
     setOrgsLoading(true)
@@ -251,6 +243,11 @@ export default function OrgAdminView({
     [reportError],
   )
 
+  // 成员表展示行：同一成员在当前组织有多个职位时合并为一行（避免出现两个一样的人）
+  const memberRows = useMemo(() => groupOrganizationMembers(members), [members])
+  // 当前成员页内的用户 ID（按展示行去重）→ 姓名 / 任职组织 / 先锋等级
+  const memberIds = useMemo(() => memberRows.map((m) => m.user_id), [memberRows])
+
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
   const search = useMemberSearch({
     orgs: orgsInTree,
@@ -262,7 +259,7 @@ export default function OrgAdminView({
       setMemberPage(uiKey, page)
       void loadMembers(orgId, page)
     },
-    memberRows: members,
+    memberRows,
     // 搜索状态按模块 key 记忆：进入成员详情再返回后继续展示上一次的模糊匹配结果
     persistKey: uiKey,
   })
@@ -293,47 +290,11 @@ export default function OrgAdminView({
     }
   }, [selectedId, loadMembers, consumePendingPage, uiKey, setMemberPage])
 
-  // parent_id -> children 组树（搜索关键词仅前端过滤名称/编码）
-  const treeData = useMemo<TreeProps['treeData']>(() => {
-    const kw = orgSearch.trim().toLowerCase()
-    const filtered = kw
-      ? orgsInTree.filter(
-          (o) =>
-            o.name.toLowerCase().includes(kw) || o.code.toLowerCase().includes(kw),
-        )
-      : orgsInTree
-    // 保留匹配节点的祖先链，使树结构完整
-    const visible = new Set<number>()
-    for (const o of filtered) {
-      let cur: OrganizationInfo | undefined = o
-      while (cur) {
-        visible.add(cur.id)
-        cur =
-          cur.parent_id != null
-            ? orgsInTree.find((x) => x.id === cur!.parent_id)
-            : undefined
-      }
-    }
-    const byParent = new Map<number | null, OrganizationInfo[]>()
-    for (const o of orgsInTree) {
-      if (kw && !visible.has(o.id)) continue
-      const key = o.parent_id
-      const arr = byParent.get(key)
-      if (arr) arr.push(o)
-      else byParent.set(key, [o])
-    }
-    const build = (list?: OrganizationInfo[]): NonNullable<TreeProps['treeData']> =>
-      (list ?? []).map((o) => ({
-        key: o.id,
-        title: `${o.name}（${o.code}）`,
-        children: build(byParent.get(o.id)),
-      }))
-    const roots =
-      rootOrgId !== undefined
-        ? orgsInTree.filter((o) => o.id === rootOrgId)
-        : orgsInTree.filter((o) => o.parent_id === null)
-    return build(roots)
-  }, [orgsInTree, orgSearch, rootOrgId])
+  // parent_id -> children 组树：搜索关键词仅前端过滤名称/编码（见 utils/orgTree）
+  const treeData = useMemo(
+    () => buildOrgTreeData(orgsInTree, orgSearch, rootOrgId),
+    [orgsInTree, orgSearch, rootOrgId],
+  )
 
   // 搜索定位到成员后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
   useEffect(() => {
@@ -367,7 +328,6 @@ export default function OrgAdminView({
   )
 
   // 当前成员页内的用户 ID → 姓名 / 任职组织（均走会话缓存，相同 ID 不重复请求）
-  const memberIds = useMemo(() => members.map((m) => m.user_id), [members])
   const memberNames = useUserNames(memberIds)
   const memberOrgs = useUserOrganizations(memberIds)
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
@@ -494,19 +454,29 @@ export default function OrgAdminView({
     }
   }
 
-  const removeMember = async (member: OrganizationMember) => {
-    if (selectedId === null) return
-    setActingKey(`member-${member.id}`)
-    try {
-      await removeOrgMember(selectedId, member.id)
-      message.success(t('adminOrg.memberRemoveSuccess'))
-      await loadMembers(selectedId, memberPage)
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setActingKey(null)
-    }
-  }
+  /**
+   * 移除成员：同一成员在当前组织可能有多条职位记录，逐条删除后再重新拉取列表（代码要求 25）。
+   * 使用 useCallback 保持引用稳定，避免成员列表列定义每次渲染都重建。
+   * @param member 待移除的成员行（必填，含该行全部成员记录 ID）
+   */
+  const removeMember = useCallback(
+    async (member: UserMemberRow) => {
+      if (selectedId === null) return
+      setActingKey(`member-${member.user_id}`)
+      try {
+        for (const id of member.memberIds) {
+          await removeOrgMember(selectedId, id)
+        }
+        message.success(t('adminOrg.memberRemoveSuccess'))
+        await loadMembers(selectedId, memberPage)
+      } catch (err) {
+        reportError(err)
+      } finally {
+        setActingKey(null)
+      }
+    },
+    [selectedId, memberPage, loadMembers, message, t, reportError],
+  )
 
   /**
    * 打开重置密码弹窗（复用管理端「用户与账户」的重置逻辑）。
@@ -555,7 +525,7 @@ export default function OrgAdminView({
    * 党委学校端开启 partyScoreColumns 时改为党建活动加分总分（与支部端「支部管理」一致），
    * 其余场景保持原「工作地点」列。
    */
-  const workplaceOrScoreColumn = useMemo<ColumnsType<OrganizationMember>[number]>(
+  const workplaceOrScoreColumn = useMemo<ColumnsType<UserMemberRow>[number]>(
     () =>
       partyScoreColumns
         ? {
@@ -572,14 +542,15 @@ export default function OrgAdminView({
           }
         : {
             title: t('adminOrg.colWorkplace'),
-            dataIndex: 'workplace',
             key: 'workplace',
-            render: (v: string | null) => v || '—',
+            // 同一组织多个职位的工作地点去重后合并展示（如「A、B」）
+            render: (_, record) =>
+              record.workplaces.length > 0 ? record.workplaces.join('、') : '—',
           },
     [partyScoreColumns, t, partyScores, partyScoresLoading],
   )
 
-  const memberColumns = useMemo<ColumnsType<OrganizationMember>>(
+  const memberColumns = useMemo<ColumnsType<UserMemberRow>>(
     () => [
       {
         title: 'UID',
@@ -599,6 +570,7 @@ export default function OrgAdminView({
       },
       {
         // 用户的全部任职组织（当前组织高亮），数据来自 GET /organization-members?uids=
+        // 同一组织多条职位记录只展示一个标签（避免出现两个完全相同的组织）
         title: t('adminOrg.colUserOrg'),
         key: 'user_orgs',
         width: 220,
@@ -606,13 +578,13 @@ export default function OrgAdminView({
           if (!memberOrgs.has(record.user_id)) {
             return <span className="cell-sub">{t('common.loading')}</span>
           }
-          const list = memberOrgs.get(record.user_id) ?? []
+          const list = uniqueUserOrganizations(memberOrgs.get(record.user_id) ?? [])
           if (list.length === 0) return <span className="cell-sub">—</span>
           return (
             <span className="org-member-tags">
               {list.map((o) => (
                 <Tag
-                  key={`${o.organization_id}-${o.position}`}
+                  key={o.organization_id}
                   color={o.organization_id === selectedId ? 'blue' : 'default'}
                   title={o.organization_name}
                 >
@@ -625,15 +597,21 @@ export default function OrgAdminView({
       },
       {
         title: t('adminOrg.colPosition'),
-        dataIndex: 'position',
         key: 'position',
-        width: 160,
-        // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
-        render: (v: string) => (
-          <Tooltip title={v}>
-            <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
-          </Tooltip>
-        ),
+        width: 200,
+        // 同一组织多个职位：职位栏并列展示全部职位（映射失败时回退编码），悬停展示原始编码
+        render: (_, record) =>
+          record.positions.length === 0 ? (
+            '—'
+          ) : (
+            <Space wrap size={[8, 4]}>
+              {record.positions.map((code) => (
+                <Tooltip key={code} title={code}>
+                  <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+                </Tooltip>
+              ))}
+            </Space>
+          ),
       },
       // 「工作地点 / 先锋等级」列：党委学校端改为先锋等级（党建加分总分）
       workplaceOrScoreColumn,
@@ -675,7 +653,7 @@ export default function OrgAdminView({
               cancelText={t('approval.cancel')}
               okButtonProps={{
                 danger: true,
-                loading: actingKey === `member-${record.id}`,
+                loading: actingKey === `member-${record.user_id}`,
               }}
               onConfirm={() => void removeMember(record)}
             >
@@ -698,6 +676,7 @@ export default function OrgAdminView({
       workplaceOrScoreColumn,
       showResetPassword,
       openResetPassword,
+      removeMember,
     ],
   )
 
@@ -878,18 +857,18 @@ export default function OrgAdminView({
             <Alert type="info" showIcon title={t('adminOrg.selectHint')} />
           ) : (
             <>
-              <Table<OrganizationMember>
-                rowKey={(r: OrganizationMember) => String(r.id)}
+              <Table<UserMemberRow>
+                rowKey={(r: UserMemberRow) => String(r.user_id)}
                 loading={membersLoading}
                 columns={memberColumns}
-                dataSource={members}
+                dataSource={memberRows}
                 // 搜索命中的成员所在行高亮（夜间配色见 index.css 的 .org-member-row-hit）
-                rowClassName={(record: OrganizationMember) =>
+                rowClassName={(record: UserMemberRow) =>
                   record.user_id === search.hitUid ? 'org-member-row-hit' : ''
                 }
                 locale={{ emptyText: t('common.noData') }}
                 scroll={{ x: 960 }}
-                onRow={(record: OrganizationMember) => ({
+                onRow={(record: UserMemberRow) => ({
                   onClick: (e: React.MouseEvent) => {
                     // 点击按钮/链接时不触发行点击
                     const target = e.target as HTMLElement

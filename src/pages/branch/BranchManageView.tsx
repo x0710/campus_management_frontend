@@ -22,9 +22,13 @@
  * 数据口径为党建加分总分，与支部端「支部管理」一致）；
  * 成员详情页经 ?from={fromModuleKey} 让侧栏高亮本模块，并在该来源下隐藏编辑入口。
  * 所有组织/成员查询均走会话缓存（cachedGet），退出登录由 invalidate() 统一清空。
+ *
+ * 跨页跳转：学院工作台点击某支部成绩排名时，按路由 state 传入 focusOrgId，
+ * 本页组织树挂载后滚动定位到该支部（选中态由 uiState 按 fromModuleKey 记忆）。
  */
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { listAllOrganizations, listSubsidiaries } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
@@ -78,6 +82,10 @@ export default function BranchManageView({
   ancestorDepths,
 }: BranchManageViewProps) {
   const t = useT()
+  const location = useLocation()
+
+  /** 从学院工作台点击支部排名跳转时透传的目标支部 ID（用于组织树滚动定位） */
+  const focusOrgId = (location.state as { focusOrgId?: number } | null)?.focusOrgId ?? null
 
   const [orgs, setOrgs] = useState<OrgNode[]>([])
   /** 目标组织是否还有下级：有下级才展示组织树（需求） */
@@ -137,6 +145,7 @@ export default function BranchManageView({
       autoSelectFirst={showOrgTree}
       autoSelectFirstWithMembers
       partyScoreColumns
+      focusOrgId={focusOrgId}
     />
   )
 }

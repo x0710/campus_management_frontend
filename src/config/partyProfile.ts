@@ -7,3 +7,10 @@
  * - 党员编号 / 入党时间：后端暂无接口，统一展示「暂无数据」（common.noData）。
  */
 export const PARTY_POLITICAL_STATUS_NAMES: readonly string[] = ['中共党员', '中共预备党员']
+
+/**
+ * 预备党员身份对应的职位名称。
+ * 党委学校端「组织概览」按该职位名称统计各下级组织的预备党员人数
+ * （职位名称 → 职位编码经 GET /api/positions 解析）。
+ */
+export const PARTY_PROBATIONARY_STATUS_NAME = '中共预备党员'

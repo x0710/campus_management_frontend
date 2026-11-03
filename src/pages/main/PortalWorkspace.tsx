@@ -22,7 +22,7 @@ import { Suspense, useEffect, useMemo } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import PortalHeader from '../../components/PortalHeader'
 import PageLoading from '../../components/PageLoading'
-import { getPortal, type PortalModule } from '../../config/portals'
+import { getPortal, isPortalDisabled, type PortalModule } from '../../config/portals'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 
@@ -164,7 +164,9 @@ export default function PortalWorkspace() {
     return groups
   }, [readyModules, previewModules, pendingModules, plannedModules, t])
 
-  if (!portal) {
+  // 门户 key 非法或该门户已停用（学生端 / 教师端 / 领导端）时回到默认门户：
+  // 直接输入 /portal/<key>/... 也无法进入，代码保留但不再工作
+  if (!portal || isPortalDisabled(portal.key)) {
     return <Navigate to="/" replace />
   }
 

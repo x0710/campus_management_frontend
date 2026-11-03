@@ -2,6 +2,10 @@
 /**
  * 每个工作端（学生端、教师端、产品层门户、管理员端）对应一个门户模块。
  * 模块包含图标、主色渐变、主色、规划功能列表（i18n key 后缀 + 状态）。
+ *
+ * 学生端 / 教师端 / 领导端当前为「已停用」状态：定义保留（代码与模块仍在），
+ * 但不展示入口、不在可访问门户列表中、直接输入 URL 也会被重定向回角色默认门户，
+ * 见 DISABLED_PORTAL_KEYS 与 isPortalDisabled。
  */
 
 import {
@@ -11,6 +15,7 @@ import {
   BookOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
+  ClusterOutlined,
   CrownOutlined,
   DollarOutlined,
   FileDoneOutlined,
@@ -138,20 +143,23 @@ export const PORTALS: PortalDef[] = [
     ],
   },
   {
-    // 党委学校端门户：总览（党员总数、平均分、各二级党委排名均接真实接口）；
-    // 组织管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
+    // 党委学校端门户：菜单顺序为 总览 → 组织概览 → 组织成员管理 → 岗位管理 → 系统权限管理；
+    // 总览（党员总数、平均分、各二级党委排名均接真实接口，点击排名可跳到组织概览定位该党委）；
+    // 组织成员管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
     // 岗位管理复用管理端「岗位管理」页面，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
     gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
     accent: '#08979c',
     modules: [
-      { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'school_m1', status: 'ready', icon: <LineChartOutlined /> },
+      // 组织概览：左侧组织树 + 右侧下级组织统计（党员 / 预备党员人数、先锋指数平均分）
+      { key: 'school_m6', status: 'ready', icon: <ClusterOutlined /> },
+      { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
+      { key: 'school_m5', status: 'ready', icon: <IdcardOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
       // 我的：不占用侧栏入口，改由顶栏头像菜单进入
       { key: 'school_m4', status: 'preview', icon: <UserOutlined />, hiddenFromMenu: true },
-      { key: 'school_m5', status: 'ready', icon: <IdcardOutlined /> },
     ],
   },
   {
@@ -234,6 +242,22 @@ export function getPortal(key: string | undefined): PortalDef | undefined {
 }
 
 /**
+ * 已停用的门户（学生端 / 教师端 / 领导端）。
+ * 代码与模块定义均保留，但对外不开放：可访问门户列表会过滤掉它们，
+ * PortalWorkspace 也会把直接输入 /portal/<key> 的访问重定向回角色默认门户。
+ */
+export const DISABLED_PORTAL_KEYS: PortalKey[] = ['student', 'teacher', 'leader']
+
+/**
+ * 判断门户是否已停用（不可访问）。
+ * @param key 门户 key（可为 undefined，例如 URL 参数缺失时）
+ * @returns true 表示该门户已停用
+ */
+export function isPortalDisabled(key: string | undefined): boolean {
+  return DISABLED_PORTAL_KEYS.includes(key as PortalKey)
+}
+
+/**
  * 后端角色 code -> 前端门户 key。
  * 后端 code 统一按小写比较；教师端由 DEPARTMENT_HEAD / COUNSELOR / TECHNICIAN 共用。
  */
@@ -252,19 +276,21 @@ const ROLE_PORTAL_PRIORITY = Object.keys(ROLE_TO_PORTAL)
 
 /**
  * 根据角色代码获取登录后应进入的门户端。
- * 如果多个角色代码匹配，返回优先级最高的门户端。
+ * 如果多个角色代码匹配，返回优先级最高的门户端；已停用的门户（学生端 / 教师端 / 领导端）返回 undefined。
  * @param roleCodes 当前用户的角色 code 列表（必填）
- * @returns 对应的 PortalKey；无匹配角色时返回 undefined
+ * @returns 对应的 PortalKey；无匹配角色或门户已停用时返回 undefined
  */
 export function getPortalKeyByRoleCodes(roleCodes: string[]): PortalKey | undefined {
   const normalized = new Set(roleCodes.map((code) => code.trim().toLowerCase()))
   const matchedRole = ROLE_PORTAL_PRIORITY.find((role) => normalized.has(role))
-  return matchedRole ? ROLE_TO_PORTAL[matchedRole] : undefined
+  const portalKey = matchedRole ? ROLE_TO_PORTAL[matchedRole] : undefined
+  return portalKey && !isPortalDisabled(portalKey) ? portalKey : undefined
 }
 
 /**
  * 根据角色代码获取当前用户可访问的全部门户 key。
- * 返回顺序与 PORTALS 定义顺序一致，便于下拉菜单按学生/教师/领导/管理排列。
+ * 返回顺序与 PORTALS 定义顺序一致，便于下拉菜单按学生/教师/领导/管理排列；
+ * 已停用的门户（学生端 / 教师端 / 领导端）会被过滤，不再出现在可访问列表中。
  * @param roleCodes 当前用户的角色 code 列表（必填）
  * @returns 可访问的 PortalKey 数组；无匹配角色时返回空数组
  */
@@ -276,7 +302,9 @@ export function getPortalKeysByRoleCodes(roleCodes: string[]): PortalKey[] {
       allowedPortals.add(ROLE_TO_PORTAL[role])
     }
   }
-  return PORTALS.filter((portal) => allowedPortals.has(portal.key)).map((portal) => portal.key)
+  return PORTALS.filter(
+    (portal) => allowedPortals.has(portal.key) && !isPortalDisabled(portal.key),
+  ).map((portal) => portal.key)
 }
 
 /** 角色信息最小字段：门户可访问性判定只需角色 code 与名称（必填） */
@@ -398,7 +426,7 @@ export function resolveDefaultPortalKey(roles: PortalRole[]): PortalKey {
  *   党委支部端：仅支部书记（branch_secretary）；
  *   党委学院端：仅党委委员（secretary）；
  *   党委学校端：仅校级党委（PARTY_SCH）；
- *   其余门户（学生 / 教师 / 领导 / 管理）仍按原有角色 code 映射。
+ *   其余门户（管理端）仍按原有角色 code 映射；学生端 / 教师端 / 领导端已停用，不会返回。
  * 返回顺序为党员端 / 支部端 / 学院端 / 学校端在前，其余按 PORTALS 定义顺序。
  * @param roles 当前用户的角色列表（必填）
  * @returns 非空的 PortalKey 数组（必返回；至少包含党员端）
@@ -412,8 +440,9 @@ export function getAccessiblePortalKeys(roles: PortalRole[]): PortalKey[] {
   const partyKeys = [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ACADEMY_PORTAL_KEY, SCHOOL_PORTAL_KEY].filter(
     (key) => allowed.has(key),
   )
-  const restKeys = PORTALS.filter((portal) => allowed.has(portal.key) && !partyKeys.includes(portal.key)).map(
-    (portal) => portal.key,
-  )
+  const restKeys = PORTALS.filter(
+    (portal) =>
+      allowed.has(portal.key) && !partyKeys.includes(portal.key) && !isPortalDisabled(portal.key),
+  ).map((portal) => portal.key)
   return [...partyKeys, ...restKeys]
 }

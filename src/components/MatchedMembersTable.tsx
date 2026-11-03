@@ -12,7 +12,7 @@
  *   - 分页在前端完成（每页最多 100 行，代码要求 12）；
  *   - 命中行按 hitUid 高亮，并自动翻到所在页、滚动到可视区中部。
  */
-import { Button, Table, Tag, Tooltip } from 'antd'
+import { Button, Space, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   useEffect,
@@ -28,6 +28,7 @@ import { useUserOrganizations } from '../composables/useUserOrganizations'
 import { MEMBER_TABLE_PAGE_SIZE } from '../config/organization'
 import { useT } from '../i18n'
 import type { UserOrganization } from '../api/types/organizations'
+import { uniquePositionCodes, uniqueWorkplaces } from '../utils/userOrganization'
 
 interface MatchedMembersTableProps {
   /** 匹配人员列表（必填；已按当前组织范围过滤） */
@@ -43,17 +44,18 @@ interface MatchedMembersTableProps {
 }
 
 /**
- * 从用户的任职组织列表中取出命中组织那一条记录。
+ * 取出用户在命中组织下的全部任职记录。
+ * 同一组织可能有多个职位记录（一条记录 = 一个职位），展示职位 / 工作地点时需聚合。
  *
  * @param list 该用户的全部任职组织（必填，可能为空）
  * @param orgId 命中组织 ID（必填）
- * @returns 命中组织的任职记录；没有则 undefined
+ * @returns 命中组织下的任职记录数组；没有则空数组
  */
-function pickMembership(
+function pickMemberships(
   list: UserOrganization[] | undefined,
   orgId: number,
-): UserOrganization | undefined {
-  return (list ?? []).find((o) => o.organization_id === orgId)
+): UserOrganization[] {
+  return (list ?? []).filter((o) => o.organization_id === orgId)
 }
 
 export default function MatchedMembersTable({
@@ -107,26 +109,29 @@ export default function MatchedMembersTable({
       if (names.has(row.uid)) return names.get(row.uid) || '—'
       return t('common.loading')
     }
-    /** 命中组织上的任职记录（职位 / 工作地点都取自这一条） */
-    const membershipOf = (row: MemberSearchHit): UserOrganization | undefined =>
-      pickMembership(userOrgs.get(row.uid), row.targetId)
-    /** 职位名称：未解析完成时展示 loading，映射失败回退编码 */
+    /** 命中组织上的全部任职记录（同一组织多个职位时全部取出） */
+    const membershipsOf = (row: MemberSearchHit): UserOrganization[] =>
+      pickMemberships(userOrgs.get(row.uid), row.targetId)
+    /** 职位名称：未解析完成时展示 loading；同一组织多个职位并列展示，映射失败回退编码 */
     const positionOf = (row: MemberSearchHit): ReactNode => {
       if (!userOrgs.has(row.uid)) return <span className="cell-sub">{t('common.loading')}</span>
-      const membership = membershipOf(row)
-      if (!membership) return '—'
+      const codes = uniquePositionCodes(membershipsOf(row))
+      if (codes.length === 0) return '—'
       return (
-        <Tooltip title={membership.position}>
-          <Tag color="blue">
-            {positionNames.get(membership.position) ?? membership.position}
-          </Tag>
-        </Tooltip>
+        <Space wrap size={[8, 4]}>
+          {codes.map((code) => (
+            <Tooltip key={code} title={code}>
+              <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+            </Tooltip>
+          ))}
+        </Space>
       )
     }
-    /** 工作地点：未解析完成时展示 loading */
+    /** 工作地点：未解析完成时展示 loading；多个职位的工作地点去重合并 */
     const workplaceOf = (row: MemberSearchHit): ReactNode => {
       if (!userOrgs.has(row.uid)) return <span className="cell-sub">{t('common.loading')}</span>
-      return membershipOf(row)?.workplace || '—'
+      const places = uniqueWorkplaces(membershipsOf(row))
+      return places.length > 0 ? places.join('、') : '—'
     }
 
     return [
