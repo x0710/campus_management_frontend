@@ -102,11 +102,17 @@ h3 {
 
 /* ============ 登录页 ============ */
 
+/* 整屏背景板：来源图片 public/login-background.jpg 原色铺满全屏（不叠加蓝色调滤镜），
+   登录表单以靠右的卡片（登录小窗）浮在背景之上，尽量不遮挡画面主体 */
 .login-page {
   position: relative;
   min-height: 100vh;
   display: flex;
-  background: var(--page-bg);
+  align-items: center;
+  /* 小窗靠右放置，避免遮挡背景板主体；右侧留白随视口宽度自适应 */
+  justify-content: flex-end;
+  padding: 72px clamp(24px, 7vw, 160px) 80px 24px;
+  background: url('/login-background.jpg') center center / cover no-repeat;
 }
 
 .login-top-actions {
@@ -119,8 +125,14 @@ h3 {
   gap: 4px;
   padding: 2px 6px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(15, 23, 42, 0.36);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+/* 背景为照片，操作按钮固定用白色图标，避免浅色主题下看不清 */
+.login-top-actions .ant-btn {
+  color: #fff;
 }
 
 :root[data-theme='dark'] .login-top-actions {
@@ -128,140 +140,43 @@ h3 {
   border-color: var(--line);
 }
 
-/* 左侧品牌区（不受明暗主题影响，始终保持品牌渐变） */
-.login-brand {
-  position: relative;
-  flex: 1.15;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  padding: 64px;
-  color: #fff;
-  background: linear-gradient(150deg, #10239e 0%, var(--brand-deep) 38%, var(--brand) 72%, var(--brand-light) 100%);
-}
-
-.brand-inner {
+/* 居中的登录小窗：半透明玻璃质感，可透出背景板；文字仍保持可读 */
+.login-panel {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 460px;
-  margin: auto;
-}
-
-.brand-logo {
-  width: 64px;
-  height: 64px;
+  max-width: 420px;
+  padding: 36px 36px 32px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 34px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: 0 10px 30px rgba(10, 23, 105, 0.35);
+  box-shadow: 0 24px 64px rgba(8, 16, 72, 0.35);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
-.brand-title {
-  margin: 28px 0 8px;
-  font-size: 38px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: #fff;
-}
-
-.brand-subtitle {
-  margin: 0 0 48px;
-  font-size: 15px;
-  opacity: 0.82;
-}
-
-.brand-features {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 22px;
-}
-
-.brand-features li {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.feature-icon {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-}
-
-.feature-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.feature-desc {
-  font-size: 13px;
-  line-height: 1.5;
-  opacity: 0.78;
-}
-
-.brand-decoration {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  pointer-events: none;
-}
-
-.brand-decoration-a {
-  width: 380px;
-  height: 380px;
-  right: -120px;
-  top: -120px;
-}
-
-.brand-decoration-b {
-  width: 260px;
-  height: 260px;
-  left: -80px;
-  bottom: -80px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* 右侧登录表单区 */
-.login-panel {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 24px 64px;
+/* 夜间：深色半透明玻璃，保持与暗色主题配色一致 */
+:root[data-theme='dark'] .login-panel {
+  background: rgba(26, 29, 40, 0.68);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .login-panel-inner {
   width: 100%;
-  max-width: 400px;
 }
 
-.brand-logo-mobile {
-  display: none;
+.login-logo {
   width: 56px;
   height: 56px;
-  margin: 0 auto 24px;
-  border: none;
+  margin: 0 auto 20px;
   border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28px;
+  color: #fff;
   background: linear-gradient(135deg, var(--brand), var(--brand-light));
+  box-shadow: 0 10px 24px rgba(47, 84, 235, 0.32);
 }
 
 .login-heading h2 {
@@ -302,26 +217,24 @@ h3 {
 .login-footer {
   position: absolute;
   bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 12.5px;
-  color: #aab1c0;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 920px) {
+  /* 窄屏背景主体不再可避让，小窗回归居中并取满可用宽度 */
   .login-page {
-    background: var(--page-bg);
+    justify-content: center;
+    padding: 64px 16px 72px;
   }
 
-  .login-brand {
-    display: none;
-  }
-
-  .brand-logo-mobile {
-    display: flex;
-  }
-
-  .login-top-actions {
-    background: transparent;
-    border: none;
+  .login-panel {
+    padding: 28px 22px 26px;
+    border-radius: 16px;
   }
 }
 

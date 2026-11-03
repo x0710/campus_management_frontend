@@ -1,26 +1,22 @@
 /**
  * 登录页：
  * 提供用户名密码登录、记住用户名、语言切换和主题切换。
+ * 整屏以 login-background.jpg 作背景，登录表单收进靠右的卡片（登录小窗），避免遮挡背景主体。
  * 登录成功后写入登录态，并跳转到 / 角色解析页；
  * 已登录用户访问本页时直接重定向到 /。
  * 由其他页面（如角色解析页在后端未启动时）跳转而来时，读取路由 state 中的 loginError
  * 并展示失败原因（含状态码），便于定位问题。
  */
 import {
-  ApartmentOutlined,
-  AuditOutlined,
   LockOutlined,
   MoonOutlined,
-  NotificationOutlined,
   SafetyCertificateOutlined,
-  SolutionOutlined,
   SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { App as AntdApp, Button, Checkbox, Dropdown, Form, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import axios from 'axios'
-import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import ErrorState from '../components/ErrorState'
@@ -38,13 +34,6 @@ interface LoginFormValues {
 }
 
 const REMEMBER_KEY = 'campus-remembered-user'
-
-const FEATURE_ICONS: ReactNode[] = [
-  <ApartmentOutlined key="org" />,
-  <AuditOutlined key="approval" />,
-  <NotificationOutlined key="notice" />,
-  <SolutionOutlined key="record" />,
-]
 
 export default function LoginPage() {
   const t = useT()
@@ -69,12 +58,6 @@ export default function LoginPage() {
   if (token) {
     return <Navigate to="/" replace />
   }
-
-  const features = [1, 2, 3, 4].map((i) => ({
-    icon: FEATURE_ICONS[i - 1],
-    title: t(`login.feature${i}Title`),
-    desc: t(`login.feature${i}Desc`),
-  }))
 
   const localeItems: MenuProps['items'] = [
     { key: 'zh', label: '中文' },
@@ -158,35 +141,10 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* 左侧品牌区 */}
-      <aside className="login-brand">
-        <div className="brand-inner">
-          <div className="brand-logo">
-            <SafetyCertificateOutlined />
-          </div>
-          <h1 className="brand-title">{t('common.appName')}</h1>
-          <p className="brand-subtitle">Campus Manager · {t('login.subtitle')}</p>
-
-          <ul className="brand-features">
-            {features.map((item) => (
-              <li key={item.title}>
-                <span className="feature-icon">{item.icon}</span>
-                <div>
-                  <div className="feature-title">{item.title}</div>
-                  <div className="feature-desc">{item.desc}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="brand-decoration brand-decoration-a" />
-        <div className="brand-decoration brand-decoration-b" />
-      </aside>
-
-      {/* 右侧登录区 */}
+      {/* 登录小窗：靠右显示，留出背景板主体区域 */}
       <main className="login-panel">
         <div className="login-panel-inner">
-          <div className="brand-logo brand-logo-mobile">
+          <div className="login-logo">
             <SafetyCertificateOutlined />
           </div>
 
@@ -244,11 +202,11 @@ export default function LoginPage() {
 
           <p className="login-tips">{t('login.tips')}</p>
         </div>
-
-        <footer className="login-footer">
-          © {new Date().getFullYear()} CampusManager
-        </footer>
       </main>
+
+      <footer className="login-footer">
+        © {new Date().getFullYear()} CampusManager
+      </footer>
     </div>
   )
 }
