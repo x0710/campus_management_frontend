@@ -8,7 +8,6 @@ import {
 import {
   Alert,
   App as AntdApp,
-  AutoComplete,
   Button,
   Form,
   Input,
@@ -41,8 +40,7 @@ import { queryUserRoles } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
 import { listAllOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
-import { queryPositions } from '../../api/positions'
-import type { PositionDetail } from '../../api/types/positions'
+import UsablePositionSelect from '../../components/UsablePositionSelect'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
@@ -105,7 +103,6 @@ export default function UsersAdminView() {
   const [roleMap, setRoleMap] = useState<Map<number, RoleInfo[]>>(new Map())
   // 组织 / 职位选项：仅用于新建用户弹窗（编辑入口已移到成员详情页，见 MemberDetailPage）
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
-  const [positions, setPositions] = useState<PositionDetail[]>([])
   const [myUid, setMyUid] = useState<number | null>(null)
 
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
@@ -145,14 +142,12 @@ export default function UsersAdminView() {
   useEffect(() => {
     void (async () => {
       try {
-        const [me, orgList, posRes] = await Promise.all([
+        const [me, orgList] = await Promise.all([
           getCurrentUser(),
           listAllOrganizations(),
-          queryPositions({ page: 1, page_size: 100 }),
         ])
         setMyUid(me.uid)
         setOrganizations(orgList)
-        setPositions(posRes.data)
       } catch {
         // 各下拉为空时表单仍可手填/提交，错误在列表区体现
       }
@@ -245,10 +240,6 @@ export default function UsersAdminView() {
   const orgOptions = useMemo(
     () => organizations.map((o) => ({ value: o.id, title: `${o.name}（${o.code}）` })),
     [organizations],
-  )
-  const positionOptions = useMemo(
-    () => positions.map((p) => ({ value: p.code, label: `${p.name}（${p.code}）` })),
-    [positions],
   )
 
   const openCreate = () => {
@@ -689,6 +680,7 @@ export default function UsersAdminView() {
                       rules={[{ required: true, message: t('adminUsers.selectOrg') }]}
                     >
                       <TreeSelect
+                        onChange={() => createForm.setFieldValue(['posts', field.name, 'position'], undefined)}
                         treeData={orgOptions}
                         placeholder={t('adminUsers.selectOrg')}
                         allowClear
@@ -696,23 +688,12 @@ export default function UsersAdminView() {
                         treeNodeFilterProp="title"
                       />
                     </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'position']}
-                      rules={[{ required: true, message: t('adminOrg.positionPlaceholder') }]}
-                    >
-                      <AutoComplete
-                        options={positionOptions}
-                        placeholder={t('adminOrg.positionPlaceholder')}
-                        filterOption={(
-                          input: string,
-                          option?: { label?: unknown },
-                        ) =>
-                          String(option?.label ?? '')
-                            .toLowerCase()
-                            .includes(input.toLowerCase())
-                        }
-                        allowClear
-                      />
+                    <Form.Item noStyle shouldUpdate>
+                      {({ getFieldValue }) => (
+                        <Form.Item name={[field.name, 'position']} rules={[{ required: true, message: t('adminOrg.positionPlaceholder') }]}>
+                          <UsablePositionSelect organizationId={getFieldValue(['posts', field.name, 'org_id'])} placeholder={t('adminOrg.positionPlaceholder')} allowClear />
+                        </Form.Item>
+                      )}
                     </Form.Item>
                     <Form.Item name={[field.name, 'workplace']}>
                       <Input placeholder={t('adminOrg.colWorkplace')} />

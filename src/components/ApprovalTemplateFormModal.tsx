@@ -8,7 +8,7 @@
  *          （POST/PATCH/DELETE /api/approvals/templates/{template_id}/steps[/{step_id}]）；
  *          若传入 onEdit，弹窗底部提供「编辑」按钮，可在同一弹窗内切换到编辑模式。
  * 保存成功后回调 onSaved，由调用方刷新模板列表（代码要求 13）。
- * 业务类型为「固定选项 + 其他自定义输入」：选「其他」时展开输入框，提交时上送自定义值。
+ * 学院端新增固定使用 party；其他场景业务类型为「固定选项 + 其他自定义输入」：选「其他」时展开输入框，提交时上送自定义值。
  */
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
@@ -64,6 +64,7 @@ import {
   BRANCH_ANCESTOR_DEPTHS,
   SCHOOL_ANCESTOR_DEPTHS,
 } from '../config/organization'
+import { PARTY_TEMPLATE_BUSINESS_TYPE } from '../config/partyDeclaration'
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
@@ -146,6 +147,7 @@ export default function ApprovalTemplateFormModal({
 
   const readOnly = mode === 'view'
   const isEdit = mode === 'edit'
+  const fixedPartyType = portalKey === 'academy' && mode === 'create'
   // 业务类型选择值：选「其他」时展开自定义输入
   const businessTypeValue = Form.useWatch('business_type', form)
 
@@ -296,8 +298,9 @@ export default function ApprovalTemplateFormModal({
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const businessType =
-        values.business_type === APPROVAL_BUSINESS_TYPE_OTHER
+      const businessType = fixedPartyType
+        ? PARTY_TEMPLATE_BUSINESS_TYPE
+        : values.business_type === APPROVAL_BUSINESS_TYPE_OTHER
           ? (values.business_type_custom ?? '').trim()
           : values.business_type
       if (isEdit && templateId !== undefined) {
@@ -583,7 +586,7 @@ export default function ApprovalTemplateFormModal({
             </Row>
             {/* 业务类型与启用状态并排 */}
             <Row gutter={16}>
-              <Col span={12}>
+              {!fixedPartyType && <Col span={12}>
                 <Form.Item
                   name="business_type"
                   label={t('approvalTemplate.fieldBusinessType')}
@@ -605,7 +608,7 @@ export default function ApprovalTemplateFormModal({
                     ]}
                   />
                 </Form.Item>
-              </Col>
+              </Col>}
               <Col span={12}>
                 <Form.Item
                   name="enabled"
@@ -620,7 +623,7 @@ export default function ApprovalTemplateFormModal({
                 </Form.Item>
               </Col>
             </Row>
-            {businessTypeValue === APPROVAL_BUSINESS_TYPE_OTHER && (
+            {!fixedPartyType && businessTypeValue === APPROVAL_BUSINESS_TYPE_OTHER && (
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item

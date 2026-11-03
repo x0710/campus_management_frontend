@@ -1,6 +1,5 @@
 import {
   App as AntdApp,
-  AutoComplete,
   Button,
   DatePicker,
   Divider,
@@ -28,7 +27,7 @@ import type {
   OrganizationInfo,
   UserOrganization,
 } from '../../api/types/organizations'
-import type { PositionDetail } from '../../api/types/positions'
+import UsablePositionSelect from '../../components/UsablePositionSelect'
 import { assignUserRoles, queryUserRoleRelations } from '../../api/rbac'
 import { getUser, updateUser } from '../../api/users'
 import type { UserDetail, Gender } from '../../api/types/users'
@@ -52,7 +51,6 @@ interface Props {
   uid: number
   roles: { id: number; code: string; name: string }[]
   organizations: OrganizationInfo[]
-  positions: PositionDetail[]
   onChanged: () => void
   /**
    * 只展示指定区块（成员详情页把「资料 / 系统角色 / 组织任职」拆成三个独立编辑入口，
@@ -66,7 +64,6 @@ export default function UserEditPanel({
   uid,
   roles,
   organizations,
-  positions,
   onChanged,
   section,
 }: Props) {
@@ -137,10 +134,6 @@ export default function UserEditPanel({
   const orgOptions = useMemo(
     () => organizations.map((o) => ({ value: o.id, title: `${o.name}（${o.code}）` })),
     [organizations],
-  )
-  const positionOptions = useMemo(
-    () => positions.map((p) => ({ value: p.code, label: `${p.name}（${p.code}）` })),
-    [positions],
   )
 
   const saveProfile = async () => {
@@ -343,23 +336,17 @@ export default function UserEditPanel({
               className="org-add-member-uid"
               treeData={orgOptions}
               value={newOrgId}
-              onChange={(v: number | null) => setNewOrgId(v)}
+              onChange={(v: number | null) => { setNewOrgId(v); setNewPosition('') }}
               allowClear
               showSearch
               treeNodeFilterProp="title"
               placeholder={t('adminUsers.selectOrg')}
             />
-            <AutoComplete
+            <UsablePositionSelect organizationId={newOrgId}
               className="org-add-member-pos"
-              options={positionOptions}
               value={newPosition}
-              onChange={(v: string) => setNewPosition(v)}
+              onChange={(v: string) => setNewPosition(v ?? '')}
               placeholder={t('adminOrg.positionPlaceholder')}
-              filterOption={(input: string, option?: { label?: unknown }) =>
-                String(option?.label ?? '')
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
               allowClear
             />
             <Input

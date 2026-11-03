@@ -16,6 +16,7 @@ import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import type { PaginatedResponse } from './types/common'
 import type {
+  ApprovalStep,
   ApprovalTemplate,
   ApprovalTemplateCreate,
   ApprovalTemplateCreatedResponse,
@@ -144,6 +145,20 @@ export async function updateApprovalTemplateStep(
   invalidate(TEMPLATE_CACHE_PREFIX)
 }
 
+/** 按当前审批顺序连续编号；从小到大更新，避免模板内编号唯一约束冲突。 */
+export async function normalizeApprovalTemplateSteps(templateId: number): Promise<ApprovalStep[]> {
+  const detail = await getApprovalTemplateDetail(templateId, true)
+  const steps = (detail.steps ?? []).map((step) => ({ ...step })).sort((a, b) => a.step_no - b.step_no)
+  for (const [index, step] of steps.entries()) {
+    const stepNo = index + 1
+    if (step.step_no !== stepNo) {
+      await updateApprovalTemplateStep(templateId, step.id, { step_no: stepNo })
+      step.step_no = stepNo
+    }
+  }
+  return steps
+}
+
 /**
  * DELETE /api/approvals/templates/{template_id}/steps/{step_id} 删除审批步骤
  * @param templateId 模板 ID（必填）
@@ -156,6 +171,7 @@ export async function deleteApprovalTemplateStep(
 ): Promise<void> {
   await http.delete(`/approvals/templates/${templateId}/steps/${stepId}`)
   invalidate(TEMPLATE_CACHE_PREFIX)
+  await normalizeApprovalTemplateSteps(templateId)
 }
 
 /**

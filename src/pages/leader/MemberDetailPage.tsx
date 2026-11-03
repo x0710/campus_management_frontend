@@ -80,7 +80,7 @@ import type {
   OrganizationInfo,
   UserOrganization,
 } from '../../api/types/organizations'
-import { getPosition, queryPositions } from '../../api/positions'
+import { getPosition } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getRole, queryRoles, queryUserRoleRelations } from '../../api/rbac'
 import type { RoleInfo, UserRoleRelation } from '../../api/types/rbac'
@@ -279,7 +279,6 @@ export default function MemberDetailPage() {
   const [editRefs, setEditRefs] = useState<{
     roles: RoleInfo[]
     organizations: OrganizationInfo[]
-    positions: PositionDetail[]
   } | null>(null)
 
   /**
@@ -318,14 +317,12 @@ export default function MemberDetailPage() {
       setEditSection(section)
       if (editRefs) return
       try {
-        const [roleRes, posRes, orgList] = await Promise.all([
+        const [roleRes, orgList] = await Promise.all([
           queryRoles({ page: 1, page_size: 100 }),
-          queryPositions({ page: 1, page_size: 100 }),
           listAllOrganizations(),
         ])
         setEditRefs({
           roles: roleRes.data,
-          positions: posRes.data,
           organizations: orgList,
         })
       } catch (err) {
@@ -469,7 +466,6 @@ export default function MemberDetailPage() {
             uid={userId}
             roles={editRefs.roles}
             organizations={editRefs.organizations}
-            positions={editRefs.positions}
             section={editSection ?? undefined}
             // 任一区块保存后强制刷新成员资料、系统角色与组织任职展示（代码要求 25）
             onChanged={handleChanged}

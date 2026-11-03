@@ -4,11 +4,14 @@
  */
 import type { PageQuery } from './common'
 
+export type PositionUsageScope = 'self_only' | 'self_and_children'
+
 /** 职位（api.json: PositionDetailDto，code 为主键） */
 export interface PositionDetail {
   code: string
   /** 职位所属组织 ID */
   organization_id: number
+  usage_scope: PositionUsageScope
   name: string
   description: string | null
   created_at: string
@@ -18,11 +21,15 @@ export interface PositionDetail {
 /** 用户职位（GET /api/user-positions 返回元素，额外带 user id） */
 export interface UserPosition extends PositionDetail {
   uid: number
+  /** 实际任职组织；organization_id 仍为职位所属组织。 */
+  member_organization_id: number
 }
 
 /** 职位分页查询参数 */
 export interface PositionQuery extends PageQuery {
   keyword?: string
+  /** 按目标组织可任职资格筛选，包含父组织向直属子组织开放的职位。 */
+  usable_in_organization_id?: number
   /** 按所属组织 ID 过滤 */
   organization_id?: number
 }
@@ -33,6 +40,7 @@ export interface PositionCreateRequest {
   /** 职位所属组织 ID（必填） */
   organization_id: number
   name: string
+  usage_scope?: PositionUsageScope
   description?: string
 }
 
@@ -42,8 +50,7 @@ export interface PositionCreateRequest {
  * 空值时应省略该字段（见 updatePosition 调用方）。
  */
 export interface PositionUpdateRequest {
-  /** 职位所属组织 ID（可选） */
-  organization_id?: number
+  usage_scope?: PositionUsageScope | null
   name?: string
   description?: string
 }

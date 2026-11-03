@@ -12,7 +12,6 @@ import {
 import {
   Alert,
   App as AntdApp,
-  AutoComplete,
   Button,
   Form,
   Input,
@@ -52,10 +51,9 @@ import type {
   OrganizationInfo,
   OrganizationMember,
 } from '../../api/types/organizations'
-import { queryPositions } from '../../api/positions'
+import UsablePositionSelect from '../../components/UsablePositionSelect'
 import { getPartyScoreOrganizationAverage, getPartyScoreTotals } from '../../api/partyScores'
 import { resetUserPassword } from '../../api/users'
-import type { PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import MatchedMembersTable from '../../components/MatchedMembersTable'
@@ -168,8 +166,6 @@ export default function OrgAdminView({
   const [orgAverageScore, setOrgAverageScore] = useState<string | null>(null)
   const [orgAverageLoading, setOrgAverageLoading] = useState(false)
 
-  const [positions, setPositions] = useState<PositionDetail[]>([])
-
   const [orgModal, setOrgModal] = useState<
     { mode: 'create' | 'edit'; org?: OrganizationInfo } | null
   >(null)
@@ -218,18 +214,6 @@ export default function OrgAdminView({
   useEffect(() => {
     void loadOrgs()
   }, [loadOrgs])
-
-  // 职位列表供「添加成员」弹窗的职位自动补全使用（加载失败不阻塞，仍可手填）
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await queryPositions({ page: 1, page_size: 100 })
-        setPositions(res.data)
-      } catch {
-        // 忽略：无 position.read 权限时保留空选项
-      }
-    })()
-  }, [])
 
   const loadMembers = useCallback(
     async (orgId: number, page: number, force?: boolean) => {
@@ -384,7 +368,7 @@ export default function OrgAdminView({
     orgs: orgsInTree,
     memberPageSize: MEMBER_PAGE_SIZE,
     activeOrgId: selectedId,
-    onSelectOrg: (orgId: number) => setSelectedId(uiKey, orgId),
+    onSelectOrg: (orgId: number) => { setNewMember((s) => ({ ...s, position: '' })); setSelectedId(uiKey, orgId) },
     onClearFilter: () => setOrgSearch(''),
     onLoadPage: (orgId: number, page: number) => {
       setMemberPage(uiKey, page)
@@ -450,10 +434,6 @@ export default function OrgAdminView({
     [orgsInTree],
   )
 
-  const positionOptions = useMemo(
-    () => positions.map((p) => ({ value: p.code, label: `${p.name}（${p.code}）` })),
-    [positions],
-  )
 
   const selectedOrg = useMemo(
     () => orgsInTree.find((o) => o.id === selectedId) ?? null,
@@ -495,6 +475,7 @@ export default function OrgAdminView({
     // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
     // （false：不要按当前命中人员重新定位，否则会覆盖用户刚选中的组织）
     if (search.matchOnly) search.toggleMatchOnly(false)
+    setNewMember((s) => ({ ...s, position: '' }))
     setSelectedId(uiKey, keys.length ? Number(keys[0]) : null)
   }
 
@@ -1157,17 +1138,11 @@ export default function OrgAdminView({
             />
           </Form.Item>
           <Form.Item label={t('adminOrg.colPosition')}>
-            <AutoComplete
+            <UsablePositionSelect organizationId={selectedId} key={selectedId}
               style={{ width: '100%' }}
-              options={positionOptions}
               placeholder={t('adminOrg.positionPlaceholder')}
               value={newMember.position}
-              onChange={(v: string) => setNewMember((s) => ({ ...s, position: v }))}
-              filterOption={(input: string, option?: { label?: unknown }) =>
-                String(option?.label ?? '')
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
+              onChange={(v: string) => setNewMember((s) => ({ ...s, position: v ?? '' }))}
               allowClear
             />
           </Form.Item>

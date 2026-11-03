@@ -9,16 +9,14 @@
  * 下拉选项由父组件（模板详情弹窗）统一加载后传入：value 为职位编码（提交值），label 为职位名称（展示值），
  * 保证表格「审批人角色」列与下拉框展示一致。
  */
-import { App as AntdApp, Form, Input, InputNumber, Modal, Select } from 'antd'
+import { App as AntdApp, Form, Input, Modal, Select } from 'antd'
 import { useEffect, useState } from 'react'
-import { addApprovalTemplateStep, updateApprovalTemplateStep } from '../api/approvalmodel'
+import { addApprovalTemplateStep, normalizeApprovalTemplateSteps, updateApprovalTemplateStep } from '../api/approvalmodel'
 import type { ApprovalStep } from '../api/types/approvalmodel'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
   APPROVAL_STEP_ASSIGNEE_MAX_LENGTH,
   APPROVAL_STEP_DESC_MAX_LENGTH,
-  APPROVAL_STEP_NO_MAX,
-  APPROVAL_STEP_NO_MIN,
 } from '../config/approvalTemplate'
 import { useT } from '../i18n'
 
@@ -27,7 +25,6 @@ export type ApprovalTemplateStepMode = 'create' | 'edit'
 
 /** 步骤表单字段 */
 interface StepFormValues {
-  step_no?: number
   position?: string
   assignee_value?: string
   description?: string
@@ -78,7 +75,6 @@ export default function ApprovalTemplateStepModal({
       return
     }
     form.setFieldsValue({
-      step_no: step.step_no,
       position: step.position ?? undefined,
       assignee_value: step.assignee_value ?? undefined,
       description: step.description ?? undefined,
@@ -91,7 +87,6 @@ export default function ApprovalTemplateStepModal({
     setSaving(true)
     try {
       const payload = {
-        step_no: values.step_no as number,
         position: values.position?.trim() || null,
         assignee_value: values.assignee_value?.trim() || null,
         description: values.description?.trim() || null,
@@ -100,7 +95,8 @@ export default function ApprovalTemplateStepModal({
         await updateApprovalTemplateStep(templateId, step.id, payload)
         message.success(t('approvalTemplate.stepUpdateSuccess'))
       } else {
-        await addApprovalTemplateStep(templateId, payload)
+        const steps = await normalizeApprovalTemplateSteps(templateId)
+        await addApprovalTemplateStep(templateId, { ...payload, step_no: steps.length + 1 })
         message.success(t('approvalTemplate.stepCreateSuccess'))
       }
       onSaved()
@@ -125,19 +121,6 @@ export default function ApprovalTemplateStepModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
-        <Form.Item
-          name="step_no"
-          label={t('approvalTemplate.fieldStepNo')}
-          rules={[{ required: true, message: t('approvalTemplate.stepNoRequired') }]}
-          extra={t('approvalTemplate.fieldStepNoPlaceholder')}
-        >
-          <InputNumber
-            style={{ width: '100%' }}
-            min={APPROVAL_STEP_NO_MIN}
-            max={APPROVAL_STEP_NO_MAX}
-            precision={0}
-          />
-        </Form.Item>
         <Form.Item
           name="position"
           label={t('approvalTemplate.fieldStepPosition')}

@@ -21,6 +21,7 @@ import {
   Modal,
   Popconfirm,
   Spin,
+  Select,
   Table,
   Tag,
   Tooltip,
@@ -35,7 +36,7 @@ import {
   queryPositions,
   updatePosition,
 } from '../../api/positions'
-import type { PositionDetail } from '../../api/types/positions'
+import type { PositionUsageScope, PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
@@ -50,6 +51,7 @@ import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
 
 type PositionFormValues = {
+  usage_scope: PositionUsageScope
   code: string
   organization_id: number
   name: string
@@ -137,11 +139,13 @@ export default function PositionsAdminView() {
   const openCreate = () => {
     setModal({ mode: 'create' })
     form.resetFields()
+    form.setFieldValue('usage_scope', 'self_only')
   }
 
   const openEdit = (position: PositionDetail) => {
     setModal({ mode: 'edit', position })
     form.setFieldsValue({
+      usage_scope: position.usage_scope,
       code: position.code,
       organization_id: position.organization_id,
       name: position.name,
@@ -158,6 +162,7 @@ export default function PositionsAdminView() {
         await createPosition({
           code: values.code.trim(),
           organization_id: values.organization_id,
+          usage_scope: values.usage_scope,
           name: values.name.trim(),
           description: values.description?.trim() || undefined,
         })
@@ -165,7 +170,7 @@ export default function PositionsAdminView() {
       } else {
         // description 为空时省略该字段：后端将 None 视为「保留原值」
         await updatePosition(modal.position!.code, {
-          organization_id: values.organization_id,
+          usage_scope: values.usage_scope,
           name: values.name.trim(),
           ...(values.description?.trim() ? { description: values.description.trim() } : {}),
         })
@@ -210,6 +215,7 @@ export default function PositionsAdminView() {
         key: 'organization_id',
         width: 120,
       },
+      { title: t('adminPositions.fieldUsageScope'), dataIndex: 'usage_scope', render: (scope: PositionUsageScope) => t(scope === 'self_and_children' ? 'adminPositions.scopeSelfAndChildren' : 'adminPositions.scopeSelfOnly') },
       { title: t('adminPositions.fieldName'), dataIndex: 'name', key: 'name', width: 180 },
       {
         title: t('adminPositions.fieldDesc'),
@@ -365,6 +371,7 @@ export default function PositionsAdminView() {
             rules={[{ required: true, message: t('adminPositions.orgRequired') }]}
           >
             <InputNumber
+              disabled={modal?.mode === 'edit'}
               min={1}
               precision={0}
               placeholder={t('adminPositions.orgPlaceholder')}
@@ -377,6 +384,12 @@ export default function PositionsAdminView() {
             rules={[{ required: true, message: t('adminPositions.nameRequired') }]}
           >
             <Input maxLength={POSITION_NAME_MAX_LENGTH} />
+          </Form.Item>
+          <Form.Item name="usage_scope" label={t('adminPositions.fieldUsageScope')} rules={[{ required: true }]}>
+            <Select options={[
+              { value: 'self_only', label: t('adminPositions.scopeSelfOnly') },
+              { value: 'self_and_children', label: t('adminPositions.scopeSelfAndChildren') },
+            ]} />
           </Form.Item>
           <Form.Item
             name="description"
@@ -421,6 +434,11 @@ export default function PositionsAdminView() {
                   key: 'name',
                   label: t('adminPositions.fieldName'),
                   children: detail?.name ?? '—',
+                },
+                {
+                  key: 'usage_scope',
+                  label: t('adminPositions.fieldUsageScope'),
+                  children: detail ? t(detail.usage_scope === 'self_and_children' ? 'adminPositions.scopeSelfAndChildren' : 'adminPositions.scopeSelfOnly') : '—',
                 },
                 {
                   key: 'description',
