@@ -15,6 +15,12 @@ const APPROVAL_STEP_SCAN_PAGE_SIZE = 100
 /** 按步骤 ID 查找审批步骤时最多扫描的页数，避免异常数据导致无限翻页 */
 const APPROVAL_STEP_SCAN_MAX_PAGES = 10
 
+/** 识别「自动通过环节」时单页拉取本人审批步骤的条数（后端允许的最大值） */
+const MY_APPROVAL_STEP_PAGE_SIZE = 100
+
+/** 识别「自动通过环节」时最多扫描的页数，避免异常数据导致无限翻页 */
+const MY_APPROVAL_STEP_MAX_PAGES = 5
+
 /**
  * GET /api/approvals 审批步骤列表。
  * 注意：接口返回裸数组（无分页 total），page/page_size 由后端 LIMIT/OFFSET 生效。
@@ -23,6 +29,26 @@ export function queryApprovals(params: ApprovalTodoQuery = {}) {
   return http
     .get<ApprovalInstanceStep[]>('/approvals', { params })
     .then((res) => res.data)
+}
+
+/**
+ * 拉取当前登录用户作为审批人的全部审批步骤。
+ *
+ * 后端 GET /api/approvals 缺省按「我的待办（approver_id=自己）」过滤。
+ * 当某个审批环节的审批人就是申请人本人时，后端会在创建审批实例时把该环节
+ * 直接置为 approved 且**不生成审批意见记录**；首页 / 详情页需要这批步骤
+ * 才能把自动通过的环节计入审批进度，避免一直显示「审核中」。
+ * @returns Promise<ApprovalInstanceStep[]> 当前用户的审批步骤（可能包含各业务的实例）
+ */
+export async function queryMyApprovalSteps(): Promise<ApprovalInstanceStep[]> {
+  const steps: ApprovalInstanceStep[] = []
+  for (let page = 1; page <= MY_APPROVAL_STEP_MAX_PAGES; page += 1) {
+    const batch = await queryApprovals({ page, page_size: MY_APPROVAL_STEP_PAGE_SIZE })
+    steps.push(...batch)
+    // 裸数组无 total：不足一页表示已到末尾
+    if (batch.length < MY_APPROVAL_STEP_PAGE_SIZE) break
+  }
+  return steps
 }
 
 /**

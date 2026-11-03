@@ -7,19 +7,25 @@
  *   1. 审批实例的审批意见记录（GET /api/approvals/{instanceId}/records）：
  *      出现驳回 → 被驳回；
  *   2. 申报模板的审批步骤（GET /api/approvals/templates/{templateId}）：
- *      每个步骤都必须有对应的「同意」记录，全部完成才算申请成功。
+ *      每个步骤都必须有对应的「同意」记录，全部完成才算申请成功；
+ *   3. 当前用户作为审批人的审批步骤（GET /api/approvals）：
+ *      审批人是申请人本人的环节由后端直接置为已通过且不产生审批记录，
+ *      这些自动通过环节同样计入已完成，避免这类申请一直显示「审核中」。
  *
- * 模板步骤取不到时回退 `approved_score`，保证旧数据仍可展示。
- * 审批记录 / 模板详情均走会话缓存，同一实例、同一模板只请求一次。
+ * 审批记录 / 模板步骤 / 自动通过环节均尽量并行读取；任一辅助数据取不到时
+ * 按其余数据降级判定，保证旧数据仍可展示。
  */
 import { useEffect, useState } from 'react'
 import { getApprovalTemplateDetail } from '../api/approvalmodel'
-import { getApprovalRecords } from '../api/approvals'
-import type { ApprovalRecordItem } from '../api/types/approvals'
+import { getApprovalRecords, queryMyApprovalSteps } from '../api/approvals'
+import type { ApprovalInstanceStep, ApprovalRecordItem } from '../api/types/approvals'
 import type { ApprovalStep } from '../api/types/approvalmodel'
 import type { PartyScore } from '../api/types/partyScores'
 import type { PartyScoreApplicationStatus } from '../config/partyDeclaration'
-import { resolvePartyScoreApplicationStatus } from '../utils/partyScore'
+import {
+  collectSelfApprovedStepOrders,
+  resolvePartyScoreApplicationStatus,
+} from '../utils/partyScore'
 
 export interface PartyScoreApplicationStatusesState {
   /** 申报记录 ID → 审核状态；尚未解析完成的记录不在 Map 中 */
@@ -84,10 +90,15 @@ export function usePartyScoreApplicationStatuses(
           }
         }),
       ),
-    ]).then(([recordResults, templateResults]) => {
+      // 自动通过环节（审批人为申请人本人）没有审批记录，需额外读取本人审批步骤；
+      // 读取失败时按空集合降级，退回原有「同意记录」判定
+      queryMyApprovalSteps().catch((): ApprovalInstanceStep[] => []),
+    ]).then(([recordResults, templateResults, mySteps]) => {
       if (cancelled) return
       const recordsByInstance = new Map<number, ApprovalRecordItem[] | null>(recordResults)
       const stepsByTemplate = new Map<number, ApprovalStep[] | null>(templateResults)
+      // 审批实例 ID → 本人审批步骤中已通过的环节序号（含后端自动通过的环节）
+      const selfApprovedStepOrders = collectSelfApprovedStepOrders(mySteps)
 
       const resolved = new Map<number, PartyScoreApplicationStatus>()
       for (const record of records) {
@@ -101,6 +112,7 @@ export function usePartyScoreApplicationStatuses(
             record,
             recordsByInstance.get(record.approval_instance_id) ?? null,
             templateSteps,
+            selfApprovedStepOrders.get(record.approval_instance_id) ?? null,
           ),
         )
       }

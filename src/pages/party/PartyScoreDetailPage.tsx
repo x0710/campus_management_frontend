@@ -11,14 +11,17 @@
  *     审批实例与更新时间，以及逐环节的审批意见流转。
  *
  * 审核状态判定：
- *   已核定分数 → 申请成功；审批记录含驳回决定 → 被驳回；其余 → 审核中。
+ *   审批记录含驳回决定 → 被驳回；模板每个环节都有「同意」记录或属于
+ *   「审批人是申请人本人」的自动通过环节 → 申请成功；其余 → 审核中。
+ *   （自动通过环节由后端直接置为已通过且不产生审批记录，需读取本人审批步骤识别。）
  *   审批记录由 PartyScoreApprovalRecords 加载后通过 onRecordsLoaded 回传，
  *   避免页面与流转组件重复请求同一接口。
  *
  * 数据源：
  *   GET /api/party-scores/{id}                 申报详情（含附件下载地址与模板 ID）
- *   GET /api/approvals/templates               申报类型名称（失败时回退模板 ID）
+ *   GET /api/approvals/templates               申报类型名称 / 审批步骤（失败时回退模板 ID）
  *   GET /api/approvals/{id}/records            审批意见流转（用于展示与状态判定）
+ *   GET /api/approvals                         本人审批步骤（识别自动通过的环节）
  */
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Descriptions, Skeleton, Spin, Tag } from 'antd'
@@ -27,6 +30,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { getApprovalTemplateDetail } from '../../api/approvalmodel'
+import { queryMyApprovalSteps } from '../../api/approvals'
 import { getPartyScore } from '../../api/partyScores'
 import type { ApprovalRecordItem } from '../../api/types/approvals'
 import type { ApprovalStep } from '../../api/types/approvalmodel'
@@ -43,6 +47,7 @@ import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import {
+  collectSelfApprovedStepOrders,
   formatPartyScore,
   isNegativePartyScore,
   resolvePartyScoreApplicationStatus,
@@ -78,6 +83,11 @@ export default function PartyScoreDetailPage() {
   const [templateSteps, setTemplateSteps] = useState<
     ApprovalStep[] | null | undefined
   >(undefined)
+  /**
+   * 本人审批步骤中已通过的环节序号（含后端自动通过的环节）。
+   * null 表示尚未加载完成，用于避免状态先显示「审核中」再变成「申请成功」。
+   */
+  const [selfApprovedStepNos, setSelfApprovedStepNos] = useState<Set<number> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   /** 手动刷新计数：递增以强制重新挂载审批记录组件并绕过缓存 */
@@ -97,6 +107,7 @@ export default function PartyScoreDetailPage() {
       // 重新加载期间清空旧审批记录与模板步骤，状态标签回到加载态，避免展示上一次结果
       setApprovalRecords(null)
       setTemplateSteps(undefined)
+      setSelfApprovedStepNos(null)
       try {
         setDetail(await getPartyScore(numId, force))
       } catch (err) {
@@ -115,7 +126,7 @@ export default function PartyScoreDetailPage() {
 
   /*
    * 模板审批步骤：用于判断是否所有环节都已完成。
-   * 仅当每个步骤都有对应的「同意」审批记录时才显示申请成功，
+   * 仅当每个步骤都有对应的「同意」审批记录（或属于自动通过环节）时才显示申请成功，
    * 避免两步审批只完成一步时被 approved_score 误判为成功。
    */
   useEffect(() => {
@@ -144,13 +155,47 @@ export default function PartyScoreDetailPage() {
     }
   }, [detail])
 
+  /*
+   * 自动通过环节：当某个环节的审批人就是申请人本人时，后端会直接将该环节置为
+   * 已通过且不生成审批意见记录；必须额外读取本人审批步骤，否则这类申请会因缺少
+   * 一条「同意」记录而一直显示审核中。
+   */
+  useEffect(() => {
+    let cancelled = false
+    setSelfApprovedStepNos(null)
+
+    const instanceId = Number(detail?.approval_instance_id)
+    if (!Number.isFinite(instanceId) || instanceId <= 0) {
+      setSelfApprovedStepNos(new Set<number>())
+      return () => {
+        cancelled = true
+      }
+    }
+
+    queryMyApprovalSteps()
+      .then((steps) => {
+        if (cancelled) return
+        setSelfApprovedStepNos(
+          collectSelfApprovedStepOrders(steps).get(instanceId) ?? new Set<number>(),
+        )
+      })
+      .catch(() => {
+        // 取不到时按空集合降级，退回原有「同意记录」判定
+        if (!cancelled) setSelfApprovedStepNos(new Set<number>())
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [detail])
+
   /** 手动刷新：同时重新请求申报详情与审批意见 */
   const refreshPage = useCallback(() => {
     setRefreshSeq((seq) => seq + 1)
     void load(true)
   }, [load])
 
-  /** 返回党员端首页；没有来源模块信息时回退门户首页 */
+  /** 返回来源模块：……首页近期记录（party_m1）或成绩申报记录（party_m2）；无来源时回退门户首页 */
   const backToHome = useCallback(() => {
     if (portalKey && fromModuleKey) {
       navigate(`/portal/${portalKey}/${fromModuleKey}`)
@@ -164,14 +209,26 @@ export default function PartyScoreDetailPage() {
   }, [portalKey, fromModuleKey, navigate])
 
   /**
-   * 审核状态：审批记录与模板步骤都加载完成后，按「全部环节均已同意」判定申请成功；
+   * 审核状态：审批记录、模板步骤与本人自动通过环节都加载完成后，
+   * 由 resolvePartyScoreApplicationStatus 判定（所有环节均有同意记录或属于自动通过环节）；
    * 加载期间为 null（页面展示加载态），避免状态先显示「审核中」再变成「被驳回 / 成功」。
    */
   const applicationStatus = useMemo<PartyScoreApplicationStatus | null>(() => {
     if (!detail) return null
-    if (approvalRecords === null || templateSteps === undefined) return null
-    return resolvePartyScoreApplicationStatus(detail, approvalRecords, templateSteps)
-  }, [detail, approvalRecords, templateSteps])
+    if (
+      approvalRecords === null ||
+      templateSteps === undefined ||
+      selfApprovedStepNos === null
+    ) {
+      return null
+    }
+    return resolvePartyScoreApplicationStatus(
+      detail,
+      approvalRecords,
+      templateSteps,
+      selfApprovedStepNos,
+    )
+  }, [detail, approvalRecords, templateSteps, selfApprovedStepNos])
 
   /** 申报类型展示文案：优先模板名称，取不到时回退模板 ID */
   const templateLabel = detail
@@ -181,27 +238,36 @@ export default function PartyScoreDetailPage() {
     : '—'
 
   /**
-   * 审批进度：已完成「同意」的模板环节数 / 模板总环节数。
+   * 审批进度：已完成的模板环节数 / 模板总环节数。
+   * 已完成环节 = 审批意见为「同意」的环节 + 审批人是申请人本人、由后端自动通过的环节；
+   * 自动通过环节不产生审批意见记录，只按记录统计会少一个环节。
    * 模板步骤或审批记录尚未加载完成时返回 null，页面展示占位符。
    */
   const approvalProgress = useMemo(() => {
-    if (approvalRecords === null) return null
+    if (approvalRecords === null || selfApprovedStepNos === null) return null
     const stepNos = templateSteps?.map((step) => step.step_no)
     if (!stepNos || stepNos.length === 0) return null
     const required = new Set(stepNos)
-    const agreed = new Set(
+    const done = new Set<number>(
       approvalRecords
         .filter((record) => record.decision === 'agree' && required.has(record.step_order))
         .map((record) => record.step_order),
     )
-    return { done: agreed.size, total: required.size }
-  }, [approvalRecords, templateSteps])
+    // 自动通过环节没有审批记录，但同样属于已完成
+    for (const stepNo of selfApprovedStepNos) {
+      if (required.has(stepNo)) done.add(stepNo)
+    }
+    return { done: done.size, total: required.size }
+  }, [approvalRecords, templateSteps, selfApprovedStepNos])
 
   return (
     <div className="party-approval-detail">
       <div className="party-approval-detail-header">
         <Button type="primary" icon={<ArrowLeftOutlined />} onClick={backToHome}>
-          {t('partyDeclaration.backToHome')}
+          {/* 从首页近期记录进入时回首页，从成绩申报记录进入时回到申报记录列表 */}
+          {fromModuleKey && fromModuleKey !== 'party_m1'
+            ? t('partyDeclaration.backToDeclarations')
+            : t('partyDeclaration.backToHome')}
         </Button>
         <div className="party-approval-detail-title">
           <h3>{t('partyDeclaration.detailTitle')}</h3>

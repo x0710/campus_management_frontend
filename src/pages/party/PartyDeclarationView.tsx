@@ -10,49 +10,38 @@
  * 下拉支持输入搜索：停止输入 1 秒后才带 keyword 请求服务端模糊匹配（名称 / 编码），
  * 避免连续输入时频繁请求；已选模板与已加载模板名称会被保留，不会因搜索结果缩窄而回退成 ID。
  *
+ * 「我的申报记录」展示审核进度（审核中 / 申请成功 / 被驳回，判定口径与首页近期记录一致，
+ * 必须所有审批环节完成才算申请成功）；点击记录行跳转到独立申报详情页
+ * （复用首页的 PartyScoreDetailPage，展示申请内容 + 审核内容，不再弹窗）。
+ *
  * 附件：先上传文件拿 ID，再随创建请求的 files 字段提交，实现申请与附件匹配；
  * 后端加分接口不提供申报时段 / 事由 / 撤回 / 删除，故页面不展示这些字段与操作。
  * 按代码要求 4，接口细节只写在注释里，不进入页面文案。
  */
 import { ReloadOutlined } from '@ant-design/icons'
-import {
-  App as AntdApp,
-  Button,
-  Descriptions,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Spin,
-  Table,
-} from 'antd'
+import { App as AntdApp, Button, Form, Input, InputNumber, Select, Spin, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { getApprovalTemplateDetail, queryApprovalTemplates } from '../../api/approvalmodel'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
-import {
-  createPartyScore,
-  getPartyScore,
-  hydratePartyScoreRows,
-  queryPartyScores,
-} from '../../api/partyScores'
+import { createPartyScore, hydratePartyScoreRows, queryPartyScores } from '../../api/partyScores'
 import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import type { PaginatedResponse } from '../../api/types/common'
 import type { PartyScore } from '../../api/types/partyScores'
-import AttachmentLinks from '../../components/AttachmentLinks'
 import AttachmentUploader from '../../components/AttachmentUploader'
 import ErrorState from '../../components/ErrorState'
-import PartyScoreApprovalRecords from '../../components/PartyScoreApprovalRecords'
 import {
   PARTY_DECLARATION_MAX_FILES,
   PARTY_DECLARATION_PAGE_SIZE,
+  PARTY_SCORE_APPLICATION_STATUS_COLOR,
   PARTY_TEMPLATE_BUSINESS_TYPE,
   PARTY_TEMPLATE_SEARCH_DEBOUNCE_MS,
 } from '../../config/partyDeclaration'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { usePaginated } from '../../hooks/usePaginated'
+import { usePartyScoreApplicationStatuses } from '../../composables/usePartyScoreApplicationStatuses'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
@@ -88,17 +77,13 @@ export default function PartyDeclarationView() {
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
+  const navigate = useNavigate()
+  const { portalKey, moduleKey } = useParams<{ portalKey: string; moduleKey?: string }>()
   const [form] = Form.useForm<DeclarationFormValues>()
 
   const [submitting, setSubmitting] = useState(false)
   /** 当前登录用户 ID（用于按 user_id 过滤本人记录；就绪前不拉取列表，避免取到他人数据） */
   const [myUid, setMyUid] = useState<number | null>(null)
-  /** 点击记录行打开的申报详情（先展示列表行数据，再用详情接口补充附件地址） */
-  const [detail, setDetail] = useState<PartyScore | null>(null)
-  /** 详情接口加载状态（附件下载地址 file_urls 来自详情接口） */
-  const [detailLoading, setDetailLoading] = useState(false)
-  /** 详情接口错误文案（含状态码） */
-  const [detailError, setDetailError] = useState<string | null>(null)
   /** 申报类型可选模板（审批模板，business_type='party'） */
   const [templates, setTemplates] = useState<ApprovalTemplate[]>([])
   const [templatesError, setTemplatesError] = useState<string | null>(null)
@@ -309,6 +294,9 @@ export default function PartyDeclarationView() {
       },
     )
 
+  /** 我的申报记录审核进度：审批记录 + 模板步骤判定，与首页近期记录同一口径 */
+  const { statuses } = usePartyScoreApplicationStatuses(data)
+
   /** user_id 就绪后重新拉取本人申报记录 */
   useEffect(() => {
     if (myUid !== null) reload()
@@ -364,6 +352,24 @@ export default function PartyDeclarationView() {
           ),
       },
       {
+        // 审核进度：与首页近期记录一致，展示「审核中 / 申请成功 / 被驳回」，
+        // 不直接展示申请分数，避免被误认为已获得成绩；状态未解析完成时显示加载中
+        title: t('partyDeclaration.colReviewStatus'),
+        key: 'review_status',
+        width: 120,
+        align: 'center',
+        render: (_, record) => {
+          const status = statuses.get(record.id)
+          return status ? (
+            <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
+              {t(`partyDeclaration.applicationStatus_${status}`)}
+            </Tag>
+          ) : (
+            <Spin size="small" />
+          )
+        },
+      },
+      {
         title: t('partyDeclaration.colCreatedAt'),
         dataIndex: 'created_at',
         key: 'created_at',
@@ -371,35 +377,19 @@ export default function PartyDeclarationView() {
         render: (v: string) => formatDateTime(v, locale),
       },
     ],
-    [t, locale, templateNameById],
+    [t, locale, templateNameById, statuses],
   )
 
   /**
-   * 打开申报详情：先用列表行数据即时展示，再请求详情接口补充附件下载地址（file_urls）。
-   * @param record 列表行数据（必填）
+   * 打开申报详情：跳转独立详情页（复用首页近期记录的审批详细页），
+   * 携带来源模块以便侧栏保持「成绩申报」高亮、返回按钮回到本页。
+   * @param record 当前点击的申报记录（必填）
    */
-  const openDetail = useCallback(
-    async (record: PartyScore) => {
-      setDetail(record)
-      setDetailLoading(true)
-      setDetailError(null)
-      try {
-        // 详情包含附件下载地址，打开时绕过缓存重新请求，避免展示旧数据导致看不到附件
-        setDetail(await getPartyScore(record.id, true))
-      } catch (err) {
-        setDetailError(extractErrorReason(err, t))
-      } finally {
-        setDetailLoading(false)
-      }
-    },
-    [t],
-  )
-
-  /** 关闭申报详情并清理加载 / 错误状态 */
-  const closeDetail = () => {
-    setDetail(null)
-    setDetailError(null)
-    setDetailLoading(false)
+  const openRecordDetail = (record: PartyScore) => {
+    if (!portalKey) return
+    navigate(
+      `/portal/${portalKey}/party-scores/${record.id}?from=${moduleKey ?? 'party_m2'}`,
+    )
   }
 
   /** 提交加分申请：成功后重置表单并刷新本人申报记录（代码要求 13） */
@@ -568,9 +558,9 @@ export default function PartyDeclarationView() {
               loading={loading || myUid === null}
               columns={columns}
               dataSource={data}
-              scroll={{ x: 760 }}
+              scroll={{ x: 880 }}
               onRow={(record) => ({
-                onClick: () => void openDetail(record),
+                onClick: () => openRecordDetail(record),
                 title: t('partyDeclaration.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
@@ -593,63 +583,6 @@ export default function PartyDeclarationView() {
           )}
         </div>
       </section>
-
-      {/* 申报详情：点击记录行打开，仅展示加分申请字段（只读，无撤回/删除操作） */}
-      <Modal
-        open={detail !== null}
-        title={t('partyDeclaration.detailTitle')}
-        onCancel={closeDetail}
-        footer={<Button onClick={closeDetail}>{t('partyDeclaration.close')}</Button>}
-      >
-        {detail ? (
-          <>
-          <Descriptions column={1} size="small" bordered>
-            <Descriptions.Item label={t('partyDeclaration.colId')}>{detail.id}</Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.colDeclType')}>
-              {detail.template_id !== undefined
-                ? templateNameById.get(detail.template_id) ?? detail.template_id
-                : t('common.unknown')}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.colScore')}>
-              {formatPartyScore(detail.requested_score)}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.colApproved')}>
-              {formatPartyScore(detail.approved_score)}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.fieldReason')}>
-              {detail.reason?.trim() ? detail.reason : '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.detailInstance')}>
-              {detail.approval_instance_id}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.colCreatedAt')}>
-              {formatDateTime(detail.created_at, locale)}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.colUpdatedAt')}>
-              {formatDateTime(detail.updated_at, locale)}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('partyDeclaration.fieldFiles')}>
-              {detailLoading ? (
-                t('common.loading')
-              ) : detailError ? (
-                <ErrorState message={detailError} onRetry={() => void openDetail(detail)} />
-              ) : (
-                <AttachmentLinks
-                  urls={detail.file_urls}
-                  emptyText={t('leaveDetail.noAttachment')}
-                />
-              )}
-            </Descriptions.Item>
-          </Descriptions>
-          <div className="party-declaration-records">
-            <div className="party-declaration-records-title">
-              {t('partyDeclaration.flowSectionTitle')}
-            </div>
-            <PartyScoreApprovalRecords instanceId={detail.approval_instance_id} force />
-          </div>
-          </>
-        ) : null}
-      </Modal>
     </div>
   )
 }
