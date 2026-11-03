@@ -55,8 +55,8 @@ export interface UserCreateRequest {
 /** PATCH /api/users/{id} 可更新字段 */
 export interface UserUpdateRequest {
   name?: string
-  email?: string
-  phone?: string
+  email?: string | null
+  phone?: string | null
   /** YYYY-MM-DD */
   birthday?: string | null
   gender?: Gender

@@ -1,17 +1,17 @@
 /**
- * 组织成员按职位统计（党委支部端 / 党委学院端工作台共用）。
+ * 组织成员按职位统计（党委支部端 / 党委学院端 / 学校端工作台共用）。
  *
- * GET /api/organizations/{id}/members 支持 position 过滤并返回分页 total，
- * 因此可以按职位名称统计人数（如「中共党员」「中共预备党员」）：
+ * 使用 POST /api/organizations/member-counts 批量统计（取代旧的
+ * GET /api/organizations/{id}/members?position=... 取分页 total 再逐组织累加的做法）：
  *   1. GET /api/positions 拉取全部职位，把职位名称解析为职位编码（接口走会话缓存）；
- *   2. 对目标组织及其全部下级组织，逐个职位编码用 page_size=1 只取 total 后相加。
+ *   2. 每个职位编码一条统计条件 { org_id, position, recursive: true } 交给批量接口，
+ *      一次请求即可统计该组织及全部下级组织的人数（同一批最多 100 条，超出自动分批）。
  *
- * 说明：按职位记录数统计；同一用户在同一组织有多条职位记录时会重复计数
- * （与学校端组织概览「预备党员人数」口径一致）。
+ * 说明：人数由后端按用户 ID 去重，同一成员在多条职位记录 / 多个下级组织任职也只计一次，
+ * 口径与学校端组织概览「预备党员人数」一致。
  */
-import { listSubsidiaries, queryOrgMembers } from '../api/organizations'
+import { listSubsidiaries, queryOrganizationMemberCounts } from '../api/organizations'
 import { listAllPositions } from '../api/positions'
-import { ORG_OVERVIEW_STATS_CONCURRENCY } from '../config/organization'
 
 /**
  * 列出组织自身及其全部下级组织 ID。
@@ -36,7 +36,7 @@ export async function listOrgSelfAndDescendantIds(rootId: number): Promise<numbe
 /**
  * 按职位名称统计组织及其全部下级组织的成员人数。
  *
- * 职位列表读取失败、职位名称不存在或组织下级查询失败时，对应职位返回 null
+ * 职位列表读取失败、职位名称未配置对应职位或统计请求失败时，对应职位返回 null
  * （由调用方展示占位符），不阻塞工作台其余统计。
  *
  * @param rootId 根组织 ID（必填）
@@ -49,13 +49,6 @@ export async function countOrgMembersByPositionNames(
 ): Promise<Record<string, number | null>> {
   const result: Record<string, number | null> = {}
   for (const name of positionNames) result[name] = null
-
-  let orgIds: number[]
-  try {
-    orgIds = await listOrgSelfAndDescendantIds(rootId)
-  } catch {
-    return result
-  }
 
   let codesByName: Map<string, string[]>
   try {
@@ -73,44 +66,25 @@ export async function countOrgMembersByPositionNames(
   }
 
   // 无对应职位编码说明职位未配置，保持 null 而不是 0，避免把「未配置」误读为「0 人」
+  const requests: { name: string; position: string }[] = []
   for (const name of positionNames) {
-    if ((codesByName.get(name) ?? []).length > 0) result[name] = 0
+    const codes = codesByName.get(name) ?? []
+    if (codes.length === 0) continue
+    result[name] = 0
+    for (const code of codes) requests.push({ name, position: code })
   }
+  if (requests.length === 0) return result
 
-  for (let start = 0; start < orgIds.length; start += ORG_OVERVIEW_STATS_CONCURRENCY) {
-    const chunk = orgIds.slice(start, start + ORG_OVERVIEW_STATS_CONCURRENCY)
-    const chunkCounts = await Promise.all(
-      chunk.map(async (orgId) => {
-        const entries = await Promise.all(
-          positionNames.map(async (name) => {
-            const totals = await Promise.all(
-              (codesByName.get(name) ?? []).map((code) =>
-                queryOrgMembers(orgId, { page: 1, page_size: 1, position: code })
-                  .then((res) => res.total)
-                  .catch(() => null),
-              ),
-            )
-            // 任一职位查询失败则该职位人数不可信，返回 null 交由调用方展示占位符
-            if (totals.some((count) => count === null)) return [name, null] as const
-            return [
-              name,
-              (totals as number[]).reduce((sum, count) => sum + count, 0),
-            ] as const
-          }),
-        )
-        return entries
-      }),
+  try {
+    const counts = await queryOrganizationMemberCounts(
+      requests.map(({ position }) => ({ org_id: rootId, position, recursive: true })),
     )
-    for (const entries of chunkCounts) {
-      for (const [name, count] of entries) {
-        // 职位未配置 / 查询失败时保持 null（不参与累加）
-        if (count === null || result[name] === null) {
-          result[name] = null
-          continue
-        }
-        result[name] += count
-      }
-    }
+    requests.forEach(({ name }, index) => {
+      result[name] = (result[name] ?? 0) + (counts[index]?.member_count ?? 0)
+    })
+  } catch {
+    // 统计失败时对应职位人数不可信，回退占位符（null）
+    for (const name of positionNames) result[name] = null
   }
 
   return result

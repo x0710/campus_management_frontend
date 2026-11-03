@@ -8,6 +8,7 @@ import {  updateUser, getUser } from '../api/users'
 import type { Gender, UserDetail } from '../api/types/users'
 import { extractErrorReason } from '../api/common'
 import { useT } from '../i18n'
+import { normalizeGender } from '../utils/gender'
 import ErrorState from './ErrorState'
 
 interface ProfileFormValues {
@@ -49,7 +50,7 @@ export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Pr
       const d = await getUser(uid)
       form.setFieldsValue({
         name: d.name ?? '',
-        gender: (d.gender as Gender | null) ?? undefined,
+        gender: normalizeGender(d.gender) ?? undefined,
         email: d.email ?? '',
         phone: d.phone ?? '',
         birthday: d.birthday ? dayjs(d.birthday) : null,

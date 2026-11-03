@@ -3,11 +3,10 @@
  *
  * 已接入真实接口：
  *   学院总人数（人）  经 composables/usePortalOrg 定位当前用户所属「学院」组织（组织树深度 1）→
- *                   GET /api/organizations/{id}/member-counts?recursive=true
- *                   按组织统计成员数（含全部下级组织，前端相加得总数）
+ *                   POST /api/organizations/member-counts（org_id + recursive=true，
+ *                   后端按用户 ID 去重，含全部下级组织）
  *   党员人数（人）  按职位名称「中共党员」经 GET /api/positions 解析职位编码后，
- *                   对学院及全部下级组织调用 GET /api/organizations/{id}/members?position=
- *                   取分页 total 汇总（含全部下级组织）
+ *                   调用 POST /api/organizations/member-counts（position + recursive=true）
  *   预备党员人数（人） 同上，按职位名称「中共预备党员」统计
  *   平均分          GET /api/party/scores/organization-average?organization_id=…&recursive=true
  *   各支部排名       GET /api/organizations/{id}/subsidiaries 获取直接下级支部，

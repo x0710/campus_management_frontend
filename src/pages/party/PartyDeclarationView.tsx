@@ -7,6 +7,8 @@
  *   GET  /api/party-scores/{id}             查询加分申请详情（含 file_urls 附件下载地址）
  *   GET  /api/party-scores?user_id=..       查询本人申报记录（分页；user_id 需显式传入，接口不会自动限定当前用户）
  * 「申报类型」取自审批模板 GET /api/approvals/templates（business_type='party'，见 config/partyDeclaration.ts）。
+ * 下拉支持输入搜索：停止输入 1 秒后才带 keyword 请求服务端模糊匹配（名称 / 编码），
+ * 避免连续输入时频繁请求；已选模板与已加载模板名称会被保留，不会因搜索结果缩窄而回退成 ID。
  *
  * 附件：先上传文件拿 ID，再随创建请求的 files 字段提交，实现申请与附件匹配；
  * 后端加分接口不提供申报时段 / 事由 / 撤回 / 删除，故页面不展示这些字段与操作。
@@ -47,6 +49,7 @@ import {
   PARTY_DECLARATION_MAX_FILES,
   PARTY_DECLARATION_PAGE_SIZE,
   PARTY_TEMPLATE_BUSINESS_TYPE,
+  PARTY_TEMPLATE_SEARCH_DEBOUNCE_MS,
 } from '../../config/partyDeclaration'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { usePaginated } from '../../hooks/usePaginated'
@@ -99,30 +102,85 @@ export default function PartyDeclarationView() {
   /** 申报类型可选模板（审批模板，business_type='party'） */
   const [templates, setTemplates] = useState<ApprovalTemplate[]>([])
   const [templatesError, setTemplatesError] = useState<string | null>(null)
+  /** 申报类型下拉是否正在请求（输入搜索 / 初次加载） */
+  const [templatesLoading, setTemplatesLoading] = useState(true)
+  /**
+   * 模板 ID → 名称的累积映射：每次搜索的结果都合并进来（只增不减），
+   * 避免输入搜索后下拉只含匹配项时，申报记录里的其他模板名称回退成 ID。
+   */
+  const [templateNames, setTemplateNames] = useState<Map<number, string>>(new Map())
+  /** 当前选中的模板：搜索后结果不含它时，下拉与加分细则仍能展示名称 */
+  const [selectedTemplate, setSelectedTemplate] = useState<ApprovalTemplate | null>(null)
+  /** 模板搜索请求序号：快速连续搜索时丢弃过期响应 */
+  const templatesReqRef = useRef(0)
+  /** 申报类型输入搜索的防抖计时器（停止输入 1 秒后再请求） */
+  const templateSearchTimerRef = useRef<number | null>(null)
   /** 已选模板的加分细则（选择申报类型后从模板详情接口加载） */
   const [rules, setRules] = useState<TemplateRulesState | null>(null)
   /** 加分细则请求序号：快速切换模板时丢弃过期响应 */
   const rulesReqRef = useRef(0)
 
-  /** 加载成绩申报可用的审批模板；失败时在表单区展示错误与重试（代码要求 9） */
-  const loadTemplates = useCallback(async () => {
-    setTemplatesError(null)
-    try {
-      const res = await queryApprovalTemplates({
-        business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
-        enabled: true,
-        page: 1,
-        page_size: PARTY_DECLARATION_PAGE_SIZE,
-      })
-      setTemplates(res.data)
-    } catch (err) {
-      setTemplatesError(extractErrorReason(err, t))
-    }
-  }, [t])
+  /**
+   * 加载成绩申报可用的审批模板（服务端按 keyword 模糊匹配模板名称 / 编码）。
+   * 初次加载或重试失败时在表单区展示错误与重试（代码要求 9）；
+   * 输入关键字搜索失败时只弹提示、保留当前选项，避免整块表单被错误页替换。
+   * @param keyword 搜索关键字（可选，空值表示加载全部可用模板）
+   * @param options 额外选项（可选）：force 绕过会话缓存、silent 静默失败
+   */
+  const loadTemplates = useCallback(
+    async (keyword?: string, options?: { force?: boolean; silent?: boolean }) => {
+      const reqId = templatesReqRef.current + 1
+      templatesReqRef.current = reqId
+      const silent = options?.silent ?? false
+      setTemplatesLoading(true)
+      if (!silent) setTemplatesError(null)
+      try {
+        const res = await queryApprovalTemplates(
+          {
+            business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
+            enabled: true,
+            page: 1,
+            page_size: PARTY_DECLARATION_PAGE_SIZE,
+            keyword: keyword?.trim() ? keyword.trim() : undefined,
+          },
+          options?.force,
+        )
+        if (templatesReqRef.current !== reqId) return
+        setTemplates(res.data)
+        // 合并名称映射（搜索只覆盖下拉可选范围，记录展示仍需要全部已知模板名称）
+        setTemplateNames((prev) => {
+          const merged = new Map(prev)
+          res.data.forEach((item) => merged.set(item.id, item.name))
+          return merged
+        })
+      } catch (err) {
+        if (templatesReqRef.current !== reqId) return
+        if (silent) {
+          reportError(err)
+        } else {
+          setTemplatesError(extractErrorReason(err, t))
+        }
+      } finally {
+        if (templatesReqRef.current === reqId) setTemplatesLoading(false)
+      }
+    },
+    [reportError, t],
+  )
 
   useEffect(() => {
     void loadTemplates()
   }, [loadTemplates])
+
+  /** 卸载时清理尚未触发的搜索防抖计时器 */
+  useEffect(
+    () => () => {
+      if (templateSearchTimerRef.current !== null) {
+        window.clearTimeout(templateSearchTimerRef.current)
+        templateSearchTimerRef.current = null
+      }
+    },
+    [],
+  )
 
   /**
    * 加载所选模板的加分细则：先用列表里的 description 即时展示，再用模板详情接口
@@ -158,6 +216,61 @@ export default function PartyDeclarationView() {
     },
     [t, templates],
   )
+
+  /**
+   * 申报类型输入搜索：输入停止 1 秒后才按关键字请求模糊匹配。
+   * 连续输入会重置计时器，避免每敲一个字都发一次请求。
+   * @param value 搜索关键字（必填，可为空串表示恢复全部模板）
+   */
+  const onTemplateSearch = useCallback(
+    (value: string) => {
+      if (templateSearchTimerRef.current !== null) {
+        window.clearTimeout(templateSearchTimerRef.current)
+      }
+      templateSearchTimerRef.current = window.setTimeout(() => {
+        templateSearchTimerRef.current = null
+        void loadTemplates(value, { silent: true })
+      }, PARTY_TEMPLATE_SEARCH_DEBOUNCE_MS)
+    },
+    [loadTemplates],
+  )
+
+  /**
+   * 选择申报类型：记录已选模板（搜索后其不在结果中也仍展示名称），并加载其加分细则。
+   * @param value 选中的模板 ID（可为 undefined，表示清空选择）
+   */
+  const onTemplateChange = useCallback(
+    (value: number | undefined) => {
+      const picked =
+        value === undefined ? null : templates.find((item) => item.id === value) ?? null
+      setSelectedTemplate(picked)
+      if (value === undefined) {
+        setRules(null)
+        // 使仍在途的加分细则请求失效，避免清空选择后右侧仍展示旧模板细则
+        rulesReqRef.current += 1
+        return
+      }
+      void loadRules(value)
+    },
+    [loadRules, templates],
+  )
+
+  /** 申报类型下拉选项：当前结果 + 已选模板兜底（搜索后已选项不在结果中仍显示名称） */
+  const templateOptions = useMemo(() => {
+    const options = templates.map((item) => ({
+      value: item.id,
+      label: item.name,
+      title: item.description || item.name,
+    }))
+    if (selectedTemplate && !templates.some((item) => item.id === selectedTemplate.id)) {
+      options.unshift({
+        value: selectedTemplate.id,
+        label: selectedTemplate.name,
+        title: selectedTemplate.description || selectedTemplate.name,
+      })
+    }
+    return options
+  }, [templates, selectedTemplate])
 
   /** 获取当前登录用户：提交时作为 user_id */
   useEffect(() => {
@@ -201,11 +314,8 @@ export default function PartyDeclarationView() {
     if (myUid !== null) reload()
   }, [myUid, reload])
 
-  /** 申报类型 ID → 名称，用于列表与详情展示（查不到时回退展示 ID，不编造名称） */
-  const templateNameById = useMemo(
-    () => new Map(templates.map((item) => [item.id, item.name])),
-    [templates],
-  )
+  /** 申报类型 ID → 名称，用于列表与详情展示（累积全部已加载模板；查不到时回退展示 ID） */
+  const templateNameById = templateNames
 
   const columns = useMemo<ColumnsType<PartyScore>>(
     () => [
@@ -307,8 +417,11 @@ export default function PartyDeclarationView() {
       message.success(t('partyDeclaration.createSuccess'))
       form.resetFields()
       setRules(null)
+      setSelectedTemplate(null)
       // 使仍在途的加分细则请求失效，避免提交后右侧闪现旧模板细则
       rulesReqRef.current += 1
+      // 恢复完整的申报类型列表（清掉上一次输入搜索的结果）
+      void loadTemplates()
       if (page === 1) refresh()
       else setPage(1)
     } catch (err) {
@@ -344,14 +457,18 @@ export default function PartyDeclarationView() {
                     rules={[{ required: true, message: t('partyDeclaration.typeRequired') }]}
                   >
                     <Select
+                      showSearch
+                      // 关键字由服务端按名称 / 编码模糊匹配（输入停止 1 秒后才搜索），前端不做本地过滤
+                      filterOption={false}
+                      loading={templatesLoading}
+                      notFoundContent={
+                        templatesLoading ? <Spin size="small" /> : t('common.noData')
+                      }
                       placeholder={t('partyDeclaration.typeRequired')}
-                      options={templates.map((item) => ({
-                        value: item.id,
-                        label: item.name,
-                        title: item.description || item.name,
-                      }))}
+                      options={templateOptions}
+                      onSearch={onTemplateSearch}
                       // 选择模板后立即加载并展示该模板的加分细则（代码要求 14）
-                      onChange={(value: number) => void loadRules(value)}
+                      onChange={onTemplateChange}
                     />
                   </Form.Item>
 
@@ -405,8 +522,8 @@ export default function PartyDeclarationView() {
                 ) : (
                   <>
                     <div className="party-declaration-rules-name">
-                      {templates.find((item) => item.id === rules.templateId)?.name ??
-                        rules.templateId}
+                      {/* 名称用累积映射：搜索后已选模板可能不在当前下拉结果中 */}
+                      {templateNameById.get(rules.templateId) ?? rules.templateId}
                     </div>
                     {rules.loading && rules.description?.trim() ? (
                       // 列表已带回加分细则时先展示，详情接口返回后再覆盖

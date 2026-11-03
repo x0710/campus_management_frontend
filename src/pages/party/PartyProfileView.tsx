@@ -1,5 +1,5 @@
-import { BellOutlined, UserOutlined } from '@ant-design/icons'
-import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, Descriptions, Empty, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
+import { BellOutlined, EditOutlined, UserOutlined } from '@ant-design/icons'
+import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, Descriptions, Empty, Form, Input, Modal, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getApprovalTemplateDetail, mockApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
@@ -7,7 +7,7 @@ import { getMyRoles } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import { deleteNotice, markNoticeRead, markNoticeUnread, queryNotices } from '../../api/notices'
 import { listUserOrganizations } from '../../api/organizations'
-import { getMyProfile } from '../../api/users'
+import { getMyProfile, updateUser } from '../../api/users'
 import type { ApprovalStep, ApprovalTemplate, MockApprovalApprover } from '../../api/types/approvalmodel'
 import type { Notice } from '../../api/types/notices'
 import type { UserOrganization } from '../../api/types/organizations'
@@ -32,6 +32,7 @@ import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateOnly, formatDateTime } from '../../utils/datetime'
+import { normalizeGender } from '../../utils/gender'
 
 /**
  * 党员端：我的（我的成绩记录 / 年度评价报告 / 消息通知 / 审批指南 / 关于井大大先锋）。
@@ -54,6 +55,11 @@ function ProfileDescriptions() {
   const [orgs, setOrgs] = useState<UserOrganization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { message } = AntdApp.useApp()
+  // 基本信息编辑弹窗：仅手机号、邮箱可编辑
+  const [basicEditOpen, setBasicEditOpen] = useState(false)
+  const [basicSaving, setBasicSaving] = useState(false)
+  const [basicForm] = Form.useForm<{ phone: string; email: string }>()
   // 党员编号 / 入党时间：拿到当前用户 ID 后按需查询党员档案
   const {
     profiles: partyProfiles,
@@ -87,6 +93,42 @@ function ProfileDescriptions() {
     void load()
   }, [load])
 
+  /** 打开基本信息编辑弹窗：仅回填手机号与邮箱 */
+  const openBasicEdit = () => {
+    basicForm.setFieldsValue({
+      phone: user?.phone ?? '',
+      email: user?.email ?? '',
+    })
+    setBasicEditOpen(true)
+  }
+
+  /** 保存手机号 / 邮箱（姓名、性别、生日等其余资料只读） */
+  const saveBasicInfo = async () => {
+    if (!user) return
+    let values: { phone: string; email: string }
+    try {
+      values = await basicForm.validateFields()
+    } catch {
+      return
+    }
+    setBasicSaving(true)
+    try {
+      const phone = values.phone?.trim() || null
+      const email = values.email?.trim() || null
+      await updateUser(user.id, { phone, email })
+      // 同步本地展示；接口缓存已在 updateUser 内失效，下次重新进入会拉取最新资料
+      setUser((prev) => (prev ? { ...prev, phone, email } : prev))
+      message.success(t('profile.saveSuccess'))
+      setBasicEditOpen(false)
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    } finally {
+      setBasicSaving(false)
+    }
+  }
+
   // 姓名：真实姓名优先，取不到时回退账户名，最后回退占位符
   const displayName = user?.name?.trim() || name?.trim() || username || t('common.unknown')
   // 所属支部：取第一项任职组织名称，无任职时回退占位符
@@ -98,10 +140,11 @@ function ProfileDescriptions() {
   const politicalStatus = orgs
     .map((org) => positionNames.get(org.position)?.trim() ?? '')
     .find((positionName) => PARTY_POLITICAL_STATUS_NAMES.includes(positionName))
+  const gender = normalizeGender(user?.gender)
   const genderLabel =
-    user?.gender === 'male'
+    gender === 'male'
       ? t('profile.male')
-      : user?.gender === 'female'
+      : gender === 'female'
         ? t('profile.female')
         : t('profile.unknown')
 
@@ -118,9 +161,24 @@ function ProfileDescriptions() {
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'stretch', width: '100%' }}>
-        <Card size="small" title={t('profile.basicInfo')} style={{ flex: '1 1 480px', minWidth: 0 }}>
+        <Card
+          size="small"
+          title={t('profile.basicInfo')}
+          style={{ flex: '1 1 480px', minWidth: 0 }}
+          extra={
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={openBasicEdit}
+            >
+              {t('common.edit')}
+            </Button>
+          }
+        >
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label={t('profile.name')}>{displayName}</Descriptions.Item>
             <Descriptions.Item label={t('profile.gender')}>{genderLabel}</Descriptions.Item>
@@ -219,7 +277,41 @@ function ProfileDescriptions() {
           </Space>
         )}
       </Card>
-    </Space>
+      </Space>
+
+      {/* 基本信息编辑：仅手机号、邮箱可修改 */}
+      <Modal
+        open={basicEditOpen}
+        title={t('profile.editTitle')}
+        width={420}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
+        confirmLoading={basicSaving}
+        onCancel={() => setBasicEditOpen(false)}
+        onOk={() => void saveBasicInfo()}
+        destroyOnHidden
+      >
+        <Form form={basicForm} layout="vertical" autoComplete="off">
+          <Form.Item
+            name="phone"
+            label={t('profile.phone')}
+            rules={[{ max: 32, message: t('profile.phoneTooLong') }]}
+          >
+            <Input maxLength={32} placeholder={t('profile.phonePlaceholder')} />
+          </Form.Item>
+          <Form.Item
+            name="email"
+            label={t('profile.email')}
+            rules={[
+              { type: 'email', message: t('profile.emailInvalid') },
+              { max: 128, message: t('profile.emailTooLong') },
+            ]}
+          >
+            <Input maxLength={128} placeholder={t('profile.emailPlaceholder')} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   )
 }
 

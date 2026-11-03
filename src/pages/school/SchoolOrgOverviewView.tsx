@@ -12,16 +12,20 @@
  * 操作对象为左侧当前选中的组织；「学院党委」根容器禁止删除。新建/编辑/删除成功后
  * 强制重新拉取组织树并重算下级统计（代码要求 5、25）。
  *
- * 统计口径（人数与平均分均含全部下级组织，与学校端总览「各二级党委排名」一致）：
- * - 党员人数：GET /api/organizations/{id}/member-counts?recursive=true（后端去重后的成员人数，
- *   前端把各下级组织计数相加，与总览「全校党员」口径一致）；
- * - 先锋指数平均分：同接口的 average_score（后端 DecimalText），按「基础分 + 加分」换算，
- *   最多保留小数点后 3 位；
- * - 预备党员人数：职位名称为「中共预备党员」的成员数。职位名称经 GET /api/positions
- *   解析为职位编码后，对目标组织及其全部下级组织调用
- *   GET /api/organizations/{id}/members?position= 按职位统计（暂不跨组织去重）。
+ * 列表排序：预备党员人数 / 党员人数 / 先锋指数平均分三列支持点击表头排序，
+ * 同一时间仅一列生效（切换列自动取消上一列，再次点击可取消排序），支持正序与逆序；
+ * 空值（统计未取到）始终排在最后，排序变化时回到第 1 页。
  *
- * 请求复用：member-counts 接口本身不走会话缓存（人数需实时），本页按
+ * 统计口径（人数与平均分均含全部下级组织，与学校端总览「各二级党委排名」一致）：
+ * - 党员人数：POST /api/organizations/member-counts，条件 { org_id, recursive: true }，
+ *   后端按用户 ID 去重（同一成员跨组织任职也只计一次），旧 GET member-counts 已下线；
+ * - 先锋指数平均分：GET /api/party/scores/organization-average 的 average_score
+ *   （后端 DecimalText），按「基础分 + 加分」换算，最多保留小数点后 3 位；
+ * - 预备党员人数：职位名称为「中共预备党员」的成员数。职位名称经 GET /api/positions
+ *   解析为职位编码后，把每个编码作为同一批量人数接口的一条条件（position + recursive=true），
+ *   与党员人数合并成一次请求。
+ *
+ * 请求复用：批量人数接口本身不走会话缓存（人数需实时），本页按
  * 「下级组织 ID:刷新代数」在页面内缓存统计 Promise，切换组织再切回、或组织/职位
  * 数据晚到导致重跑时都不会重复请求；点「刷新」会递增代数并重新统计。
  */
@@ -48,7 +52,7 @@ import {
   Tree,
   TreeSelect,
 } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
+import type { ColumnsType, TableProps } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
 import axios from 'axios'
 import {
@@ -65,15 +69,17 @@ import {
   createOrganization,
   deleteOrganization,
   listAllOrganizations,
-  queryOrgMembers,
+  queryOrganizationMemberCounts,
   updateOrganization,
 } from '../../api/organizations'
 import { getPartyScoreOrganizationAverage } from '../../api/partyScores'
 import { listAllPositions } from '../../api/positions'
-import type { OrganizationInfo } from '../../api/types/organizations'
+import type {
+  OrganizationInfo,
+  OrganizationMemberCountRequest,
+} from '../../api/types/organizations'
 import ErrorState from '../../components/ErrorState'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
-import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import {
   MEMBER_TABLE_PAGE_SIZE,
   ORG_OVERVIEW_STATS_CONCURRENCY,
@@ -85,11 +91,7 @@ import { PARTY_PROBATIONARY_STATUS_NAME } from '../../config/partyProfile'
 import { useT } from '../../i18n'
 import { useUiStateStore } from '../../store/uiState'
 import { formatPartyScoreTotalDecimal } from '../../utils/partyScore'
-import {
-  buildOrgTreeData,
-  collectOrgSubtree,
-  listOrgDescendantIds,
-} from '../../utils/orgTree'
+import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 
 /** 下级组织统计（null 表示未取到：加载中或加载失败） */
 interface OrgChildStats {
@@ -116,79 +118,87 @@ interface OrgFormValues {
   parent_id: number | null
 }
 
+/** antd 排序方向 */
+type SortOrder = 'ascend' | 'descend' | null
+
 /**
- * 统计指定组织及其全部下级组织中「预备党员」的人数。
- * @param orgIds 需要统计的组织 ID（必填，含目标组织自身）
- * @param positionCodes 职位名称为「中共预备党员」的职位编码（必填，可为空数组）
- * @param force 是否绕过会话缓存重新请求（可选，默认 false）
- * @returns Promise<number> 命中人数（按职位记录数汇总；无编码或无组织时返回 0）
+ * 可排序数值比较：null 表示统计未取到（加载中 / 失败），正序与倒序都排在最后。
+ * antd 会对降序结果整体取反，因此降序时把空值的符号也反过来，保证取反后仍在末尾。
+ * @param a 对比值 A（必填，可为 null）
+ * @param b 对比值 B（必填，可为 null）
+ * @param order 当前排序方向（可选，antd 传入）
+ * @returns 比较结果（<0 / 0 / >0）
  */
-async function countReserveMembers(
-  orgIds: number[],
-  positionCodes: string[],
-  force?: boolean,
-): Promise<number> {
-  if (orgIds.length === 0 || positionCodes.length === 0) return 0
-  let total = 0
-  for (let start = 0; start < orgIds.length; start += ORG_OVERVIEW_STATS_CONCURRENCY) {
-    const chunk = orgIds.slice(start, start + ORG_OVERVIEW_STATS_CONCURRENCY)
-    const counts = await Promise.all(
-      chunk.map(async (orgId) => {
-        // 每个组织按职位编码各自取一次分页总数，page_size=1 只取 total，减少返回数据量
-        const positionTotals = await Promise.all(
-          positionCodes.map((code) =>
-            queryOrgMembers(orgId, { page: 1, page_size: 1, position: code }, force)
-              .then((res) => res.total)
-              .catch(() => 0),
-          ),
-        )
-        return positionTotals.reduce((sum, count) => sum + count, 0)
-      }),
-    )
-    total += counts.reduce((sum, count) => sum + count, 0)
+function compareNullableNumber(a: number | null, b: number | null, order?: SortOrder): number {
+  if (a === null && b === null) return 0
+  if (a === null) return order === 'descend' ? -1 : 1
+  if (b === null) return order === 'descend' ? 1 : -1
+  return a - b
+}
+
+/**
+ * 先锋指数平均分（后端 DecimalText）排序比较：转成数字后比较，空值同样排在最后。
+ * @param a 平均分 A（必填，可为 null）
+ * @param b 平均分 B（必填，可为 null）
+ * @param order 当前排序方向（可选）
+ * @returns 比较结果（<0 / 0 / >0）
+ */
+function compareNullableScore(a: string | null, b: string | null, order?: SortOrder): number {
+  const parse = (value: string | null): number | null => {
+    if (value === null || value.trim() === '') return null
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : null
   }
-  return total
+  return compareNullableNumber(parse(a), parse(b), order)
 }
 
 /**
  * 加载单个下级组织的统计项（党员人数 / 预备党员人数 / 先锋指数平均分）。
+ *
+ * 人数统一走 POST /api/organizations/member-counts 批量接口：一次请求同时包含
+ * 「全部职位人数」与「预备党员各职位编码人数」两组条件（均 recursive=true，含下级组织），
+ * 由后端按用户 ID 去重（同一成员跨组织任职也只计一次），无需前端逐级汇总成员列表。
+ *
  * @param childId 下级组织 ID（必填）
- * @param orgsInTree 组织树范围内的全部组织（必填，用于展开该组织及其下级组织）
  * @param reserveCodes 预备党员职位编码（可为 null：职位未加载成功，预备党员人数返回 null）
- * @param force 是否绕过会话缓存（可选，默认 false）
+ * @param force 是否绕过会话缓存重新请求（可选，默认 false；仅影响平均分缓存）
  * @returns Promise<OrgChildStats> 统计项（单项失败时对应字段为 null）
  */
 async function loadChildStats(
   childId: number,
-  orgsInTree: OrganizationInfo[],
   reserveCodes: string[] | null,
   force?: boolean,
 ): Promise<OrgChildStats> {
-  const subtreeOrgIds = [childId, ...listOrgDescendantIds(orgsInTree, childId)]
-  const reservePromise =
-    reserveCodes === null
-      ? Promise.resolve<number | null>(null)
-      : countReserveMembers(subtreeOrgIds, reserveCodes, force)
+  // 第 1 项统计全部职位人数，其余各项按预备党员职位编码统计，响应顺序与请求一致
+  const countRequests: OrganizationMemberCountRequest[] = [{ org_id: childId, recursive: true }]
+  if (reserveCodes !== null) {
+    for (const code of reserveCodes) {
+      countRequests.push({ org_id: childId, position: code, recursive: true })
+    }
+  }
 
-  const [averageResult, memberResult, reserveResult] = await Promise.allSettled([
+  const [averageResult, countsResult] = await Promise.allSettled([
     getPartyScoreOrganizationAverage({ organization_id: childId, recursive: true }, force),
-    // 党员人数与总览「全校党员」同口径：member-counts?recursive=true 的去重人数（接口本身不缓存）
-    countOrgMemberTotal(childId),
-    reservePromise,
+    // 人数需实时，批量人数接口本身不走会话缓存
+    queryOrganizationMemberCounts(countRequests),
   ])
 
-  // 三项全部失败说明该组织统计整体不可用：抛出首个错误由调用方统一提示
-  if (
-    averageResult.status === 'rejected' &&
-    memberResult.status === 'rejected' &&
-    reserveResult.status === 'rejected'
-  ) {
+  // 平均分与人数都失败说明该组织统计整体不可用：抛出首个错误由调用方统一提示
+  if (averageResult.status === 'rejected' && countsResult.status === 'rejected') {
     throw averageResult.reason
   }
 
+  const memberCount =
+    countsResult.status === 'fulfilled' ? (countsResult.value[0]?.member_count ?? 0) : null
+  // 预备党员人数：职位未加载成功 → null（占位符）；职位未配置 → 0；其余为各职位编码人数之和
+  const reserveMemberCount =
+    reserveCodes === null || countsResult.status === 'rejected'
+      ? null
+      : countsResult.value.slice(1).reduce((sum, item) => sum + item.member_count, 0)
+
   return {
-    memberCount: memberResult.status === 'fulfilled' ? memberResult.value : null,
-    reserveMemberCount: reserveResult.status === 'fulfilled' ? reserveResult.value : null,
+    memberCount,
+    reserveMemberCount,
     averageScore: averageResult.status === 'fulfilled' ? averageResult.value.average_score : null,
   }
 }
@@ -252,7 +262,7 @@ export default function SchoolOrgOverviewView() {
 
   /**
    * 页面内统计缓存：key = `下级组织ID:刷新代数` → 统计 Promise。
-   * member-counts 不走向会话缓存，这里在页面内复用同一代数的统计请求：
+   * 批量人数接口不走向会话缓存，这里在页面内复用同一代数的统计请求：
    * 切换组织再切回、或组织/职位数据晚到导致 effect 重跑时，不会对同一组织重复发请求。
    */
   const statsCacheRef = useRef<Map<string, Promise<OrgChildStats>>>(new Map())
@@ -474,7 +484,7 @@ export default function SchoolOrgOverviewView() {
       const cacheKey = `${childId}:${refreshTick}`
       const cached = statsCacheRef.current.get(cacheKey)
       if (cached) return cached
-      const pending = loadChildStats(childId, orgsInTree, reserveCodes, force)
+      const pending = loadChildStats(childId, reserveCodes, force)
       statsCacheRef.current.set(cacheKey, pending)
       pending.catch(() => {
         if (statsCacheRef.current.get(cacheKey) === pending) {
@@ -522,7 +532,6 @@ export default function SchoolOrgOverviewView() {
     childrenKey,
     orgsLoading,
     reserveReady,
-    orgsInTree,
     reserveCodes,
     refreshTick,
     activeStatsKey,
@@ -602,6 +611,17 @@ export default function SchoolOrgOverviewView() {
     [openOrgMembers, t],
   )
 
+  /**
+   * 表格变更：点击统计列表头排序（单列生效，切换列时自动取消上一列）后回到第 1 页；
+   * 翻页时沿用用户选择的页码。
+   */
+  const onTableChange: TableProps<OrgChildRow>['onChange'] = useCallback(
+    (pagination, _filters, _sorter, extra) => {
+      setPage(extra.action === 'sort' ? 1 : (pagination.current ?? 1))
+    },
+    [],
+  )
+
   const columns = useMemo<ColumnsType<OrgChildRow>>(
     () => [
       {
@@ -629,7 +649,8 @@ export default function SchoolOrgOverviewView() {
         render: (value: string) => value || '—',
       },
       {
-        // 悬停说明预备党员人数的统计口径（按职位名称统计，代码要求 10）
+        // 悬停说明预备党员人数的统计口径（按职位名称统计，代码要求 10）；
+        // 标题已有口径提示，关闭 antd 的排序提示避免 Tooltip 嵌套
         title: (
           <Tooltip title={t('schoolOrgOverview.reserveHint')}>
             <span>{t('schoolOrgOverview.colReserveMembers')}</span>
@@ -637,6 +658,9 @@ export default function SchoolOrgOverviewView() {
         ),
         key: 'reserveMemberCount',
         width: 130,
+        sorter: (a, b, order) =>
+          compareNullableNumber(a.reserveMemberCount, b.reserveMemberCount, order),
+        showSorterTooltip: false,
         render: (_, record) =>
           statsLoading ? (
             <span className="cell-sub">{t('common.loading')}</span>
@@ -648,6 +672,7 @@ export default function SchoolOrgOverviewView() {
         title: t('schoolOrgOverview.colMembers'),
         key: 'memberCount',
         width: 110,
+        sorter: (a, b, order) => compareNullableNumber(a.memberCount, b.memberCount, order),
         render: (_, record) =>
           statsLoading ? (
             <span className="cell-sub">{t('common.loading')}</span>
@@ -659,6 +684,7 @@ export default function SchoolOrgOverviewView() {
         title: t('schoolOrgOverview.colAverageScore'),
         key: 'averageScore',
         width: 140,
+        sorter: (a, b, order) => compareNullableScore(a.averageScore, b.averageScore, order),
         render: (_, record) =>
           statsLoading ? (
             <span className="cell-sub">{t('common.loading')}</span>
@@ -826,6 +852,7 @@ export default function SchoolOrgOverviewView() {
               }}
               scroll={{ x: 1000 }}
               onRow={onRow}
+              onChange={onTableChange}
               pagination={{
                 current: page,
                 pageSize: MEMBER_TABLE_PAGE_SIZE,
@@ -833,7 +860,6 @@ export default function SchoolOrgOverviewView() {
                 showSizeChanger: false,
                 showQuickJumper: true,
                 showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
-                onChange: (p: number) => setPage(p),
               }}
             />
           )}

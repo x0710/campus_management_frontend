@@ -15,6 +15,12 @@ export const PARTY_DECLARATION_PAGE_SIZE = 100
 /** 单次申报最多可上传的附件数量 */
 export const PARTY_DECLARATION_MAX_FILES = 10
 
+/**
+ * 申报类型输入搜索的防抖时长（毫秒）：停止输入 1 秒后才按关键字请求模糊匹配，
+ * 避免连续输入过程中每敲一个字就发一次请求。
+ */
+export const PARTY_TEMPLATE_SEARCH_DEBOUNCE_MS = 1000
+
 /** 党员端首页「近期记录」展示条数（取最近的若干条成绩申报） */
 export const PARTY_RECENT_RECORD_LIMIT = 5
 

@@ -36,12 +36,64 @@ export interface UserOrganization extends OrganizationMember {
   organization_name: string
 }
 
-/** 组织成员数量统计项（GET /organizations/{org_id}/member-counts 返回单个对象；recursive=true 时 member_count 含全部下级组织） */
+/**
+ * 批量人数统计条件（POST /organizations/member-counts 请求体单项）。
+ * 接口要求每批 1～100 项，每项必须包含 org_id。
+ */
+export interface OrganizationMemberCountRequest {
+  /** 组织 ID（必填，必须大于 0） */
+  org_id: number
+  /** 职位编码，精确匹配；不传或为 null 时统计全部职位 */
+  position?: string | null
+  /** 是否包含数据范围内的子组织（默认 false） */
+  recursive?: boolean
+}
+
+/**
+ * 批量人数统计可额外返回的信息（POST /organizations/member-counts?include=...）。
+ * 多个选项用英文逗号拼接，统一作用于请求体中的每一项：
+ * - gender：返回 gender_counts；
+ * - organization_name：返回根组织名称 organization_name；
+ * - personnel：返回 personnel_counts（学生 / 职工 / 其他）。
+ */
+export type OrganizationMemberCountInclude = 'gender' | 'organization_name' | 'personnel'
+
+/** 当前统计范围内的性别分布：未填写、异常值或无对应用户归入 unknown；三项之和等于 member_count */
+export interface OrganizationMemberGenderCounts {
+  male: number
+  female: number
+  unknown: number
+}
+
+/**
+ * 当前统计范围内按档案是否存在划分的人数：学生与职工身份可重叠（不按在读 / 在职状态过滤），
+ * other_count 仅统计两种档案都不存在的成员，因此三项之和可能大于 member_count。
+ */
+export interface OrganizationMemberPersonnelCounts {
+  student_count: number
+  staff_count: number
+  other_count: number
+}
+
+/**
+ * 批量人数统计结果（POST /organizations/member-counts 返回项，与请求逐项对应且顺序一致）。
+ * member_count 按用户 ID 去重，跨组织任职也只计一次。
+ */
 export interface OrganizationMemberCountItem {
   /** 组织 ID */
-  organization_id: number
-  /** 该组织去重后的成员数量（非负） */
+  org_id: number
+  /** 统计条件中的职位编码（未指定时为 null） */
+  position?: string | null
+  /** 是否包含子组织 */
+  recursive: boolean
+  /** 按用户 ID 去重的人数（非负；无匹配成员时为 0） */
   member_count: number
+  /** 仅 ?include=gender 时返回的性别分布 */
+  gender_counts?: OrganizationMemberGenderCounts | null
+  /** 仅 ?include=organization_name 时返回（递归统计仍为根组织名称；组织不存在时为 null） */
+  organization_name?: string | null
+  /** 仅 ?include=personnel 时返回的学生 / 职工 / 其他人数 */
+  personnel_counts?: OrganizationMemberPersonnelCounts | null
 }
 
 /** 组织树链路节点（GET /organizations/{id}/tree 返回项；链路顺序为「根 → 查询组织」） */

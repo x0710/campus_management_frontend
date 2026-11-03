@@ -3,8 +3,8 @@
  *
  * 已接入真实接口：
  *   全校党员（人）  固定以「学院党委」容器（ID=2）为起点 →
- *                   GET /api/organizations/{id}/member-counts?recursive=true
- *                   按组织统计成员数（含全部下级组织，前端相加得总数）
+ *                   POST /api/organizations/member-counts（org_id=2 + recursive=true，
+ *                   后端按用户 ID 去重，含全部下级组织）
  *   平均分          GET /api/party/scores/organization-average?organization_id=2&recursive=true
  *   各二级党委排名   GET /api/organizations/{id}/subsidiaries 获取「学院党委」容器（ID=2）下的
  *                   各二级学院党委，再逐个调用 GET /api/party/scores/organization-average

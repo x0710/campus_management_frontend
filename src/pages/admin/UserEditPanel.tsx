@@ -35,6 +35,7 @@ import type { UserDetail, Gender } from '../../api/types/users'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { usePositionNames } from '../../composables/usePositionNames'
 import { useT } from '../../i18n'
+import { normalizeGender } from '../../utils/gender'
 
 interface ProfileFormValues {
   name?: string
@@ -102,7 +103,7 @@ export default function UserEditPanel({
         email: d.email ?? '',
         phone: d.phone ?? '',
         birthday: d.birthday ? dayjs(d.birthday) : null,
-        gender: (d.gender as Gender | null) ?? undefined,
+        gender: normalizeGender(d.gender) ?? undefined,
       })
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)

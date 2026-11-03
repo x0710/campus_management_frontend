@@ -20,11 +20,12 @@ import type { UserOrganization } from '../../api/types/organizations'
 import { getPosition } from '../../api/positions'
 import type { PositionDetail } from '../../api/types/positions'
 import { getUser } from '../../api/users'
-import type { Gender, UserDetail } from '../../api/types/users'
+import type { UserDetail } from '../../api/types/users'
 import { extractErrorReason } from '../../api/common'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateOnly, formatDateTime } from '../../utils/datetime'
+import { normalizeGender } from '../../utils/gender'
 
 const { Text } = Typography
 
@@ -118,7 +119,7 @@ export default function StudentProfileView() {
 
   const genderLabel = useMemo(() => {
     if (!user) return null
-    switch (user.gender as Gender | null) {
+    switch (normalizeGender(user.gender)) {
       case 'male':
         return t('profile.male')
       case 'female':

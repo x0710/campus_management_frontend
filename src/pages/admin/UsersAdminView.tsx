@@ -52,6 +52,7 @@ import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { isUidTerm } from '../../utils/personSearch'
+import { normalizeGender } from '../../utils/gender'
 
 /** 用户列表每页条数（代码要求 12：表格每页最多 100 行） */
 const PAGE_SIZE = 100
@@ -325,7 +326,7 @@ export default function UsersAdminView() {
       const error =
         !username
           ? t('adminUsers.batchErrUsername')
-          : gender && gender !== 'male' && gender !== 'female'
+          : gender && !normalizeGender(gender)
             ? t('adminUsers.batchErrGender')
             : orgStr && orgStr.split('|').some((o) => o && isNaN(Number(o)))
               ? t('adminUsers.batchErrOrg')
@@ -362,10 +363,7 @@ export default function UsersAdminView() {
     const orgs = split(u.org).map(Number)
     const pos = split(u.pos)
     const workplaces = split(u.workplaces)
-    const gender = (() => {
-      const g = u.gender.toLowerCase()
-      return g === 'male' || g === 'female' ? (g as Gender) : undefined
-    })()
+    const gender = normalizeGender(u.gender)
     return {
       username: u.username,
       password: u.password || undefined,
@@ -863,7 +861,11 @@ export default function UsersAdminView() {
                 dataIndex: 'gender',
                 key: 'gender',
                 width: 80,
-                render: (v: string) => v || <span className="cell-sub">—</span>,
+                render: (v: string) => {
+                  const g = normalizeGender(v)
+                  if (!g) return v || <span className="cell-sub">—</span>
+                  return g === 'male' ? t('profile.male') : t('profile.female')
+                },
               },
               {
                 title: 'org',

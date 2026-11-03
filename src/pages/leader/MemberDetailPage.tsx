@@ -164,6 +164,7 @@ import {
 import { useT, type TranslateFn } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateOnly, formatDateTime } from '../../utils/datetime'
+import { normalizeGender } from '../../utils/gender'
 import { formatCentsAsYuan, yuanToCents } from '../../utils/money'
 import { formatPartyScore, isNegativePartyScore } from '../../utils/partyScore'
 import {
@@ -351,7 +352,7 @@ export default function MemberDetailPage() {
 
   /** 性别文案（与个人资料页一致） */
   const genderLabel = useMemo(() => {
-    switch (user?.gender) {
+    switch (normalizeGender(user?.gender)) {
       case 'male':
         return t('profile.male')
       case 'female':

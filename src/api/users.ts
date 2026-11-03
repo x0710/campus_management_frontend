@@ -57,6 +57,8 @@ export async function updateUser(id: number, body: UserUpdateRequest): Promise<v
   await http.patch(`/users/${id}`, body)
   invalidate('GET /users')
   invalidate(`GET /users/${id}`)
+  // 本人资料可能通过 /users/me 缓存，更新后一并失效，避免“我的”页继续展示旧手机号/邮箱
+  invalidate('GET /users/me')
 }
 
 /** DELETE /api/users/{id} 删除用户（不能删除自己） */

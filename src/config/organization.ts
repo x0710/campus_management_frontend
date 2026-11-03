@@ -51,12 +51,15 @@ export const SCHOOL_ORG_OVERVIEW_MODULE_KEY = 'school_m6'
 export const ACADEMY_BRANCH_MODULE_KEY = 'academy_m5'
 
 /**
- * 组织概览 / 工作台按职位统计人数时的并发上限。
+ * 组织概览 / 工作台统计下级组织时的并发上限。
  *
- * 党员人数（member-counts）与先锋指数平均分（organization-average）各需一次请求；
- * 预备党员 / 党员人数需按职位编码逐个下级组织查询，设上限避免一次性打出过多请求。
+ * 人数统一走 POST /organizations/member-counts 批量接口（一次请求可含多个组织 / 职位条件），
+ * 先锋指数平均分（organization-average）仍需按组织逐个请求，设上限避免一次性打出过多请求。
  */
 export const ORG_OVERVIEW_STATS_CONCURRENCY = 8
+
+/** 批量人数统计接口（POST /organizations/member-counts）单次请求最多条数（接口上限 100） */
+export const ORGANIZATION_MEMBER_COUNT_BATCH_SIZE = 100
 
 /**
  * 党员端首页顶部组织链路无法查询到组织树时的兜底根组织名称。

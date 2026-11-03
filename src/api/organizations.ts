@@ -1,11 +1,14 @@
 /** 组织模块, 提供组织、组织成员与用户任职相关 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { ORGANIZATION_MEMBER_COUNT_BATCH_SIZE } from '../config/organization'
 import type { PaginatedResponse } from './types/common'
 import type {
   OrganizationInfo,
   OrganizationMember,
+  OrganizationMemberCountInclude,
   OrganizationMemberCountItem,
+  OrganizationMemberCountRequest,
   OrganizationMemberInput,
   OrganizationMemberQuery,
   OrganizationQuery,
@@ -92,24 +95,51 @@ export async function queryOrgMembers(
 }
 
 /**
- * GET /api/organizations/{org_id}/member-counts 按组织统计成员数量。
- * 后端返回单个统计对象 { organization_id, member_count }；member_count 为去重后的成员人数，
- * recursive=true 时包含所有下级组织。计数会随成员变更实时变化，故不走会话缓存。
- * 为兼容后端可能返回数组的形态，这里统一归一化为数组返回。
- * @param orgId 组织 ID（必填，路径参数）
- * @param recursive 是否递归统计子组织成员（可选；默认仅统计当前组织）
- * @returns Promise<OrganizationMemberCountItem[]> 组织成员统计项数组（恒为数组，通常仅一项）
+ * POST /api/organizations/member-counts 批量统计组织成员人数（取代旧的
+ * GET /api/organizations/{org_id}/member-counts，旧接口已下线）。
+ *
+ * 请求体为 1～100 项条件数组，每项必须包含 org_id；可选 position（职位编码，精确匹配，
+ * 不可为空字符串）与 recursive（是否包含可访问的子组织，默认 false）。响应与请求逐项
+ * 对应且顺序一致，member_count 按用户 ID 去重（跨组织任职也只计一次），不存在的组织 /
+ * 职位或无匹配成员返回 0；任何一项超出数据范围时整批返回 403。
+ * 人数需实时，故不走会话缓存；条件为空时直接返回空数组，不发请求。
+ *
+ * @param requests 统计条件数组（必填，超过单批上限时自动分批请求）
+ * @param include 需要额外返回的信息（可选；gender / organization_name / personnel，
+ *   去重后按逗号拼接为查询参数，统一作用于本批所有条件）
+ * @returns Promise<OrganizationMemberCountItem[]> 与 requests 顺序一致的统计结果
  */
 export async function queryOrganizationMemberCounts(
-  orgId: number,
-  recursive?: boolean,
+  requests: OrganizationMemberCountRequest[],
+  include?: readonly OrganizationMemberCountInclude[],
 ): Promise<OrganizationMemberCountItem[]> {
-  const res = await http.get<OrganizationMemberCountItem[] | OrganizationMemberCountItem | null>(
-    `/organizations/${orgId}/member-counts`,
-    recursive === undefined ? undefined : { params: { recursive } },
-  )
-  if (!res.data) return []
-  return Array.isArray(res.data) ? res.data : [res.data]
+  const includeParam = include?.length ? [...new Set(include)].join(',') : undefined
+
+  const results: OrganizationMemberCountItem[] = []
+  for (let start = 0; start < requests.length; start += ORGANIZATION_MEMBER_COUNT_BATCH_SIZE) {
+    const chunk = requests.slice(start, start + ORGANIZATION_MEMBER_COUNT_BATCH_SIZE)
+    const res = await http.post<OrganizationMemberCountItem[]>(
+      '/organizations/member-counts',
+      chunk,
+      includeParam === undefined ? undefined : { params: { include: includeParam } },
+    )
+    results.push(...(res.data ?? []))
+  }
+  return results
+}
+
+/**
+ * 统计单个条件的人数：POST /api/organizations/member-counts 批量接口的单项调用。
+ * @param request 统计条件（必填）
+ * @param include 需要额外返回的信息（可选；仅返回人数时可省略）
+ * @returns 按用户 ID 去重后的人数（无匹配成员时返回 0）
+ */
+export async function countOrganizationMembers(
+  request: OrganizationMemberCountRequest,
+  include?: readonly OrganizationMemberCountInclude[],
+): Promise<number> {
+  const [item] = await queryOrganizationMemberCounts([request], include)
+  return item?.member_count ?? 0
 }
 
 /** POST /api/organizations/{id}/members 添加成员，返回新成员记录 */

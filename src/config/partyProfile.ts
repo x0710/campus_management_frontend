@@ -11,15 +11,15 @@ export const PARTY_POLITICAL_STATUS_NAMES: readonly string[] = ['中共党员', 
 /**
  * 正式党员身份对应的职位名称。
  * 党委支部端 / 学院端工作台按该职位名称统计「党员人数」：
- * 职位名称经 GET /api/positions 解析为职位编码后，调用
- * GET /api/organizations/{id}/members?position= 取分页 total 汇总。
+ * 职位名称经 GET /api/positions 解析为职位编码后，作为
+ * POST /api/organizations/member-counts 的一条条件（position + recursive=true）。
  */
 export const PARTY_FULL_MEMBER_STATUS_NAME = '中共党员'
 
 /**
  * 预备党员身份对应的职位名称。
  * 党委学校端「组织概览」按该职位名称统计各下级组织的预备党员人数
- * （职位名称 → 职位编码经 GET /api/positions 解析）；
+ * （职位名称 → 职位编码经 GET /api/positions 解析，再走批量人数接口 member-counts）；
  * 党委支部端 / 学院端工作台同样按该职位名称统计「预备党员人数」。
  */
 export const PARTY_PROBATIONARY_STATUS_NAME = '中共预备党员'
