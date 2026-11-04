@@ -18,8 +18,6 @@ import PartyScoreRecords from '../../components/PartyScoreRecords'
 import PartyScoreSummary from '../../components/PartyScoreSummary'
 import {
   APPROVAL_TEMPLATE_PAGE_SIZE,
-  getBusinessTypeColor,
-  getBusinessTypeLabel,
 } from '../../config/approvalTemplate'
 import { NOTICE_CATEGORY_LABEL_KEYS } from '../../config/notices'
 import { PARTY_NOTICE_PAGE_SIZE } from '../../config/partyDeclaration'
@@ -33,6 +31,7 @@ import { useAuthStore } from '../../store/auth'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateOnly, formatDateTime } from '../../utils/datetime'
 import { normalizeGender } from '../../utils/gender'
+import OrganizationName from '../../components/OrganizationName'
 
 /**
  * 党员端：我的（我的成绩记录 / 年度评价报告 / 消息通知 / 审批指南 / 关于井大大先锋）。
@@ -559,10 +558,9 @@ function ApprovalGuide() {
           label: (
             <span className="party-guide-title">
               <span>{template.name}</span>
-              <Tag color={getBusinessTypeColor(template.business_type)}>
-                {getBusinessTypeLabel(template.business_type, t)}
+              <Tag>
+                {t('approvalTemplate.fieldOrganization')}：<OrganizationName id={template.organization_id} />
               </Tag>
-              <Tag color="geekblue">{template.code}</Tag>
             </span>
           ),
           children: (

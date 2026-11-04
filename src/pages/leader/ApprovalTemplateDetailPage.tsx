@@ -33,7 +33,6 @@ import {
   Input,
   Popconfirm,
   Row,
-  Select,
   Skeleton,
   Space,
   Switch,
@@ -56,17 +55,14 @@ import type { ApprovalStep, ApprovalTemplateDetail } from '../../api/types/appro
 import ApprovalTemplateStepModal, {
   type ApprovalTemplateStepMode,
 } from '../../components/ApprovalTemplateStepModal'
+import { PARTY_TEMPLATE_BUSINESS_TYPE } from '../../config/partyDeclaration'
 import ErrorState from '../../components/ErrorState'
+import OrganizationName from '../../components/OrganizationName'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
-  APPROVAL_BUSINESS_TYPE_CUSTOM_MAX_LENGTH,
-  APPROVAL_BUSINESS_TYPE_OPTIONS,
-  APPROVAL_BUSINESS_TYPE_OTHER,
   APPROVAL_POSITION_FETCH_SIZE,
   APPROVAL_TEMPLATE_DESC_MAX_LENGTH,
   APPROVAL_TEMPLATE_NAME_MAX_LENGTH,
-  getBusinessTypeColor,
-  getBusinessTypeLabel,
 } from '../../config/approvalTemplate'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
@@ -81,8 +77,6 @@ interface StepModalState {
 /** 指标信息卡片内联编辑表单值 */
 interface TemplateInfoFormValues {
   name: string
-  business_type: string
-  business_type_custom?: string
   enabled: boolean
   description?: string
 }
@@ -108,7 +102,6 @@ export default function ApprovalTemplateDetailPage() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [infoForm] = Form.useForm<TemplateInfoFormValues>()
-  const businessTypeValue = Form.useWatch('business_type', infoForm)
   const [stepModal, setStepModal] = useState<StepModalState | null>(null)
   const [deletingStepId, setDeletingStepId] = useState<number | null>(null)
 
@@ -196,16 +189,11 @@ export default function ApprovalTemplateDetailPage() {
     }
   }, [portalKey, fromModuleKey, navigate])
 
-  /** 进入指标信息卡片内联编辑：回填当前详情（自定义业务类型回填到「其他」输入框） */
+  /** 进入指标信息卡片内联编辑：回填当前详情 */
   const startEdit = useCallback(() => {
     if (!detail) return
-    const knownBusinessType = APPROVAL_BUSINESS_TYPE_OPTIONS.includes(detail.business_type)
     infoForm.setFieldsValue({
       name: detail.name,
-      business_type: knownBusinessType
-        ? detail.business_type
-        : APPROVAL_BUSINESS_TYPE_OTHER,
-      business_type_custom: knownBusinessType ? undefined : detail.business_type || undefined,
       enabled: Boolean(detail.enabled),
       description: detail.description ?? undefined,
     })
@@ -223,15 +211,10 @@ export default function ApprovalTemplateDetailPage() {
     if (!detail) return
     try {
       const values = await infoForm.validateFields()
-      const businessType =
-        values.business_type === APPROVAL_BUSINESS_TYPE_OTHER
-          ? values.business_type_custom?.trim()
-          : values.business_type
-
       setSaving(true)
       await updateApprovalTemplate(detail.id, {
         name: values.name.trim(),
-        business_type: businessType,
+        business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
         enabled: values.enabled,
         description: values.description?.trim() ? values.description.trim() : null,
       })
@@ -414,12 +397,12 @@ export default function ApprovalTemplateDetailPage() {
                   className="approval-template-info-form"
                 >
                   <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item label={t('approvalTemplate.fieldCode')}>
-                        <Input value={detail.code} disabled />
+                    <Col span={24}>
+                      <Form.Item label={t('approvalTemplate.fieldOrganization')}>
+                        <OrganizationName id={detail.organization_id} />
                       </Form.Item>
                     </Col>
-                    <Col span={12}>
+                    <Col span={24}>
                       <Form.Item
                         name="name"
                         label={t('approvalTemplate.fieldName')}
@@ -437,32 +420,6 @@ export default function ApprovalTemplateDetailPage() {
                   <Row gutter={16}>
                     <Col span={12}>
                       <Form.Item
-                        name="business_type"
-                        label={t('approvalTemplate.fieldBusinessType')}
-                        rules={[
-                          {
-                            required: true,
-                            message: t('approvalTemplate.businessTypeRequired'),
-                          },
-                        ]}
-                      >
-                        <Select
-                          placeholder={t('approvalTemplate.fieldBusinessTypePlaceholder')}
-                          options={[
-                            ...APPROVAL_BUSINESS_TYPE_OPTIONS.map((type) => ({
-                              value: type,
-                              label: t(`approvalTemplate.business_${type}`),
-                            })),
-                            {
-                              value: APPROVAL_BUSINESS_TYPE_OTHER,
-                              label: t('approvalTemplate.business_other'),
-                            },
-                          ]}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
                         name="enabled"
                         label={t('approvalTemplate.fieldEnabled')}
                         valuePropName="checked"
@@ -474,23 +431,6 @@ export default function ApprovalTemplateDetailPage() {
                       </Form.Item>
                     </Col>
                   </Row>
-                  {businessTypeValue === APPROVAL_BUSINESS_TYPE_OTHER && (
-                    <Form.Item
-                      name="business_type_custom"
-                      label={t('approvalTemplate.fieldBusinessType')}
-                      rules={[
-                        {
-                          required: true,
-                          message: t('approvalTemplate.businessTypeCustomRequired'),
-                        },
-                      ]}
-                    >
-                      <Input
-                        maxLength={APPROVAL_BUSINESS_TYPE_CUSTOM_MAX_LENGTH}
-                        placeholder={t('approvalTemplate.fieldBusinessTypeCustomPlaceholder')}
-                      />
-                    </Form.Item>
-                  )}
                   <Form.Item
                     name="description"
                     label={t('approvalTemplate.fieldDescription')}
@@ -506,16 +446,11 @@ export default function ApprovalTemplateDetailPage() {
               ) : (
                 <>
                   <Descriptions column={1} bordered size="small">
-                    <Descriptions.Item label={t('approvalTemplate.fieldCode')}>
-                      {detail.code}
+                    <Descriptions.Item label={t('approvalTemplate.fieldOrganization')}>
+                      <OrganizationName id={detail.organization_id} />
                     </Descriptions.Item>
                     <Descriptions.Item label={t('approvalTemplate.fieldName')}>
                       {detail.name}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={t('approvalTemplate.fieldBusinessType')}>
-                      <Tag color={getBusinessTypeColor(detail.business_type)}>
-                        {getBusinessTypeLabel(detail.business_type, t)}
-                      </Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label={t('approvalTemplate.fieldEnabled')}>
                       <Tag color={detail.enabled ? 'success' : 'default'}>

@@ -109,7 +109,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     getMyRoles()
       .then((roles) => {
         if (cancelled) return
-        // 按角色解析可访问门户：党员端始终可选，支部端 / 学院端 / 学校端仅对应书记角色可见
+        // 按角色及上下级关系解析门户，上级角色同时获得下级门户选项
         setIsSuperAdmin(roles.some(isSuperAdminRole))
         setPortalKeys(getAccessiblePortalKeys(roles))
       })

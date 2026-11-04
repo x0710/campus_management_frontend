@@ -11,7 +11,7 @@
  * 说明：后端 business_type 筛选仅支持单值，无法承载代码要求 18 的「类型多选」，
  * 因此本页一次性取回（page_size = APPROVAL_TEMPLATE_FETCH_SIZE）后在前端完成多选筛选与分页；
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
- * 交互：工具栏可按业务类型多选、启用状态筛选；点击表格任意一行或「详情」按钮进入独立详情页
+ * 交互：工具栏可按名称、启用状态筛选；点击表格任意一行或「详情」按钮进入独立详情页
  * （/portal/:portalKey/approval-templates/:id?from=<moduleKey>），不再弹窗；新增仍使用弹窗。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -25,13 +25,11 @@ import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import { extractErrorReason } from '../../api/common'
 import ApprovalTemplateFormModal from '../../components/ApprovalTemplateFormModal'
 import ErrorState from '../../components/ErrorState'
+import OrganizationName from '../../components/OrganizationName'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
-  APPROVAL_BUSINESS_TYPE_OPTIONS,
   APPROVAL_TEMPLATE_FETCH_SIZE,
   APPROVAL_TEMPLATE_PAGE_SIZE,
-  getBusinessTypeColor,
-  getBusinessTypeLabel,
 } from '../../config/approvalTemplate'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
@@ -55,7 +53,6 @@ export default function ApprovalTemplateManageView() {
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
-  const [businessTypes, setBusinessTypes] = useState<string[]>([])
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all')
   // 列表重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
   const [reload, setReload] = useState<{ seq: number; force: boolean }>({
@@ -104,26 +101,14 @@ export default function ApprovalTemplateManageView() {
     void load()
   }, [load])
 
-  /** 业务类型多选筛选项：固定选项 + 列表中出现的自定义类型 */
-  const businessOptions = useMemo(() => {
-    const extra = allRows
-      .map((row) => row.business_type)
-      .filter((v) => v && !APPROVAL_BUSINESS_TYPE_OPTIONS.includes(v))
-    return Array.from(new Set([...APPROVAL_BUSINESS_TYPE_OPTIONS, ...extra]))
-  }, [allRows])
-
-  /** 前端筛选：关键词 + 业务类型多选 + 启用状态（代码要求 18） */
+  /** 前端筛选：关键词 + 启用状态（代码要求 18） */
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
     return allRows.filter((row) => {
       if (
         kw &&
-        !String(row.code).toLowerCase().includes(kw) &&
         !row.name.toLowerCase().includes(kw)
       ) {
-        return false
-      }
-      if (businessTypes.length > 0 && !businessTypes.includes(row.business_type)) {
         return false
       }
       const enabled = row.enabled
@@ -131,7 +116,7 @@ export default function ApprovalTemplateManageView() {
       if (enabledFilter === 'off' && enabled) return false
       return true
     })
-  }, [allRows, keyword, businessTypes, enabledFilter])
+  }, [allRows, keyword, enabledFilter])
 
   /** 前端分页切片（代码要求 12：每页最多 20 行） */
   const totalPages = Math.max(1, Math.ceil(filtered.length / APPROVAL_TEMPLATE_PAGE_SIZE))
@@ -164,27 +149,15 @@ export default function ApprovalTemplateManageView() {
   const columns = useMemo<ColumnsType<ApprovalTemplate>>(
     () => [
       {
-        title: t('approvalTemplate.colCode'),
-        dataIndex: 'code',
-        key: 'code',
-        width: 160,
-        render: (code: string) => <Tag color="geekblue">{code}</Tag>,
-      },
-      {
         title: t('approvalTemplate.colName'),
         dataIndex: 'name',
         key: 'name',
       },
       {
-        title: t('approvalTemplate.colBusinessType'),
-        dataIndex: 'business_type',
-        key: 'business_type',
-        width: 130,
-        render: (type: string) => (
-          <Tooltip title={getBusinessTypeLabel(type, t)}>
-            <Tag color={getBusinessTypeColor(type)}>{getBusinessTypeLabel(type, t)}</Tag>
-          </Tooltip>
-        ),
+        title: t('approvalTemplate.fieldOrganization'),
+        dataIndex: 'organization_id',
+        key: 'organization_id',
+        render: (id: number) => <OrganizationName id={id} />,
       },
       {
         title: t('approvalTemplate.colEnabled'),
@@ -262,22 +235,6 @@ export default function ApprovalTemplateManageView() {
               onSearch={(v: string) => {
                 setPage(1)
                 setKeyword(v)
-              }}
-            />
-            <Select<string[]>
-              mode="multiple"
-              allowClear
-              maxTagCount="responsive"
-              style={{ width: 220 }}
-              value={businessTypes}
-              placeholder={t('approvalTemplate.filterBusinessPlaceholder')}
-              options={businessOptions.map((type) => ({
-                value: type,
-                label: getBusinessTypeLabel(type, t),
-              }))}
-              onChange={(v: string[]) => {
-                setPage(1)
-                setBusinessTypes(v)
               }}
             />
             <Select<EnabledFilter>

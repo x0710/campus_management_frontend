@@ -10,9 +10,11 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App'
 import './index.css'
+import { useClearButtonTabOrder } from './hooks/useClearButtonTabOrder'
 import { useSettingsStore } from './store/settings'
 
 function RootProviders() {
+  useClearButtonTabOrder()
   const locale = useSettingsStore((s) => s.locale)  // 语言切换
   const themeMode = useSettingsStore((s) => s.theme)  // 主题切换
   const dark = themeMode === 'dark'

@@ -8,7 +8,7 @@
  *          （POST/PATCH/DELETE /api/approvals/templates/{template_id}/steps[/{step_id}]）；
  *          若传入 onEdit，弹窗底部提供「编辑」按钮，可在同一弹窗内切换到编辑模式。
  * 保存成功后回调 onSaved，由调用方刷新模板列表（代码要求 13）。
- * 学院端新增固定使用 party；其他场景业务类型为「固定选项 + 其他自定义输入」：选「其他」时展开输入框，提交时上送自定义值。
+ * 指标业务类型固定为 party，新增与编辑不提供类型选择。
  */
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
@@ -49,15 +49,9 @@ import ApprovalTemplateStepModal, {
   type ApprovalTemplateStepMode,
 } from './ApprovalTemplateStepModal'
 import {
-  APPROVAL_BUSINESS_TYPE_CUSTOM_MAX_LENGTH,
-  APPROVAL_BUSINESS_TYPE_OPTIONS,
-  APPROVAL_BUSINESS_TYPE_OTHER,
   APPROVAL_POSITION_FETCH_SIZE,
-  APPROVAL_TEMPLATE_CODE_MAX_LENGTH,
   APPROVAL_TEMPLATE_DESC_MAX_LENGTH,
   APPROVAL_TEMPLATE_NAME_MAX_LENGTH,
-  getBusinessTypeColor,
-  getBusinessTypeLabel,
 } from '../config/approvalTemplate'
 import {
   ACADEMY_ANCESTOR_DEPTHS,
@@ -69,6 +63,7 @@ import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
 import ErrorState from './ErrorState'
+import OrganizationName from './OrganizationName'
 
 /** 弹窗模式：新增 / 编辑 / 只读查看 */
 export type ApprovalTemplateFormMode = 'create' | 'edit' | 'view'
@@ -83,13 +78,10 @@ const PORTAL_ORG_DEPTHS: Partial<Record<string, readonly number[]>> = {
   branch: BRANCH_ANCESTOR_DEPTHS,
 }
 
-/** 模板表单字段（business_type_custom 仅在选中「其他」时使用） */
+/** 模板表单字段 */
 interface TemplateFormValues {
   organization_id?: number
-  code?: string
   name: string
-  business_type: string
-  business_type_custom?: string
   enabled: boolean
   description?: string
 }
@@ -147,10 +139,6 @@ export default function ApprovalTemplateFormModal({
 
   const readOnly = mode === 'view'
   const isEdit = mode === 'edit'
-  const fixedPartyType = portalKey === 'academy' && mode === 'create'
-  // 业务类型选择值：选「其他」时展开自定义输入
-  const businessTypeValue = Form.useWatch('business_type', form)
-
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
   const reportError = useErrorFeedback()
 
@@ -163,12 +151,8 @@ export default function ApprovalTemplateFormModal({
         const data = await getApprovalTemplateDetail(templateId, force)
         if (cancelledRef?.cancelled) return
         setDetail(data)
-        const isKnownType = APPROVAL_BUSINESS_TYPE_OPTIONS.includes(data.business_type)
         form.setFieldsValue({
-          code: data.code,
           name: data.name,
-          business_type: isKnownType ? data.business_type : APPROVAL_BUSINESS_TYPE_OTHER,
-          business_type_custom: isKnownType ? undefined : (data.business_type ?? undefined),
           // 后端响应 enabled 为 i8（0/1）数字，表单 Switch 需布尔值，故此处显式转换，
           // 否则回填后原样提交会给后端 `Option<bool>` 字段送去整数导致 400
           enabled: Boolean(data.enabled),
@@ -298,15 +282,10 @@ export default function ApprovalTemplateFormModal({
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const businessType = fixedPartyType
-        ? PARTY_TEMPLATE_BUSINESS_TYPE
-        : values.business_type === APPROVAL_BUSINESS_TYPE_OTHER
-          ? (values.business_type_custom ?? '').trim()
-          : values.business_type
       if (isEdit && templateId !== undefined) {
         await updateApprovalTemplate(templateId, {
           name: values.name.trim(),
-          business_type: businessType,
+          business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
           enabled: values.enabled,
           description: values.description?.trim() || null,
         })
@@ -315,9 +294,12 @@ export default function ApprovalTemplateFormModal({
         await createApprovalTemplate({
           // 后端创建接口要求必传所属组织 ID（该校验由表单必填规则保证）
           organization_id: values.organization_id as number,
-          code: (values.code ?? '').trim(),
+          // 使用 128 位随机值生成全局唯一编码，兼容非 HTTPS 内网环境。
+          code: `approval_${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+            byte.toString(16).padStart(2, '0'),
+          ).join('')}`,
           name: values.name.trim(),
-          business_type: businessType,
+          business_type: PARTY_TEMPLATE_BUSINESS_TYPE,
           enabled: values.enabled,
           description: values.description?.trim() || null,
         })
@@ -471,18 +453,11 @@ export default function ApprovalTemplateFormModal({
           detail && (
             <div>
               <Descriptions column={2} bordered size="small">
-                <Descriptions.Item label={t('approvalTemplate.fieldCode')} span={2}>
-                  {detail.code || <Typography.Text type="secondary">—</Typography.Text>}
+                <Descriptions.Item label={t('approvalTemplate.fieldOrganization')} span={2}>
+                  <OrganizationName id={detail.organization_id} />
                 </Descriptions.Item>
                 <Descriptions.Item label={t('approvalTemplate.fieldName')} span={2}>
                   {detail.name}
-                </Descriptions.Item>
-                <Descriptions.Item label={t('approvalTemplate.fieldBusinessType')}>
-                  <Tooltip title={getBusinessTypeLabel(detail.business_type, t)}>
-                    <Tag color={getBusinessTypeColor(detail.business_type)}>
-                      {getBusinessTypeLabel(detail.business_type, t)}
-                    </Tag>
-                  </Tooltip>
                 </Descriptions.Item>
                 <Descriptions.Item label={t('approvalTemplate.fieldEnabled')}>
                   <Tag color={detail.enabled ? 'green' : 'default'}>
@@ -555,23 +530,13 @@ export default function ApprovalTemplateFormModal({
                 />
               </Form.Item>
             )}
-            {/* 编码与名称并排，压缩上半部分高度，给下方「加分细则」留出更多空间 */}
+            {isEdit && detail && (
+              <Form.Item label={t('approvalTemplate.fieldOrganization')}>
+                <OrganizationName id={detail.organization_id} />
+              </Form.Item>
+            )}
             <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="code"
-                  label={t('approvalTemplate.fieldCode')}
-                  rules={[{ required: true, message: t('approvalTemplate.codeRequired') }]}
-                  extra={isEdit ? t('approvalTemplate.fieldCodeImmutableHint') : undefined}
-                >
-                  <Input
-                    maxLength={APPROVAL_TEMPLATE_CODE_MAX_LENGTH}
-                    disabled={isEdit}
-                    placeholder={t('approvalTemplate.fieldCodePlaceholder')}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
+              <Col span={24}>
                 <Form.Item
                   name="name"
                   label={t('approvalTemplate.fieldName')}
@@ -584,31 +549,8 @@ export default function ApprovalTemplateFormModal({
                 </Form.Item>
               </Col>
             </Row>
-            {/* 业务类型与启用状态并排 */}
+            {/* 启用状态 */}
             <Row gutter={16}>
-              {!fixedPartyType && <Col span={12}>
-                <Form.Item
-                  name="business_type"
-                  label={t('approvalTemplate.fieldBusinessType')}
-                  rules={[
-                    { required: true, message: t('approvalTemplate.businessTypeRequired') },
-                  ]}
-                >
-                  <Select
-                    placeholder={t('approvalTemplate.fieldBusinessTypePlaceholder')}
-                    options={[
-                      ...APPROVAL_BUSINESS_TYPE_OPTIONS.map((type) => ({
-                        value: type,
-                        label: t(`approvalTemplate.business_${type}`),
-                      })),
-                      {
-                        value: APPROVAL_BUSINESS_TYPE_OTHER,
-                        label: t('approvalTemplate.business_other'),
-                      },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>}
               <Col span={12}>
                 <Form.Item
                   name="enabled"
@@ -623,27 +565,6 @@ export default function ApprovalTemplateFormModal({
                 </Form.Item>
               </Col>
             </Row>
-            {!fixedPartyType && businessTypeValue === APPROVAL_BUSINESS_TYPE_OTHER && (
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="business_type_custom"
-                    label={t('approvalTemplate.fieldBusinessType')}
-                    rules={[
-                      {
-                        required: true,
-                        message: t('approvalTemplate.businessTypeCustomRequired'),
-                      },
-                    ]}
-                  >
-                    <Input
-                      maxLength={APPROVAL_BUSINESS_TYPE_CUSTOM_MAX_LENGTH}
-                      placeholder={t('approvalTemplate.fieldBusinessTypeCustomPlaceholder')}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-            )}
             <Form.Item
               name="description"
               label={t('approvalTemplate.fieldDescription')}

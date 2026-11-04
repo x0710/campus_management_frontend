@@ -423,8 +423,8 @@ export function resolveDefaultPortalKey(roles: PortalRole[]): PortalKey {
 /**
  * 根据角色获取当前用户可访问的全部门户：
  *   党员端：全部登录用户；
- *   党委支部端：仅支部书记（branch_secretary）；
- *   党委学院端：仅党委委员（secretary）；
+ *   党委支部端：支部书记及学院、学校上级角色；
+ *   党委学院端：党委委员及学校上级角色；
  *   党委学校端：仅校级党委（PARTY_SCH）；
  *   其余门户（管理端）仍按原有角色 code 映射；学生端 / 教师端 / 领导端已停用，不会返回。
  * 返回顺序为党员端 / 支部端 / 学院端 / 学校端在前，其余按 PORTALS 定义顺序。
@@ -433,9 +433,11 @@ export function resolveDefaultPortalKey(roles: PortalRole[]): PortalKey {
  */
 export function getAccessiblePortalKeys(roles: PortalRole[]): PortalKey[] {
   const allowed = new Set<PortalKey>([PARTY_PORTAL_KEY, ...getPortalKeysByRoleCodes(roles.map((role) => role.code))])
-  if (roles.some(isBranchSecretary)) allowed.add(BRANCH_PORTAL_KEY)
-  if (roles.some(isAcademySecretary)) allowed.add(ACADEMY_PORTAL_KEY)
-  if (roles.some(isSchoolSecretary)) allowed.add(SCHOOL_PORTAL_KEY)
+  const school = roles.some(isSchoolSecretary)
+  const academy = school || roles.some(isAcademySecretary)
+  if (academy || roles.some(isBranchSecretary)) allowed.add(BRANCH_PORTAL_KEY)
+  if (academy) allowed.add(ACADEMY_PORTAL_KEY)
+  if (school) allowed.add(SCHOOL_PORTAL_KEY)
 
   const partyKeys = [PARTY_PORTAL_KEY, BRANCH_PORTAL_KEY, ACADEMY_PORTAL_KEY, SCHOOL_PORTAL_KEY].filter(
     (key) => allowed.has(key),

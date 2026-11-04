@@ -74,6 +74,7 @@ export function getBusinessTypeLabel(
   t: TranslateFn,
 ): string {
   if (!type) return t('approvalTemplate.businessUnknown')
+  if (type === 'party') return t('approvalTemplate.business_other')
   return APPROVAL_BUSINESS_TYPE_OPTIONS.includes(type)
     ? t(`approvalTemplate.business_${type}`)
     : type
