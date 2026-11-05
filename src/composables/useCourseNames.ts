@@ -19,7 +19,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { getCourse } from '../api/courses'
 import type { CourseDetail } from '../api/types/courses'
 
-/** 批量解析课程详情：Map<courseId, CourseDetail | null> */
+/**
+ * 批量解析课程详情：Map<courseId, CourseDetail | null>
+ * @param ids 类型：number[]；默认值：无；是否必填：必填
+ * @returns 类型：Map<number, CourseDetail | null>
+ */
 export function useCourseDetails(ids: number[]): Map<number, CourseDetail | null> {
   const [details, setDetails] = useState<Map<number, CourseDetail | null>>(new Map())
 
@@ -63,7 +67,11 @@ export function useCourseDetails(ids: number[]): Map<number, CourseDetail | null
   return details
 }
 
-/** 批量解析课程名称：Map<courseId, course_name | null>（内部复用 useCourseDetails） */
+/**
+ * 批量解析课程名称：Map<courseId, course_name | null>（内部复用 useCourseDetails）
+ * @param ids 类型：number[]；默认值：无；是否必填：必填
+ * @returns 类型：Map<number, string | null>
+ */
 export function useCourseNames(ids: number[]): Map<number, string | null> {
   const details = useCourseDetails(ids)
 

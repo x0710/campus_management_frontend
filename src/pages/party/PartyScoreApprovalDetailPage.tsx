@@ -110,6 +110,7 @@ function toActionMode(action: ApprovalAction | null): ActionMode {
 /**
  * 路由入口：以审批步骤 ID 作为 key，切换步骤时强制重建页面，
  * 避免上一页的加载结果、操作表单与预选动作残留（无需再用 effect 手动清空 state）。
+ * @returns 类型：Element
  */
 export default function PartyScoreApprovalDetailPage() {
   const { stepId } = useParams<{ stepId: string }>()

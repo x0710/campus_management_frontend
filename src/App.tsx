@@ -8,6 +8,7 @@
 import { lazy } from 'react'
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import ForcePasswordChangeModal from './components/ForcePasswordChangeModal'
+import { BULK_ADD_MEMBERS_ROUTE } from './config/bulkMembers'
 import LoginPage from './pages/LoginPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalRedirect from './pages/main/PortalRedirect'
@@ -27,6 +28,7 @@ const ApprovalTemplateDetailPage = lazy(
   () => import('./pages/leader/ApprovalTemplateDetailPage'),
 )
 const MemberDetailPage = lazy(() => import('./pages/leader/MemberDetailPage'))
+const BulkAddMembersView = lazy(() => import('./pages/admin/BulkAddMembersView'))
 
 
 /**
@@ -44,6 +46,9 @@ function RequireAuth() {
   return <Outlet key={token} />
 }
 
+/** App 组件。
+ * @returns 类型：Element
+ */
 export default function App() {
   return (
     <>
@@ -96,6 +101,9 @@ export default function App() {
           {/* 成员详情：领导端组织概览/老师端班级管理/党委各端支部管理/管理端组织架构/
               学校端组织管理点击成员进入，沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route path="organization-members/:uid" element={<MemberDetailPage />} />
+          {/* 批量添加新成员：组织成员管理左侧组织树「新建组织」旁按钮进入，
+              页内同时查看组织 / 身份 / 系统角色三张对照表与样表（?from=<moduleKey>） */}
+          <Route path={BULK_ADD_MEMBERS_ROUTE} element={<BulkAddMembersView />} />
         </Route>
 
       {/* 未匹配的已登录地址统一回到角色解析页 */}

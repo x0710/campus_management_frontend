@@ -1,3 +1,5 @@
+/** 审批步骤表单弹窗（新增 / 编辑审批模板下的步骤）。 */
+
 import { usePositionLabel } from '../composables/usePositionLabel'
 /**
  * 审批步骤表单弹窗（可复用组件）：新增 / 编辑审批模板下的一个步骤。
@@ -50,6 +52,10 @@ interface ApprovalTemplateStepModalProps {
   onSaved: () => void
 }
 
+/** ApprovalTemplateStepModal 组件。
+ * @param { open, mode, templateId, step, positionOptions, positionsLoading, onCancel, onSaved, } 类型：ApprovalTemplateStepModalProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function ApprovalTemplateStepModal({
   open,
   mode,

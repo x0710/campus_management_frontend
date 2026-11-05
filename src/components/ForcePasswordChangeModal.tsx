@@ -24,6 +24,9 @@ interface ForcePasswordForm {
   confirm_password: string
 }
 
+/** ForcePasswordChangeModal 组件。
+ * @returns 类型：Element
+ */
 export default function ForcePasswordChangeModal() {
   const t = useT()
   const { message } = AntdApp.useApp()

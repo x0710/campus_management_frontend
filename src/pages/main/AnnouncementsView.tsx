@@ -35,7 +35,9 @@ import {
   getAnnouncementDisplayStatus,
   type AnnouncementDisplayStatus,
 } from '../../config/announcement'
+import { DEFAULT_TABLE_PAGE_SIZE } from '../../config/table'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useSettingsStore } from '../../store/settings'
 import ErrorState from '../../components/ErrorState'
 import { formatDateTime } from '../../utils/datetime'
@@ -44,13 +46,14 @@ import { useErrorFeedback } from '../../composables/useErrorFeedback'
 
 const { Text } = Typography
 
-/** 前端分页默认每页条数（代码要求 12：表格每页最多 100 行） */
-const DEFAULT_PAGE_SIZE = 100
-
 /** 表头多选筛选项（value 为字符串，onFilter 时还原类型） */
 type TypeFilterValue = AnnouncementType
 type PriorityFilterValue = AnnouncementPriority
 
+/** AnnouncementsView 组件。
+ * @param { manage = false } 类型：{ manage?: boolean }；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function AnnouncementsView({ manage = false }: { manage?: boolean }) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -100,7 +103,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   const [priorityFilter, setPriorityFilter] = useState<FilterValue | null>(null)
   const [statusFilter, setStatusFilter] = useState<FilterValue | null>(null)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [pageSize, setPageSize] = useState(DEFAULT_TABLE_PAGE_SIZE)
 
   const load = useCallback(
     async (force?: boolean) => {
@@ -342,7 +345,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
       pageSize,
       showSizeChanger: true,
       showQuickJumper: true,
-      showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+      showTotal: (n: number) => formatPaginationTotal(t, n, pageSize),
     }),
     [page, pageSize, t],
   )

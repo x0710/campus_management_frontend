@@ -93,6 +93,7 @@ import {
 } from '../../config/organization'
 import { PARTY_PROBATIONARY_STATUS_NAME } from '../../config/partyProfile'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useUiStateStore } from '../../store/uiState'
 import { formatPartyScoreTotalDecimal } from '../../utils/partyScore'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
@@ -219,7 +220,10 @@ subscribeCacheInvalidation(() => {
   childStatsCache.clear()
 })
 
-/** 党委学校端：组织概览（组织树 + 下级组织统计表） */
+/**
+ * 党委学校端：组织概览（组织树 + 下级组织统计表）
+ * @returns 类型：Element
+ */
 export default function SchoolOrgOverviewView() {
   const t = useT()
   const { message } = AntdApp.useApp()
@@ -892,7 +896,7 @@ export default function SchoolOrgOverviewView() {
                 total: rows.length,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_TABLE_PAGE_SIZE),
               }}
             />
           )}

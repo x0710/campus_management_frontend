@@ -36,6 +36,7 @@ import {
 } from '../../config/announcement'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
@@ -44,7 +45,10 @@ interface PublishListQuery extends PageQuery {
   status?: AnnouncementStatus
 }
 
-/** 领导端：我发布的通知（列表 + 新建/编辑跳转 + 详情 + 删除） */
+/**
+ * 领导端：我发布的通知（列表 + 新建/编辑跳转 + 详情 + 删除）
+ * @returns 类型：Element
+ */
 export default function PublishAnnouncementView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -267,7 +271,7 @@ export default function PublishAnnouncementView() {
               total,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+              showTotal: (n: number) => formatPaginationTotal(t, n, pageSize),
               onChange: (nextPage: number, nextSize: number) => {
                 if (nextSize !== pageSize) setPageSize(nextSize)
                 else setPage(nextPage)

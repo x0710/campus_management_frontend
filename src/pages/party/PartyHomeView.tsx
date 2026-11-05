@@ -44,6 +44,9 @@ function formatRecordDate(value: string): string {
 /** 顶部组织链路：仅包含组织 2 的子组织，按「当前组织 → 上级组织」排列。 */
 type PartyOrgChain = string[]
 
+/** PartyHomeView 组件。
+ * @returns 类型：Element
+ */
 export default function PartyHomeView() {
   const t = useT()
   const navigate = useNavigate()

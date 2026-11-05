@@ -49,6 +49,7 @@ import {
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 
 type PositionFormValues = {
   usage_scope: PositionUsageScope
@@ -58,6 +59,9 @@ type PositionFormValues = {
   description?: string
 }
 
+/** PositionsAdminView 组件。
+ * @returns 类型：Element
+ */
 export default function PositionsAdminView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -338,7 +342,7 @@ export default function PositionsAdminView() {
                 total,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, POSITION_PAGE_SIZE),
                 onChange: (p: number) => setPage(p),
               }}
               />

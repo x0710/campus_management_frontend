@@ -1,3 +1,5 @@
+/** 成员详情 - 基本信息面板。 */
+
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { usePositionLabel } from '../../../composables/usePositionLabel'
 import { BankOutlined, EditOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
@@ -61,6 +63,8 @@ const { Text } = Typography
  * 基本信息面板：用户资料 + 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载）。
  * 支部端 / 学院端来源不展示「系统角色」「组织任职」两张卡片（showRoleOrgCards=false），
  * 此时跳过角色请求，组织任职仍加载以供「党员信息」卡片使用。
+ * @param props 类型：{ user: UserDetail | null loading: boolean genderLabel: string locale: 'zh' | 'en' t: TranslateFn 是否展示编辑入口（管理端 / 党委学校端等来源为 true） canEdit: boolean 是否展示「党员信息」卡片（支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） showPar；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function BasicInfoPanel({
   user,

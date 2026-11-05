@@ -1,3 +1,5 @@
+/** GET 请求会话缓存实现：稳定键、TTL、并发合并与失效。 */
+
 export interface CachedGetOptions {
   force?: boolean
   maxAgeMs?: number
@@ -15,7 +17,13 @@ function canonical(value: unknown): unknown {
   return value
 }
 
-/** 结构化编码，避免参数中的 &、=、逗号及嵌套对象造成键冲突。 */
+/**
+ * 结构化编码，避免参数中的 &、=、逗号及嵌套对象造成键冲突。
+ * @param method 类型：'GET'；默认值：无；是否必填：必填
+ * @param url 类型：string；默认值：无；是否必填：必填
+ * @param params 类型：Params；默认值：无；是否必填：可选
+ * @returns 类型：string
+ */
 export function makeCacheKey(method: 'GET', url: string, params?: Params): string {
   const query = params && Object.keys(params).length ? JSON.stringify(canonical(params)) : ''
   return `${method} ${url}${query ? `?${encodeURIComponent(query)}` : ''}`

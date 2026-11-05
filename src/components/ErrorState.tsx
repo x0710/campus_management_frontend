@@ -31,7 +31,11 @@ interface ErrorStateProps {
   className?: string
 }
 
-/** 统一错误提示：错误 Alert（含图标）+ 可选恢复按钮 */
+/**
+ * 统一错误提示：错误 Alert（含图标）+ 可选恢复按钮
+ * @param { message, description, onRetry, retryText, style, className, } 类型：ErrorStateProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function ErrorState({
   message,
   description,

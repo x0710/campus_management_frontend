@@ -16,7 +16,10 @@ import type { OrganizationInfo } from '../../api/types/organizations'
 import OrgMembersExplorer from '../../components/OrgMembersExplorer'
 import { useT } from '../../i18n'
 
-/** 领导端：组织概览（全部组织，点击成员进入详情页） */
+/**
+ * 领导端：组织概览（全部组织，点击成员进入详情页）
+ * @returns 类型：Element
+ */
 export default function LeaderOrgView() {
   const t = useT()
 

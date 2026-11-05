@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/auth'
 /**
  * 门户解析组件。
  * 无入参；根据当前用户角色跳转到对应门户；失败时回到登录页并携带失败原因。
+ * @returns 类型：Element
  */
 export default function PortalRedirect() {
   const t = useT()

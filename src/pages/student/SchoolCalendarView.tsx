@@ -9,6 +9,9 @@ import CalendarBoard from '../../components/CalendarBoard'
 import { useCalendarEvents } from '../../composables/useCalendarEvents'
 import { useT } from '../../i18n'
 
+/** SchoolCalendarView 组件。
+ * @returns 类型：Element
+ */
 export default function SchoolCalendarView() {
   const t = useT()
   const { message } = AntdApp.useApp()

@@ -3,21 +3,8 @@
  * 分页相关类型已统一收敛到 types/common.ts，本文件只保留错误处理工具函数。
  */
 import axios from 'axios'
+import { HTTP_STATUS_REASON_KEYS } from '../config/http'
 import type { TranslateFn } from '../i18n'
-
-/**
- * HTTP 状态码 → 中文原因说明的 i18n key 映射。
- * 用于报错时用中文写明原因，避免直接把后端英文/数据库原文抛给用户。
- */
-const HTTP_STATUS_REASON_KEYS: Record<number, string> = {
-  400: 'common.errBadRequest',
-  401: 'common.errUnauthorized',
-  403: 'common.errForbidden',
-  404: 'common.errNotFound',
-  409: 'common.errConflict',
-  412: 'common.errPreconditionFailed',
-  500: 'common.errServerError',
-}
 
 /**
  * 从 axios 异常提取「状态码 + 中文原因 + 后端原文」的可展示文案（代码要求 9：错误提示需含 404、500 等状态码）。

@@ -1,3 +1,5 @@
+/** 党员积分扣分按钮与扣分表单弹窗。 */
+
 import { App, Alert, Button, Form, Input, InputNumber, Modal } from 'antd'
 import { useEffect, useState } from 'react'
 import { getCurrentUser } from '../api/auth'
@@ -6,6 +8,10 @@ import { useErrorFeedback } from '../composables/useErrorFeedback'
 import { useT } from '../i18n'
 import { useUserNames } from '../composables/useUserNames'
 
+/** PartyScoreDeductionButton 组件。
+ * @param { userId, onSaved } 类型：{ userId: number onSaved: () => void }；默认值：无；是否必填：必填
+ * @returns 类型：Element | null
+ */
 export default function PartyScoreDeductionButton({ userId, onSaved }: {
   userId: number
   onSaved: () => void

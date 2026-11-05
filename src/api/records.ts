@@ -19,7 +19,12 @@ import type {
   DailyRecordUpdateRequest,
 } from './types/records'
 
-/** GET /api/records 分页查询日常记录（force=true 绕过会话缓存） */
+/**
+ * GET /api/records 分页查询日常记录（force=true 绕过会话缓存）
+ * @param params 类型：DailyRecordQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<DailyRecordInfo>>
+ */
 export function queryRecords(
   params: DailyRecordQuery = {},
   force?: boolean,
@@ -31,19 +36,33 @@ export function queryRecords(
   )
 }
 
-/** GET /api/records/{id} 获取日常记录详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/records/{id} 获取日常记录详情（force=true 绕过会话缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<DailyRecordDetail>
+ */
 export function getRecord(id: number, force?: boolean): Promise<DailyRecordDetail> {
   return cachedGet<DailyRecordDetail>(`/records/${id}`, undefined, { force })
 }
 
-/** POST /api/records 创建日常记录，返回新记录 ID，成功后失效列表缓存 */
+/**
+ * POST /api/records 创建日常记录，返回新记录 ID，成功后失效列表缓存
+ * @param body 类型：DailyRecordCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createRecord(body: DailyRecordCreateRequest): Promise<number> {
   const res = await http.post<number>('/records', body)
   invalidate('GET /records')
   return res.data
 }
 
-/** PATCH /api/records/{id} 部分更新日常记录，成功后失效列表与详情缓存 */
+/**
+ * PATCH /api/records/{id} 部分更新日常记录，成功后失效列表与详情缓存
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：DailyRecordUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateRecord(
   id: number,
   body: DailyRecordUpdateRequest,
@@ -52,7 +71,11 @@ export async function updateRecord(
   invalidate('GET /records')
 }
 
-/** DELETE /api/records/{id} 删除日常记录，成功后失效列表与详情缓存 */
+/**
+ * DELETE /api/records/{id} 删除日常记录，成功后失效列表与详情缓存
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteRecord(id: number): Promise<void> {
   await http.delete(`/records/${id}`)
   invalidate('GET /records')

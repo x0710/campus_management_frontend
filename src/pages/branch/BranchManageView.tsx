@@ -76,7 +76,11 @@ interface BranchManageViewProps {
   ancestorDepths: readonly number[]
 }
 
-/** 支部端 / 党委学院端：支部管理（目标组织及其下级组织成员查看） */
+/**
+ * 支部端 / 党委学院端：支部管理（目标组织及其下级组织成员查看）
+ * @param { fromModuleKey, ancestorDepths, } 类型：BranchManageViewProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function BranchManageView({
   fromModuleKey,
   ancestorDepths,

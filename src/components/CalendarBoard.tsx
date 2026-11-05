@@ -66,6 +66,10 @@ interface CalendarBoardProps {
   renderEventActions?: (event: CalendarEventDetail) => ReactNode
 }
 
+/** CalendarBoard 组件。
+ * @param { title, value, onValueChange, typeFilter, onTypeFilterChange, eventsByDay, dayDetails, dayDetailsLoading, loading, error, onRefresh, toolbarExtra, renderEventActions, } 类型：CalendarBoardProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function CalendarBoard({
   title,
   value,

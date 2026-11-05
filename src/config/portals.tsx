@@ -234,6 +234,11 @@ export const PORTALS: PortalDef[] = [
   },
 ]
 
+/**
+ * getPortal 的参数与返回值说明。
+ * @param key 类型：string | undefined；默认值：无；是否必填：必填
+ * @returns 类型：PortalDef | undefined
+ */
 export function getPortal(key: string | undefined): PortalDef | undefined {
   return PORTALS.find((p) => p.key === key)
 }
@@ -346,6 +351,16 @@ export const PORTAL_PROFILE_MODULE_KEYS: Partial<Record<PortalKey, string>> = {
   [BRANCH_PORTAL_KEY]: 'branch_m4',
   [ACADEMY_PORTAL_KEY]: 'academy_m4',
   [SCHOOL_PORTAL_KEY]: 'school_m4',
+}
+
+/**
+ * 是否为超级管理员角色：仅按后端角色 code 精确判定（大小写不敏感），
+ * 不再依赖中文角色名，避免改名后门户切换入口与权限校验失效（代码要求 16）。
+ * @param role 角色信息（必填）
+ * @returns true 表示该角色为超级管理员
+ */
+export function isSuperAdminRole(role: PortalRole): boolean {
+  return role.code.trim().toLowerCase() === 'super_admin'
 }
 
 /**

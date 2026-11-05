@@ -27,7 +27,11 @@ import { getPartyScoreOrganizationAverage } from '../../api/partyScores'
 import ErrorState from '../../components/ErrorState'
 import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { countOrgMembersByPositionNames } from '../../composables/useOrgPositionMemberCounts'
-import { SCHOOL_COLLEGE_PARENT_ORG_ID } from '../../config/organization'
+import {
+  ORG_BRANCH_NAME_KEYWORD,
+  ORG_GENERAL_BRANCH_NAME_SUFFIX,
+  SCHOOL_COLLEGE_PARENT_ORG_ID,
+} from '../../config/organization'
 import {
   PARTY_FULL_MEMBER_STATUS_NAME,
   PARTY_PROBATIONARY_STATUS_NAME,
@@ -108,12 +112,15 @@ async function fetchOverviewStats(): Promise<OverviewStats> {
   ).length
 
   // 党总支个数：所有以「总支」结尾的组织（含机关党委、附属医院党委等各条线的下级）
-  const generalBranchCount = organizations.filter((org) => org.name.trim().endsWith('总支'))
-    .length
+  const generalBranchCount = organizations.filter((org) =>
+    org.name.trim().endsWith(ORG_GENERAL_BRANCH_NAME_SUFFIX),
+  ).length
 
   // 党支部个数：名称包含「支部」的组织（与后端按关键词「支部」检索的口径一致，
   // 因此「XX党支部委员会」等名称中带「支部」但不以「支部」结尾的组织也会计入）
-  const branchCount = organizations.filter((org) => org.name.includes('支部')).length
+  const branchCount = organizations.filter((org) =>
+    org.name.includes(ORG_BRANCH_NAME_KEYWORD),
+  ).length
 
   return {
     orgMembers: memberTotal,
@@ -142,6 +149,9 @@ function loadOverviewStats(): Promise<OverviewStats> {
   return request
 }
 
+/** SchoolOverviewView 组件。
+ * @returns 类型：Element
+ */
 export default function SchoolOverviewView() {
   const t = useT()
 

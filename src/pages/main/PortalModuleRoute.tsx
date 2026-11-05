@@ -9,7 +9,14 @@ import { ApiOutlined, AppstoreAddOutlined, LockOutlined } from '@ant-design/icon
 import { Navigate, useParams } from 'react-router'
 import { lazy, type ComponentType } from 'react'
 import { Tag } from 'antd'
-import { getPortal, type PortalKey, type PortalModule } from '../../config/portals'
+import {
+  DEFAULT_PORTAL_KEY,
+  getPortal,
+  type PortalKey,
+  type PortalModule,
+} from '../../config/portals'
+import PageLoading from '../../components/PageLoading'
+import { usePortalAccess } from '../../hooks/usePortalAccess'
 import {
   ACADEMY_ANCESTOR_DEPTHS,
   ACADEMY_BRANCH_MODULE_KEY,
@@ -67,6 +74,7 @@ const SchoolOrgAdminView = () => (
     rootOrgId={SCHOOL_COLLEGE_PARENT_ORG_ID}
     partyScoreColumns
     showResetPassword
+    showBulkAdd
   />
 )
 
@@ -150,15 +158,26 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'admin:admin_m5': PositionsAdminView,
 }
 
+/** PortalModuleRoute 组件。
+ * @returns 类型：Element
+ */
 export default function PortalModuleRoute() {
   const { portalKey, moduleKey } = useParams<{
     portalKey: string
     moduleKey?: string
   }>()
   const portal = getPortal(portalKey)
+  // 模块入口同样做角色校验，与 PortalWorkspace 形成双重兜底
+  const portalAccess = usePortalAccess(portal?.key)
 
   if (!portal) {
     return <Navigate to="/" replace />
+  }
+  if (portalAccess === null) {
+    return <PageLoading />
+  }
+  if (!portalAccess) {
+    return <Navigate to={`/portal/${DEFAULT_PORTAL_KEY}`} replace />
   }
 
   const readyModules = portal.modules.filter((m) => m.status === 'ready')

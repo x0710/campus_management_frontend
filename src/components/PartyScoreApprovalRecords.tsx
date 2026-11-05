@@ -45,6 +45,7 @@ const DECISION_TAG_COLOR: Record<ApprovalRecordItem['decision'], string> = {
 /**
  * 审批意见流转列表。
  * @param props instanceId 为审批实例 ID；force 为是否强制刷新（默认 false）
+ * @returns 类型：Element
  */
 export default function PartyScoreApprovalRecords({
   instanceId,

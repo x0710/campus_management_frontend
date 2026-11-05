@@ -1,3 +1,5 @@
+/** 成员详情 - 奖励页签：奖励记录增删改。 */
+
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
@@ -27,6 +29,7 @@ import {
   REWARDING_PROJECT_MAX_LENGTH,
 } from '../../../config/rewarding'
 import { type TranslateFn } from '../../../i18n'
+import { formatPaginationTotal } from '../../../utils/pagination'
 import { formatDateTime } from '../../../utils/datetime'
 import { formatCentsAsYuan, yuanToCents } from '../../../utils/money'
 import ErrorState from '../../../components/ErrorState'
@@ -41,6 +44,8 @@ interface RewardingFormValues {
  * 奖学金及补助 Tab：分页展示该成员的奖学金/补助记录，点击行查看详情。
  * 非只读来源（管理端 / 党委学校端）支持新增、编辑（金额以元输入、提交转分）与删除；
  * readOnly=true（如老师端班级管理进入）时隐藏以上入口，仅作查询。
+ * @param { uid, t, locale, readOnly, } 类型：{ uid: number t: TranslateFn locale: 'zh' | 'en' readOnly: boolean }；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function RewardingTab({
   uid,
@@ -281,7 +286,7 @@ export default function RewardingTab({
             total,
             showSizeChanger: false,
             showQuickJumper: true,
-            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_DETAIL_PAGE_SIZE),
             onChange: (p: number) => setPage(p),
           }}
         />

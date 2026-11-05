@@ -86,6 +86,7 @@ async function fetchPartyScoreMap(
 /**
  * 党建活动加分审核页。
  * 支部端、党委学院端的「审核管理」共用本组件。
+ * @returns 类型：Element
  */
 export default function PartyScoreApprovalView() {
   const t = useT()

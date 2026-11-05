@@ -1,3 +1,5 @@
+/** 登录态 store：token、用户信息与代登录 / 登出清理。 */
+
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 

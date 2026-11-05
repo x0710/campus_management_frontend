@@ -1,3 +1,5 @@
+/** 管理员端 - 用户编辑面板：基础信息、组织任职与角色维护。 */
+
 import {
   App as AntdApp,
   Button,
@@ -59,7 +61,11 @@ interface Props {
   section?: EditSection
 }
 
-/** 编辑用户：资料修改（PATCH /users/{id}）、角色分配（POST /rbac/users/{uid}）、组织任职管理 */
+/**
+ * 编辑用户：资料修改（PATCH /users/{id}）、角色分配（POST /rbac/users/{uid}）、组织任职管理
+ * @param { uid, roles, organizations, onChanged, section, } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function UserEditPanel({
   uid,
   roles,

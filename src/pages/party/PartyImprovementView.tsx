@@ -1,3 +1,5 @@
+/** 党员端 - 整改提升页（当前为模拟数据预览）。 */
+
 import { FileTextOutlined, FlagOutlined, UploadOutlined } from '@ant-design/icons'
 import { Alert, App as AntdApp, Button } from 'antd'
 import { useT } from '../../i18n'
@@ -14,6 +16,9 @@ const MOCK_HISTORY: { id: string; year: string }[] = [
   { id: 'h2', year: '2025' },
 ]
 
+/** PartyImprovementView 组件。
+ * @returns 类型：Element
+ */
 export default function PartyImprovementView() {
   const t = useT()
   const { message } = AntdApp.useApp()

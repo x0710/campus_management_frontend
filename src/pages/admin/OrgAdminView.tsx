@@ -1,3 +1,5 @@
+/** 管理员端 - 组织管理：组织树维护与成员增删改查。 */
+
 import {
   CloseOutlined,
   DeleteOutlined,
@@ -7,6 +9,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  TeamOutlined,
   UserAddOutlined,
 } from '@ant-design/icons'
 import {
@@ -67,7 +70,9 @@ import { usePositionLabel } from '../../composables/usePositionLabel'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { ORG_SEARCH_DEBOUNCE_MS } from '../../config/organization'
+import { BULK_ADD_MEMBERS_ROUTE } from '../../config/bulkMembers'
 import { useUiStateStore } from '../../store/uiState'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../../utils/partyScore'
@@ -108,6 +113,11 @@ interface OrgAdminViewProps {
    * 仅党委学校端「组织管理」开启。
    */
   showResetPassword?: boolean
+  /**
+   * 左侧组织树「新建组织」旁展示「批量添加新成员」按钮，点击进入填报辅助页
+   * （组织 / 身份 / 系统角色对照表 + 样表说明）。仅党委学校端开启。
+   */
+  showBulkAdd?: boolean
 }
 
 /**
@@ -207,12 +217,15 @@ function MemberSearchInput({
  * 党委学校端复用本页时开启 partyScoreColumns（先锋等级列）与 showResetPassword（重置密码操作）。
  * 成员列表按 user_id 合并：同一成员在同一组织有多个职位时只展示一行（职位栏并列展示全部职位），
  * 「所属组织」标签按组织去重；移除成员时会一并删除该成员在该组织的全部职位记录。
+ * @param { uiKey = 'admin_m3', rootOrgId, partyScoreColumns = false, showResetPassword = false, showBulkAdd = false, } 类型：OrgAdminViewProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function OrgAdminView({
   uiKey = 'admin_m3',
   rootOrgId,
   partyScoreColumns = false,
   showResetPassword = false,
+  showBulkAdd = false,
 }: OrgAdminViewProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
@@ -910,7 +923,7 @@ export default function OrgAdminView({
       <section className="panel-card org-tree-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminOrg.treeTitle')}</h3>
-          <div className="approval-toolbar">
+          <div className="approval-toolbar org-tree-toolbar">
             <Button
               size="small"
               icon={<PlusOutlined />}
@@ -918,6 +931,20 @@ export default function OrgAdminView({
             >
               {t('adminOrg.newOrg')}
             </Button>
+            {/* 批量添加新成员：进入填报辅助页（组织 / 身份 / 系统角色对照表 + 样表说明） */}
+            {showBulkAdd && (
+              <Tooltip title={t('adminOrg.bulkAddHint')}>
+                <Button
+                  size="small"
+                  icon={<TeamOutlined />}
+                  onClick={() =>
+                    navigate(`/portal/${portalKey}/${BULK_ADD_MEMBERS_ROUTE}?from=${uiKey}`)
+                  }
+                >
+                  {t('adminOrg.bulkAddMembers')}
+                </Button>
+              </Tooltip>
+            )}
             <Tooltip title={t('common.refresh')}>
               <Button size="small" icon={<ReloadOutlined />} onClick={() => void loadOrgs(true)} />
             </Tooltip>
@@ -1142,8 +1169,7 @@ export default function OrgAdminView({
                   total: displayTotal,
                   showSizeChanger: false,
                   showQuickJumper: true,
-                  showTotal: (n: number) =>
-                    `${t('common.total')} ${n} ${t('common.items')}`,
+                  showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_PAGE_SIZE),
                 }}
               />
             </>

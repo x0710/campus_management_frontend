@@ -17,7 +17,12 @@ import type {
   WorkplaceUpdateRequest,
 } from './types/organizations'
 
-/** GET /api/organizations 分页查询组织（会话内缓存；force=true 手动刷新绕过缓存） */
+/**
+ * GET /api/organizations 分页查询组织（会话内缓存；force=true 手动刷新绕过缓存）
+ * @param params 类型：OrganizationQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<OrganizationInfo>>
+ */
 export async function queryOrganizations(
   params: OrganizationQuery = {},
   force?: boolean,
@@ -39,7 +44,11 @@ export function getOrganization(id: number, force?: boolean): Promise<Organizati
   return cachedGet<OrganizationInfo>(`/organizations/${id}`, undefined, { force })
 }
 
-/** 拉取全部组织（分页接口循环取完），供组织树使用；force=true 整体绕过缓存 */
+/**
+ * 拉取全部组织（分页接口循环取完），供组织树使用；force=true 整体绕过缓存
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<OrganizationInfo[]>
+ */
 export async function listAllOrganizations(force?: boolean): Promise<OrganizationInfo[]> {
   const pageSize = 100
   const all: OrganizationInfo[] = []
@@ -51,7 +60,11 @@ export async function listAllOrganizations(force?: boolean): Promise<Organizatio
   return all
 }
 
-/** POST /api/organizations 新建组织 */
+/**
+ * POST /api/organizations 新建组织
+ * @param body 类型：{ code: string name: string parent_id?: number | null }；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createOrganization(body: {
   code: string
   name: string
@@ -62,7 +75,12 @@ export async function createOrganization(body: {
   return res.data
 }
 
-/** PATCH /api/organizations/{id} 更新组织 */
+/**
+ * PATCH /api/organizations/{id} 更新组织
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：{ code?: string; name?: string; parent_id?: number | null }；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateOrganization(
   id: number,
   body: { code?: string; name?: string; parent_id?: number | null },
@@ -72,7 +90,11 @@ export async function updateOrganization(
   invalidate(`GET /organizations/${id}/subsidiaries`)
 }
 
-/** DELETE /api/organizations/{id} 删除组织 */
+/**
+ * DELETE /api/organizations/{id} 删除组织
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteOrganization(id: number): Promise<void> {
   await http.delete(`/organizations/${id}`)
   invalidate('GET /organizations')
@@ -82,6 +104,10 @@ export async function deleteOrganization(id: number): Promise<void> {
 /**
  * GET /api/organizations/{id}/members 分页查询成员（权限 organization.member.read，会话内缓存）。
  * force=true 可绕过缓存（手动刷新）；添加/移除成员时该组织的成员缓存会自动失效。
+ * @param orgId 类型：number；默认值：无；是否必填：必填
+ * @param params 类型：OrganizationMemberQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<OrganizationMember>>
  */
 export async function queryOrgMembers(
   orgId: number,
@@ -143,7 +169,12 @@ export async function countOrganizationMembers(
   return item?.member_count ?? 0
 }
 
-/** POST /api/organizations/{id}/members 添加成员，返回新成员记录 */
+/**
+ * POST /api/organizations/{id}/members 添加成员，返回新成员记录
+ * @param orgId 类型：number；默认值：无；是否必填：必填
+ * @param member 类型：OrganizationMemberInput；默认值：无；是否必填：必填
+ * @returns 类型：Promise<OrganizationMember>
+ */
 export async function addOrgMember(
   orgId: number,
   member: OrganizationMemberInput,
@@ -154,14 +185,23 @@ export async function addOrgMember(
   return res.data
 }
 
-/** DELETE /api/organizations/{id}/members/{member_id} 按成员记录 id 移除成员 */
+/**
+ * DELETE /api/organizations/{id}/members/{member_id} 按成员记录 id 移除成员
+ * @param orgId 类型：number；默认值：无；是否必填：必填
+ * @param memberId 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function removeOrgMember(orgId: number, memberId: number): Promise<void> {
   await http.delete(`/organizations/${orgId}/members/${memberId}`)
   invalidate(`GET /organizations/${orgId}/members`)
   invalidate('GET /organization-members')
 }
 
-/** GET /api/organizations/{id}/subsidiaries 直接下级组织（会话内缓存） */
+/**
+ * GET /api/organizations/{id}/subsidiaries 直接下级组织（会话内缓存）
+ * @param orgId 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<OrganizationInfo[]>
+ */
 export async function listSubsidiaries(orgId: number): Promise<OrganizationInfo[]> {
   return cachedGet<OrganizationInfo[]>(`/organizations/${orgId}/subsidiaries`)
 }
@@ -170,6 +210,8 @@ export async function listSubsidiaries(orgId: number): Promise<OrganizationInfo[
  * GET /api/organizations/{id}/tree 组织树链路（会话内缓存）。
  * 返回「根组织 → 该组织」的完整链路，链上最后一项的 level 为 0、越靠根越大，
  * 因此链路深度（上级组织数量）= 链条数 - 1 = 根节点的 level，用于判定该组织是否为支部。
+ * @param orgId 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<OrganizationTreeNode[]>
  */
 export async function getOrganizationTree(orgId: number): Promise<OrganizationTreeNode[]> {
   return cachedGet<OrganizationTreeNode[]>(`/organizations/${orgId}/tree`)
@@ -204,7 +246,12 @@ export function listUserOrganizations(uid: number, force?: boolean): Promise<Use
   return listUserOrganizationsBatch([uid], force)
 }
 
-/** 修改任职工作地点；本人仅需登录，他人需 organization.member.update 及相应数据范围。 */
+/**
+ * 修改任职工作地点；本人仅需登录，他人需 organization.member.update 及相应数据范围。
+ * @param memberId 类型：number；默认值：无；是否必填：必填
+ * @param workplace 类型：string | null；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateMemberWorkplace(
   memberId: number,
   workplace: string | null,

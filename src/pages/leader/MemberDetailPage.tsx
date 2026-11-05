@@ -33,7 +33,10 @@ import { normalizeGender } from '../../utils/gender'
 import ErrorState from '../../components/ErrorState'
 import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
 
-/** 共享成员详情页：6 个 Tab 汇总成员基本信息、详细信息、成绩、请假、违规与奖助信息 */
+/**
+ * 共享成员详情页：6 个 Tab 汇总成员基本信息、详细信息、成绩、请假、违规与奖助信息
+ * @returns 类型：Element
+ */
 export default function MemberDetailPage() {
   const { uid, portalKey } = useParams()
   const [params] = useSearchParams()

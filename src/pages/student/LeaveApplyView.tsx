@@ -43,6 +43,7 @@ import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { LEAVE_CONFLICT_CHECK_DEBOUNCE_MS } from '../../config/leave'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
@@ -67,7 +68,10 @@ interface LeaveFormValues {
 /** 详情弹窗内正在执行的操作（用于按钮 loading 与禁用） */
 type DetailAction = 'cancel' | 'delete' | null
 
-/** 学生端：请假申请表单 + 本人请假记录（POST /api/leaves，GET /api/leaves） */
+/**
+ * 学生端：请假申请表单 + 本人请假记录（POST /api/leaves，GET /api/leaves）
+ * @returns 类型：Element
+ */
 export default function LeaveApplyView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -378,7 +382,7 @@ export default function LeaveApplyView() {
                 total,
                 showSizeChanger: true,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, pageSize),
                 onChange: (nextPage: number, nextSize: number) => {
                   if (nextSize !== pageSize) setPageSize(nextSize)
                   else setPage(nextPage)

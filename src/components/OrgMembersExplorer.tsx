@@ -1,3 +1,5 @@
+/** 组织成员浏览器：组织树 + 成员表，支持搜索、翻页与进入成员详情。 */
+
 import { useRequestSequence } from '../composables/useRequestSequence'
 import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
 /**
@@ -57,6 +59,7 @@ import { usePositionLabel } from '../composables/usePositionLabel'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
+import { formatPaginationTotal } from '../utils/pagination'
 import { useAuthStore } from '../store/auth'
 import { useUiStateStore } from '../store/uiState'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../utils/partyScore'
@@ -123,6 +126,10 @@ interface OrgMembersExplorerProps {
   focusOrgId?: number | null
 }
 
+/** OrgMembersExplorer 组件。
+ * @param { orgs, orgsLoading, orgsError, onReloadOrgs, fromModuleKey, memberPageSize = LEADER_ORG_MEMBER_PAGE_SIZE, autoSelectFirst = false, autoSelectFirstWithMembers = false, showOrgTree = true, partyScoreColumns = false, focusOrgId = null, } 类型：OrgMembersExplorerProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function OrgMembersExplorer({
   orgs,
   orgsLoading,
@@ -888,7 +895,7 @@ export default function OrgMembersExplorer({
                 total: displayTotal,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, memberPageSize),
               }}
             />
           )}

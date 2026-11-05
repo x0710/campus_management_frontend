@@ -41,6 +41,20 @@ export const SCHOOL_COLLEGE_PARENT_ORG_ID = 2
 /** 党委学校端「组织成员管理」模块 key（组织概览的「查看详细」跳转目标） */
 export const SCHOOL_ORG_ADMIN_MODULE_KEY = 'school_m2'
 
+/**
+ * 党总支层级判定后缀。
+ *
+ * 后端组织接口未返回「组织类型」字段，只能按名称后缀识别层级；
+ * 关键字统一收敛到 config，避免页面内散落硬编码中文（代码要求 7 / 16）。
+ */
+export const ORG_GENERAL_BRANCH_NAME_SUFFIX = '总支'
+
+/**
+ * 党支部层级判定关键词（与后端按关键词「支部」检索的口径一致，
+ * 因此「XX党支部委员会」这类名称中包含「支部」的组织也会计入）。
+ */
+export const ORG_BRANCH_NAME_KEYWORD = '支部'
+
 /** 党委学校端「组织概览」区域（内嵌在总览页）的会话状态 key，记忆选中组织与树展开态 */
 export const SCHOOL_ORG_OVERVIEW_UI_KEY = 'school_org_overview'
 

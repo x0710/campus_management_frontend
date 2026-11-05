@@ -1,3 +1,5 @@
+/** 党员端 - 党员档案页。 */
+
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import { usePositionFormatter, usePositionLabel } from '../../composables/usePositionLabel'
 import { BellOutlined, EditOutlined, UserOutlined } from '@ant-design/icons'
@@ -820,6 +822,9 @@ function NotificationsList() {
   )
 }
 
+/** PartyProfileView 组件。
+ * @returns 类型：Element
+ */
 export default function PartyProfileView() {
   const t = useT()
 

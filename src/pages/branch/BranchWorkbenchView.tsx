@@ -103,6 +103,9 @@ async function buildGradeDistribution(orgId: number): Promise<GradeDistributionI
   }))
 }
 
+/** BranchWorkbenchView 组件。
+ * @returns 类型：Element
+ */
 export default function BranchWorkbenchView() {
   const t = useT()
   const { portalKey } = useParams<{ portalKey: string }>()

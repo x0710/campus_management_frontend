@@ -16,12 +16,20 @@ import type {
   UserInfo,
 } from './types/auth'
 
-/** 用户名密码登录，成功后返回 JWT 与用户信息（POST /api/login） */
+/**
+ * 用户名密码登录，成功后返回 JWT 与用户信息（POST /api/login）
+ * @param data 类型：LoginRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<LoginResponse>
+ */
 export function login(data: LoginRequest) {
   return http.post<LoginResponse>('/login', data).then((res) => res.data)
 }
 
-/** 仅超级管理员可签发目标用户令牌，不更新目标账户登录时间。 */
+/**
+ * 仅超级管理员可签发目标用户令牌，不更新目标账户登录时间。
+ * @param uid 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<LoginResponse>
+ */
 export function impersonateUser(uid: number) {
   return http.post<LoginResponse>(`/credentials/${uid}/impersonate`).then((res) => res.data)
 }
@@ -30,6 +38,7 @@ export function impersonateUser(uid: number) {
  * GET /api/credentials 分页查询账户认证信息（权限 credential.read，会话内缓存）。
  * @param params 分页与用户名/状态筛选参数
  * @param force 是否绕过会话缓存（手动刷新）
+ * @returns 类型：Promise<PaginatedResponse<UserInfo>>
  */
 export function queryCredentials(
   params: CredentialQuery = {},
@@ -42,7 +51,10 @@ export function queryCredentials(
   )
 }
 
-/** 拉取当前登录用户信息（会话内缓存一次） */
+/**
+ * 拉取当前登录用户信息（会话内缓存一次）
+ * @returns 类型：Promise<UserInfo>
+ */
 export function getCurrentUser() {
   return cachedGet<UserInfo>('/credentials/me')
 }
@@ -76,6 +88,7 @@ export async function getMyRoles(force?: boolean): Promise<UserRoleInfo[]> {
  * @param uid 当前登录用户 ID（必填，取自 getCurrentUser().uid）
  * @param oldPassword 旧密码（必填，用于后端校验）
  * @param newPassword 新密码（必填）
+ * @returns 类型：Promise<void>
  */
 export async function changeMyPassword(
   uid: number,

@@ -32,6 +32,7 @@ interface PartyScoreDetailModalProps {
 /**
  * 党建加分申请详情弹窗。
  * @param props 组件 props，详见 PartyScoreDetailModalProps
+ * @returns 类型：Element
  */
 export default function PartyScoreDetailModal({
   record,

@@ -46,6 +46,9 @@ interface BranchRankingItem {
   score: number | null
 }
 
+/** AcademyWorkbenchView 组件。
+ * @returns 类型：Element
+ */
 export default function AcademyWorkbenchView() {
   const t = useT()
   const navigate = useNavigate()

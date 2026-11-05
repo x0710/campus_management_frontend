@@ -210,6 +210,9 @@ function ScoreDetailTable({
   )
 }
 
+/** StudentScoresView 组件。
+ * @returns 类型：Element
+ */
 export default function StudentScoresView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

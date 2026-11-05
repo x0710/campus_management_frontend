@@ -1,7 +1,13 @@
+/** 按组织 ID 展示组织名称的组件。 */
+
 import { useEffect, useState } from 'react'
 import { getOrganization } from '../api/organizations'
 
-/** 按 ID 显示组织名称，相同组织的并发查询由接口缓存合并。 */
+/**
+ * 按 ID 显示组织名称，相同组织的并发查询由接口缓存合并。
+ * @param { id } 类型：{ id: number }；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function OrganizationName({ id }: { id: number }) {
   const [organization, setOrganization] = useState<{ id: number; name: string } | null>(null)
 

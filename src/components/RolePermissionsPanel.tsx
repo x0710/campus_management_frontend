@@ -47,6 +47,7 @@ import {
   RBAC_PERM_SEARCH_DEBOUNCE_MS,
 } from '../config/rbac'
 import { useT } from '../i18n'
+import { formatPaginationTotal } from '../utils/pagination'
 import ErrorState from './ErrorState'
 
 import { parseRoleDataScopes, serializeRoleDataScopes, type ScopeConfig } from '../utils/roleDataScopes'
@@ -104,6 +105,10 @@ function scopeSignature(map: Record<string, ScopeConfig>, resources: string[]): 
     .join('|')
 }
 
+/** RolePermissionsPanel 组件。
+ * @param { role, onCancel, onSaved, } 类型：RolePermissionsPanelProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function RolePermissionsPanel({
   role,
   onCancel,
@@ -129,6 +134,9 @@ export default function RolePermissionsPanel({
   /** 搜索框即时输入值与防抖后的关键词 */
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
+
+  /** 权限表格当前页码（代码要求 12：支持分页并展示总页数） */
+  const [permPage, setPermPage] = useState(1)
 
   /** 「已分配权限」区域是否收起（默认展开，收起后仅保留标题与数量） */
   const [assignedCollapsed, setAssignedCollapsed] = useState(false)
@@ -177,10 +185,10 @@ export default function RolePermissionsPanel({
 
   // 输入停顿后再生效关键词：避免每敲一个字符就重算整张表
   useEffect(() => {
-    const timer = setTimeout(
-      () => setKeyword(searchInput.trim().toLowerCase()),
-      RBAC_PERM_SEARCH_DEBOUNCE_MS,
-    )
+    const timer = setTimeout(() => {
+      setKeyword(searchInput.trim().toLowerCase())
+      setPermPage(1)
+    }, RBAC_PERM_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [searchInput])
 
@@ -427,7 +435,16 @@ export default function RolePermissionsPanel({
                   columns={columns}
                   dataSource={visiblePerms}
                   locale={{ emptyText: t('common.noData') }}
-                  pagination={false}
+                  pagination={{
+                    current: permPage,
+                    pageSize: RBAC_PERMISSION_PAGE_SIZE,
+                    total: visiblePerms.length,
+                    showSizeChanger: false,
+                    showQuickJumper: true,
+                    showTotal: (n: number) =>
+                      formatPaginationTotal(t, n, RBAC_PERMISSION_PAGE_SIZE),
+                    onChange: (p: number) => setPermPage(p),
+                  }}
                   rowSelection={{
                     selectedRowKeys: selected,
                     // 搜索过滤会改变 dataSource，开启后已选但被过滤掉的行不会被 antd 丢弃，

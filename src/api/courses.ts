@@ -23,7 +23,12 @@ import type {
   CourseUpdateRequest,
 } from './types/courses'
 
-/** GET /api/courses 分页查询课程（force=true 绕过会话缓存） */
+/**
+ * GET /api/courses 分页查询课程（force=true 绕过会话缓存）
+ * @param params 类型：CourseQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<CourseInfo>>
+ */
 export function queryCourses(params: CourseQuery = {}, force?: boolean) {
   return cachedGet<PaginatedResponse<CourseInfo>>(
     '/courses',
@@ -32,19 +37,33 @@ export function queryCourses(params: CourseQuery = {}, force?: boolean) {
   )
 }
 
-/** GET /api/courses/{id} 获取课程详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/courses/{id} 获取课程详情（force=true 绕过会话缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<CourseDetail>
+ */
 export function getCourse(id: number, force?: boolean) {
   return cachedGet<CourseDetail>(`/courses/${id}`, undefined, { force })
 }
 
-/** POST /api/courses 创建课程，返回新课程 ID */
+/**
+ * POST /api/courses 创建课程，返回新课程 ID
+ * @param body 类型：CourseCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createCourse(body: CourseCreateRequest): Promise<number> {
   const res = await http.post<number>('/courses', body)
   invalidate('GET /courses')
   return res.data
 }
 
-/** PATCH /api/courses/{id} 更新课程 */
+/**
+ * PATCH /api/courses/{id} 更新课程
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：CourseUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateCourse(
   id: number,
   body: CourseUpdateRequest,
@@ -53,7 +72,11 @@ export async function updateCourse(
   invalidate('GET /courses')
 }
 
-/** DELETE /api/courses/{id} 删除课程 */
+/**
+ * DELETE /api/courses/{id} 删除课程
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteCourse(id: number): Promise<void> {
   await http.delete(`/courses/${id}`)
   invalidate('GET /courses')

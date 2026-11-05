@@ -1,3 +1,5 @@
+/** 成员详情 - 党员积分页签：积分明细、汇总与扣分。 */
+
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import PartyScoreDeductionButton from '../../../components/PartyScoreDeductionButton'
 import PartyScoreDeductionInfo from '../../../components/PartyScoreDeductionInfo'
@@ -20,6 +22,7 @@ import { useErrorFeedback } from '../../../composables/useErrorFeedback'
 import { MEMBER_DETAIL_PAGE_SIZE } from '../../../config/leaderOrg'
 import { PARTY_SCORE_BASE } from '../../../config/partyDeclaration'
 import { type TranslateFn } from '../../../i18n'
+import { formatPaginationTotal } from '../../../utils/pagination'
 import { formatDateTime } from '../../../utils/datetime'
 import { formatPartyScore, isNegativePartyScore } from '../../../utils/partyScore'
 import ErrorState from '../../../components/ErrorState'
@@ -31,6 +34,8 @@ const { Text } = Typography
  * 顶部展示「基础分 70 + 党建活动加分 = 获得加分总数」；
  * 下方分页列出该成员的全部加分申请（GET /api/party-scores?user_id=成员），
  * 点击行通过 GET /api/party-scores/{id} 查看详情（含附件下载地址，代码要求 14）。
+ * @param { uid, t, locale, } 类型：{ uid: number t: TranslateFn locale: 'zh' | 'en' }；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function PartyScoreTab({
   uid,
@@ -258,7 +263,7 @@ export default function PartyScoreTab({
             total,
             showSizeChanger: false,
             showQuickJumper: true,
-            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_DETAIL_PAGE_SIZE),
             onChange: (p: number) => setPage(p),
           }}
         />

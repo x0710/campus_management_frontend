@@ -45,6 +45,11 @@ interface OrgStudentsState {
   error: string | null
 }
 
+/**
+ * useOrgStudents 的参数与返回值说明。
+ * @param uid 类型：number | null；默认值：无；是否必填：必填
+ * @returns 类型：{ refresh: () => void; orgs: TeacherOrg[]; students: OrgStudent[]; loading: boolean; error: string | null; }
+ */
 export function useOrgStudents(uid: number | null) {
   const t = useT()
   const [state, setState] = useState<OrgStudentsState>({

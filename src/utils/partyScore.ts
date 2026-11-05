@@ -268,7 +268,11 @@ export function computePartyScoreSummary(records: PartyScore[]): PartyScoreSumma
   }
 }
 
-/** 扣分记录直接生效，不关联审批实例。 */
+/**
+ * 扣分记录直接生效，不关联审批实例。
+ * @param record 类型：Pick<PartyScore, 'approved_score' | 'approval_instance_id'>；默认值：无；是否必填：必填
+ * @returns 类型：boolean
+ */
 export function isPartyScoreDeduction(record: Pick<PartyScore, 'approved_score' | 'approval_instance_id'>): boolean {
   return record.approval_instance_id == null && isNegativePartyScore(record.approved_score)
 }

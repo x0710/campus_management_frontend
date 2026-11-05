@@ -16,7 +16,12 @@ import type {
   CalendarUpdateRequest,
 } from './types/calendars'
 
-/** GET /api/calendars 分页查询校园日历事件（force=true 绕过会话缓存） */
+/**
+ * GET /api/calendars 分页查询校园日历事件（force=true 绕过会话缓存）
+ * @param params 类型：CalendarQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<CalendarEventInfo>>
+ */
 export function queryEvents(params: CalendarQuery = {}, force?: boolean) {
   return cachedGet<PaginatedResponse<CalendarEventInfo>>(
     '/calendars',
@@ -25,7 +30,12 @@ export function queryEvents(params: CalendarQuery = {}, force?: boolean) {
   )
 }
 
-/** GET /api/calendars/{id} 获取指定日历事件详情 */
+/**
+ * GET /api/calendars/{id} 获取指定日历事件详情
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<CalendarEventDetail>
+ */
 export function getEvent(id: number, force?: boolean) {
   return cachedGet<CalendarEventDetail>(`/calendars/${id}`, undefined, { force })
 }
@@ -33,6 +43,8 @@ export function getEvent(id: number, force?: boolean) {
 /**
  * POST /api/calendars 创建日历事件（权限 calendar.create），返回新事件 ID。
  * 创建后失效全部日历缓存（列表区间与详情），保证下次读取拿到最新数据。
+ * @param body 类型：CalendarCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
  */
 export async function createEvent(body: CalendarCreateRequest): Promise<number> {
   const res = await http.post<number>('/calendars', body)
@@ -40,7 +52,12 @@ export async function createEvent(body: CalendarCreateRequest): Promise<number> 
   return res.data
 }
 
-/** PATCH /api/calendars/{id} 更新日历事件（权限 calendar.update） */
+/**
+ * PATCH /api/calendars/{id} 更新日历事件（权限 calendar.update）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：CalendarUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateEvent(
   id: number,
   body: CalendarUpdateRequest,
@@ -49,7 +66,11 @@ export async function updateEvent(
   invalidate('GET /calendars')
 }
 
-/** DELETE /api/calendars/{id} 删除日历事件（权限 calendar.delete） */
+/**
+ * DELETE /api/calendars/{id} 删除日历事件（权限 calendar.delete）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteEvent(id: number): Promise<void> {
   await http.delete(`/calendars/${id}`)
   invalidate('GET /calendars')
@@ -59,6 +80,9 @@ export async function deleteEvent(id: number): Promise<void> {
  * 拉取指定日期区间内的全部日历事件（分页聚合）。
  * 后端 page_size 上限 100，先取第 1 页拿到 total_pages，其余页并行请求后合并，
  * 使日历看板能一次性拿到整个区间的事件；各页命中缓存时不产生额外网络请求。
+ * @param range 类型：CalendarRangeQuery；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<CalendarEventInfo[]>
  */
 export async function queryEventsInRange(
   range: CalendarRangeQuery,

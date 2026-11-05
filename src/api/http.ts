@@ -1,3 +1,5 @@
+/** 全局 axios 实例与请求/响应拦截器（JWT 鉴权、401 处理、错误透传）。 */
+
 import axios from 'axios'
 import { invalidate } from './cache'
 import { useAuthStore } from '../store/auth'

@@ -22,10 +22,20 @@ import { Suspense, useEffect, useMemo } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import PortalHeader from '../../components/PortalHeader'
 import PageLoading from '../../components/PageLoading'
-import { getPortal, isPortalDisabled, type PortalModule } from '../../config/portals'
+import { BULK_ADD_MEMBERS_ROUTE } from '../../config/bulkMembers'
+import {
+  DEFAULT_PORTAL_KEY,
+  getPortal,
+  isPortalDisabled,
+  type PortalModule,
+} from '../../config/portals'
+import { usePortalAccess } from '../../hooks/usePortalAccess'
 import { PartyTerminologyContext, useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 
+/** PortalWorkspace 组件。
+ * @returns 类型：Element
+ */
 export default function PortalWorkspace() {
   const { portalKey } = useParams<{ portalKey: string }>()
   const partyPortal = ['party', 'branch', 'academy', 'school'].includes(portalKey ?? '')
@@ -42,6 +52,8 @@ function PortalWorkspaceContent() {
   const location = useLocation()
   const { portalKey } = useParams<{ portalKey: string }>()
   const portal = getPortal(portalKey)
+  // 角色访问校验：普通用户只能进入角色授权范围内的门户（超管除外）
+  const portalAccess = usePortalAccess(portal?.key)
 
   // 侧栏收起状态：持久化到 settings store（localStorage）
   const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed)
@@ -88,7 +100,8 @@ function PortalWorkspaceContent() {
       third === 'organization-members' ||
       third === 'party-score-approvals' ||
       third === 'party-scores' ||
-      third === 'approval-templates'
+      third === 'approval-templates' ||
+      third === BULK_ADD_MEMBERS_ROUTE
     ) {
       const from = new URLSearchParams(location.search).get('from')
       if (from && [...readyModules, ...previewModules].some((m) => m.key === from)) return from
@@ -180,6 +193,15 @@ function PortalWorkspaceContent() {
   // 直接输入 /portal/<key>/... 也无法进入，代码保留但不再工作
   if (!portal || isPortalDisabled(portal.key)) {
     return <Navigate to="/" replace />
+  }
+
+  // 角色权限校验：角色仍在加载时先展示加载态，未授权门户重定向到默认门户，
+  // 避免普通用户手动输入 /portal/admin/... 直接渲染管理端页面
+  if (portalAccess === null) {
+    return <PageLoading />
+  }
+  if (!portalAccess) {
+    return <Navigate to={`/portal/${DEFAULT_PORTAL_KEY}`} replace />
   }
 
   const name = t(`portal.${portal.key}_name`)

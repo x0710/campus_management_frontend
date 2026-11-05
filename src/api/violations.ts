@@ -21,7 +21,12 @@ import type {
   ViolationUpdateRequest,
 } from './types/violations'
 
-/** GET /api/violations 分页查询违规记录（force=true 绕过会话缓存） */
+/**
+ * GET /api/violations 分页查询违规记录（force=true 绕过会话缓存）
+ * @param params 类型：ViolationQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<ViolationDto>>
+ */
 export function queryViolations(params: ViolationQuery = {}, force?: boolean) {
   return cachedGet<PaginatedResponse<ViolationDto>>(
     '/violations',
@@ -30,7 +35,12 @@ export function queryViolations(params: ViolationQuery = {}, force?: boolean) {
   )
 }
 
-/** GET /api/violations/{id} 获取违规记录详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/violations/{id} 获取违规记录详情（force=true 绕过会话缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<ViolationDto>
+ */
 export function getViolation(id: number, force?: boolean) {
   return cachedGet<ViolationDto>(`/violations/${id}`, undefined, { force })
 }
@@ -46,7 +56,12 @@ export async function createViolation(body: ViolationCreateRequest): Promise<num
   return res.data.id
 }
 
-/** PATCH /api/violations/{id} 部分更新违规记录，成功后失效列表缓存 */
+/**
+ * PATCH /api/violations/{id} 部分更新违规记录，成功后失效列表缓存
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：ViolationUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateViolation(id: number, body: ViolationUpdateRequest): Promise<void> {
   await http.patch(`/violations/${id}`, body)
   invalidate('GET /violations')

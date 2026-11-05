@@ -1,3 +1,5 @@
+/** 界面设置 store：语言、主题与侧栏状态持久化。 */
+
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 

@@ -1,3 +1,5 @@
+/** 公告模块常量：类型 / 状态 / 优先级 / 颜色与展示状态计算。 */
+
 import dayjs from 'dayjs'
 import type {
   AnnouncementListItem,
@@ -76,7 +78,12 @@ export const ANNOUNCEMENT_DISPLAY_STATUS_COLOR: Record<AnnouncementDisplayStatus
   expired: 'default',
 }
 
-/** 计算公告在指定时刻的展示态（now 以毫秒时间戳传入，便于测试与定时刷新） */
+/**
+ * 计算公告在指定时刻的展示态（now 以毫秒时间戳传入，便于测试与定时刷新）
+ * @param item 类型：Pick<AnnouncementListItem, 'expire_time'>；默认值：无；是否必填：必填
+ * @param now 类型：number；默认值：Date.now()；是否必填：可选
+ * @returns 类型：AnnouncementDisplayStatus
+ */
 export function getAnnouncementDisplayStatus(
   item: Pick<AnnouncementListItem, 'expire_time'>,
   now: number = Date.now(),

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { extractErrorReason } from '../api/common'
 import type { PaginatedResponse, PageQuery } from '../api/types/common'
+import { DEFAULT_TABLE_PAGE_SIZE } from '../config/table'
 import { useT } from '../i18n'
 
 interface PaginatedState<T> {
@@ -17,6 +18,9 @@ interface PaginatedState<T> {
  * 通用服务端分页加载：
  * page 从 1 开始（与后端分页接口约定一致），pageSize 变化时回到第 1 页。
  * fetcher 第二参 force=true 表示用户手动刷新，应绕过本地缓存请求最新数据。
+ * @param fetcher 类型：(query: Q, force?: boolean) => Promise<PaginatedResponse<T>>；默认值：无；是否必填：必填
+ * @param initialQuery 类型：Omit<Q, 'page' | 'page_size'>；默认值：无；是否必填：可选
+ * @returns 类型：{ data: T[]; total: number; loading: boolean; error: string | null; page: number; setPage: Dispatch<SetStateAction<number>>; pageSize: number; setPageSize: (size: number) => void; refresh: () => void; reload: () => void; }
  */
 export function usePaginated<T, Q extends PageQuery = PageQuery>(
   fetcher: (query: Q, force?: boolean) => Promise<PaginatedResponse<T>>,
@@ -25,7 +29,7 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
   const t = useT()
   const [page, setPage] = useState(1)
   // 默认每页 100 行（代码要求 12：表格每页最多 100 行）
-  const [pageSize, setPageSizeState] = useState(100)
+  const [pageSize, setPageSizeState] = useState(DEFAULT_TABLE_PAGE_SIZE)
   const [state, setState] = useState<PaginatedState<T>>({
     data: [],
     total: 0,

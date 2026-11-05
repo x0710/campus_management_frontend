@@ -60,7 +60,11 @@ function AttachmentItem({ url, index }: { url: string; index: number }) {
   )
 }
 
-/** 附件列表：图片直接内联展示，其余以链接形式展示 */
+/**
+ * 附件列表：图片直接内联展示，其余以链接形式展示
+ * @param { urls, emptyText } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function AttachmentLinks({ urls, emptyText }: Props) {
   const list = (urls ?? []).filter((url) => url.trim())
 

@@ -1,3 +1,5 @@
+/** 学生端 - 个人信息页。 */
+
 import { usePositionLabel } from '../../composables/usePositionLabel'
 /** 学生端个人信息：汇总用户基本资料、角色、组织任职。所有数据均来自会话级缓存，避免重复请求。 */
 
@@ -42,7 +44,10 @@ interface OrgItem extends UserOrganization {
   positionError?: string
 }
 
-/** 学生端个人信息：汇总用户基本资料、角色、组织任职。所有数据均来自会话级缓存，避免重复请求。 */
+/**
+ * 学生端个人信息：汇总用户基本资料、角色、组织任职。所有数据均来自会话级缓存，避免重复请求。
+ * @returns 类型：Element
+ */
 export default function StudentProfileView() {
   const t = useT()
   const positionLabel = usePositionLabel()

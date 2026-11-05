@@ -19,7 +19,12 @@ import type {
   ProfileDetailUpdateRequest,
 } from './types/profileDetails'
 
-/** GET /api/profile-details 分页查询档案 */
+/**
+ * GET /api/profile-details 分页查询档案
+ * @param params 类型：ProfileDetailQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<ProfileDetail>>
+ */
 export async function queryProfileDetails(
   params: ProfileDetailQuery = {},
   force?: boolean,
@@ -31,12 +36,21 @@ export async function queryProfileDetails(
   )
 }
 
-/** GET /api/profile-details/{id} 获取档案详情（会话内缓存；force=true 绕过缓存） */
+/**
+ * GET /api/profile-details/{id} 获取档案详情（会话内缓存；force=true 绕过缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<ProfileDetail>
+ */
 export function getProfileDetail(id: number, force?: boolean): Promise<ProfileDetail> {
   return cachedGet<ProfileDetail>(`/profile-details/${id}`, undefined, { force })
 }
 
-/** POST /api/profile-details 创建档案，返回创建出的完整档案 */
+/**
+ * POST /api/profile-details 创建档案，返回创建出的完整档案
+ * @param body 类型：ProfileDetailCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<ProfileDetail>
+ */
 export async function createProfileDetail(
   body: ProfileDetailCreateRequest,
 ): Promise<ProfileDetail> {
@@ -45,7 +59,12 @@ export async function createProfileDetail(
   return res.data
 }
 
-/** PATCH /api/profile-details/{id} 部分更新档案 */
+/**
+ * PATCH /api/profile-details/{id} 部分更新档案
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：ProfileDetailUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateProfileDetail(
   id: number,
   body: ProfileDetailUpdateRequest,
@@ -54,7 +73,11 @@ export async function updateProfileDetail(
   invalidate('GET /profile-details')
 }
 
-/** DELETE /api/profile-details/{id} 删除档案 */
+/**
+ * DELETE /api/profile-details/{id} 删除档案
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteProfileDetail(id: number): Promise<void> {
   await http.delete(`/profile-details/${id}`)
   invalidate('GET /profile-details')

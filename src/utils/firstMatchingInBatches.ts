@@ -1,4 +1,11 @@
-/** 限制请求并发，按输入顺序选择首个匹配项；取消后不再发起下一批。 */
+/**
+ * 限制请求并发，按输入顺序选择首个匹配项；取消后不再发起下一批。
+ * @param items 类型：readonly T[]；默认值：无；是否必填：必填
+ * @param matches 类型：(item: T) => Promise<boolean>；默认值：无；是否必填：必填
+ * @param batchSize 类型：number；默认值：4；是否必填：可选
+ * @param cancelled 类型：() => boolean；默认值：() => false；是否必填：可选
+ * @returns 类型：Promise<T | undefined>
+ */
 export async function firstMatchingInBatches<T>(
   items: readonly T[],
   matches: (item: T) => Promise<boolean>,

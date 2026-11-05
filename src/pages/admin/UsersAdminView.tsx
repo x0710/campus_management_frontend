@@ -1,3 +1,5 @@
+/** 管理员端 - 用户管理：搜索、分页、增删改与详情查看。 */
+
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import { useSharedResource } from '../../composables/useSharedResource'
 import { myRolesResource } from '../../store/referenceData'
@@ -54,11 +56,10 @@ import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { usePositionLabel } from '../../composables/usePositionLabel'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { isUidTerm } from '../../utils/personSearch'
 import { normalizeGender } from '../../utils/gender'
-
-/** 用户列表每页条数（代码要求 12：表格每页最多 100 行） */
-const PAGE_SIZE = 100
+import { DEFAULT_TABLE_PAGE_SIZE } from '../../config/table'
 
 interface CreateFormValues {
   username: string
@@ -100,7 +101,10 @@ function UserListSearch({ onSearch }: { onSearch: (value: string) => void }) {
   )
 }
 
-/** 管理端：用户与账户（列表/新建/详细（详情页内编辑）/重置密码/删除） */
+/**
+ * 管理端：用户与账户（列表/新建/详细（详情页内编辑）/重置密码/删除）
+ * @returns 类型：Element
+ */
 export default function UsersAdminView() {
   const t = useT()
   const { message, modal } = AntdApp.useApp()
@@ -211,7 +215,7 @@ export default function UsersAdminView() {
       const res = await queryUsers(
         {
           page,
-          page_size: PAGE_SIZE,
+          page_size: DEFAULT_TABLE_PAGE_SIZE,
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(uidFilter ? { ids: uidFilter } : {}),
           ...(status === 'all' ? {} : { status }),
@@ -674,12 +678,11 @@ export default function UsersAdminView() {
               })}
               pagination={{
                 current: page,
-                pageSize: PAGE_SIZE,
+                pageSize: DEFAULT_TABLE_PAGE_SIZE,
                 total,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) =>
-                  `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, DEFAULT_TABLE_PAGE_SIZE),
                 onChange: (p: number) => setPage(p),
               }}
             />

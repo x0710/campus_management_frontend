@@ -1,3 +1,5 @@
+/** 成员详情 - 成绩页签：成绩查询、录入与编辑。 */
+
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
@@ -26,6 +28,7 @@ import { useErrorFeedback } from '../../../composables/useErrorFeedback'
 import { EXAM_TYPE_COLOR, EXAM_TYPE_ORDER, scoreColor } from '../../../config/examination'
 import { MEMBER_DETAIL_PAGE_SIZE } from '../../../config/leaderOrg'
 import { type TranslateFn } from '../../../i18n'
+import { formatPaginationTotal } from '../../../utils/pagination'
 import ErrorState from '../../../components/ErrorState'
 
 /** 成绩编辑表单值 */
@@ -39,6 +42,8 @@ interface ScoreFormValues {
 /**
  * 成绩信息 Tab：展示成员全部成绩，点击行编辑（PATCH /api/examinations/{id}）。
  * readOnly=true（如老师端班级管理进入）时隐藏编辑入口与行点击编辑，仅作查询（代码要求 14）。
+ * @param { uid, t, readOnly } 类型：{ uid: number; t: TranslateFn; readOnly: boolean }；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
   const { message } = AntdApp.useApp()
@@ -260,7 +265,7 @@ export default function GradesTab({ uid, t, readOnly }: { uid: number; t: Transl
             total: scores.length,
             showSizeChanger: false,
             showQuickJumper: true,
-            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_DETAIL_PAGE_SIZE),
             onChange: (p: number) => setPage(p),
           }}
         />

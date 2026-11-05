@@ -1,3 +1,5 @@
+/** 统一移除 antd 清除按钮的 tabIndex，修正表单焦点顺序。 */
+
 import { useEffect } from 'react'
 
 // Ant Design 的清除按钮没有开放 tabIndex 配置；统一处理动态表单及弹窗中的按钮。
@@ -7,6 +9,10 @@ const CLEAR_BUTTON_SELECTOR = [
   'button.ant-picker-clear',
 ].join(',')
 
+/**
+ * useClearButtonTabOrder 的参数与返回值说明。
+ * @returns 类型：void
+ */
 export function useClearButtonTabOrder() {
   useEffect(() => {
     const update = (root: Element) => {

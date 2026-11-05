@@ -10,7 +10,12 @@ import type {
   UserPosition,
 } from './types/positions'
 
-/** GET /api/positions 分页查询职位（会话内缓存；force=true 手动刷新绕过缓存） */
+/**
+ * GET /api/positions 分页查询职位（会话内缓存；force=true 手动刷新绕过缓存）
+ * @param params 类型：PositionQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<PositionDetail>>
+ */
 export async function queryPositions(
   params: PositionQuery = {},
   force?: boolean,
@@ -25,6 +30,9 @@ export async function queryPositions(
 /**
  * 拉取全部职位（分页接口循环取完），供「职位编码 → 职位名称」映射使用；
  * force=true 整体绕过缓存。返回值为职位详情数组（可能为空）。
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @param params 类型：PositionQuery；默认值：{}；是否必填：可选
+ * @returns 类型：Promise<PositionDetail[]>
  */
 export async function listAllPositions(force?: boolean, params: PositionQuery = {}): Promise<PositionDetail[]> {
   const pageSize = 100
@@ -47,7 +55,11 @@ export function getPosition(code: string, force?: boolean): Promise<PositionDeta
   return cachedGet<PositionDetail>(`/positions/${code}`, undefined, { force })
 }
 
-/** POST /api/positions 创建职位，返回新职位 code（后端响应体为纯字符串） */
+/**
+ * POST /api/positions 创建职位，返回新职位 code（后端响应体为纯字符串）
+ * @param body 类型：PositionCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<string>
+ */
 export async function createPosition(body: PositionCreateRequest): Promise<string> {
   const res = await http.post<string>('/positions', body)
   invalidate('GET /positions')
@@ -55,14 +67,23 @@ export async function createPosition(body: PositionCreateRequest): Promise<strin
   return res.data
 }
 
-/** PATCH /api/positions/{code} 更新职位（code 不可改；description 省略表示保留原值，传空字符串表示清空） */
+/**
+ * PATCH /api/positions/{code} 更新职位（code 不可改；description 省略表示保留原值，传空字符串表示清空）
+ * @param code 类型：string；默认值：无；是否必填：必填
+ * @param body 类型：PositionUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updatePosition(code: string, body: PositionUpdateRequest): Promise<void> {
   await http.patch(`/positions/${code}`, body)
   invalidate('GET /positions')
   invalidate('GET /user-positions')
 }
 
-/** DELETE /api/positions/{code} 删除职位 */
+/**
+ * DELETE /api/positions/{code} 删除职位
+ * @param code 类型：string；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deletePosition(code: string): Promise<void> {
   await http.delete(`/positions/${code}`)
   invalidate('GET /positions')
@@ -74,6 +95,7 @@ export async function deletePosition(code: string): Promise<void> {
  * 只查询本人无需额外权限；包含他人时要求 user.position.read。
  * @param uids 用户 ID 数组（必填；为空时直接返回空数组，不发请求）
  * @param force 是否绕过会话缓存（手动刷新）
+ * @returns 类型：Promise<UserPosition[]>
  */
 export function queryUserPositions(
   uids: number[],

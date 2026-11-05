@@ -145,7 +145,11 @@ export async function updateApprovalTemplateStep(
   invalidate(TEMPLATE_CACHE_PREFIX)
 }
 
-/** 按当前审批顺序连续编号；从小到大更新，避免模板内编号唯一约束冲突。 */
+/**
+ * 按当前审批顺序连续编号；从小到大更新，避免模板内编号唯一约束冲突。
+ * @param templateId 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<ApprovalStep[]>
+ */
 export async function normalizeApprovalTemplateSteps(templateId: number): Promise<ApprovalStep[]> {
   const detail = await getApprovalTemplateDetail(templateId, true)
   const steps = (detail.steps ?? []).map((step) => ({ ...step })).sort((a, b) => a.step_no - b.step_no)

@@ -32,11 +32,11 @@ import {
   getAccessiblePortalKeys,
   getPortal,
   isPortalDisabled,
+  isSuperAdminRole,
   PARTY_PORTAL_KEY,
   PORTAL_PROFILE_MODULE_KEYS,
   PORTALS,
   type PortalKey,
-  type PortalRole,
 } from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
@@ -57,17 +57,11 @@ interface ResetPasswordForm {
   confirm_password: string
 }
 
-/** 是否为超级管理员角色：优先匹配后端 code，兼顾中文角色名兜底 */
-function isSuperAdminRole(role: PortalRole): boolean {
-  const code = role.code.trim().toLowerCase()
-  return (
-    code === 'super_admin' ||
-    role.name.includes('超级管理员') ||
-    role.name.includes('超管')
-  )
-}
-
-/** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
+/**
+ * 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出
+ * @param { left } 类型：PortalHeaderProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function PortalHeader({ left }: PortalHeaderProps) {
   const t = useT()
   const { message } = AntdApp.useApp()
