@@ -49,18 +49,18 @@ function MemberDetailContent() {
   const { portalKey, uid } = useParams<{ portalKey: string; uid: string }>()
   const [searchParams] = useSearchParams()
   // 来源模块（侧栏高亮 + 返回目标）：领导端组织概览 leader_m3 / 老师端班级管理 teacher_m3 /
-  // 党委支部端 branch_m5 / 学院端 academy_m5 / 管理端 admin_m3 / 党委学校端 school_m2
+  // 支部端 branch_m5 / 学院端 academy_m5 / 管理端 admin_m3 / 党委学校端 school_m2
   const fromModuleKey = searchParams.get('from') ?? 'leader_m3'
   // 只读来源（如老师端班级管理）隐藏成绩/违规编辑入口，避免无权限操作（错误处理只作兜底）
   const readOnly = MEMBER_DETAIL_READONLY_FROM_MODULES.includes(fromModuleKey)
   // 可编辑成员资料的来源（管理端 / 党委学校端）在「基本信息」页展示编辑入口
   const canEditBasic = MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES.includes(fromModuleKey)
-  // 党委支部端 / 学院端 / 学校端的组织管理不需要请假、违规与奖助信息
+  // 支部端 / 学院端 / 学校端的组织管理不需要请假、违规与奖助信息
   const hideExtraTabs = MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES.includes(fromModuleKey)
-  // 党委支部端 / 学院端 / 学校端：不展示「详细信息」，并把「成绩信息」替换为
+  // 支部端 / 学院端 / 学校端：不展示「详细信息」，并把「成绩信息」替换为
   // 「获得加分总数（基础分 70 + 党建活动加分）+ 该成员全部加分申请」
   const partyScoreView = MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES.includes(fromModuleKey)
-  // 党委支部端 / 学院端：基本信息不再展示「系统角色」「组织任职」两块卡片
+  // 支部端 / 学院端：基本信息不再展示「系统角色」「组织任职」两块卡片
   const hideRoleOrgCards = MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES.includes(fromModuleKey)
   const userId = Number(uid)
 

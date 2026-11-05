@@ -67,6 +67,7 @@ import { usePositionLabel } from '../../composables/usePositionLabel'
 import { useUserNames } from '../../composables/useUserNames'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
+import { ORG_SEARCH_DEBOUNCE_MS } from '../../config/organization'
 import { useUiStateStore } from '../../store/uiState'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../../utils/partyScore'
@@ -107,6 +108,96 @@ interface OrgAdminViewProps {
    * 仅党委学校端「组织管理」开启。
    */
   showResetPassword?: boolean
+}
+
+/**
+ * 左侧组织树搜索框（代码要求 26）。
+ *
+ * 输入草稿保留在本组件内部，停顿 ORG_SEARCH_DEBOUNCE_MS 后才把关键词提交给宿主；
+ * 打字过程只重渲染这个输入框，不重建组织树、不重渲染成员表。
+ * @param value 已生效的搜索关键词（必填；外部清空 / 恢复时同步到输入框）
+ * @param onChange 关键词生效回调（必填；防抖结束或回车时调用）
+ * @returns 组织树搜索输入框
+ */
+function OrgTreeSearchBox({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const t = useT()
+  const [draft, setDraft] = useState(value)
+
+  // 外部重置关键词（如搜索定位后清空过滤）时同步输入框；用户输入过程中不覆盖草稿
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => onChange(draft), ORG_SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [draft, onChange])
+
+  return (
+    <Input.Search
+      allowClear
+      size="small"
+      style={{ marginBottom: 8 }}
+      prefix={<SearchOutlined />}
+      placeholder={t('adminOrg.searchPlaceholder')}
+      value={draft}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
+      onSearch={(v: string) => onChange(v)}
+    />
+  )
+}
+
+/**
+ * 成员搜索框（代码要求 26）。
+ *
+ * 输入草稿保留在本组件内部，仅在回车 / 点击搜索 / 清空时提交给宿主；
+ * 打字过程不会更新页面状态，避免每敲一个字符就重渲染整张成员表。
+ * @param value 已提交的搜索词（必填；外部结束匹配 / 恢复状态时同步到输入框）
+ * @param onChange 搜索词变更回调（必填；清空或确认搜索时调用）
+ * @param onSearch 触发查询回调（必填；回车 / 点击搜索按钮时调用）
+ * @param loading 是否正在搜索（必填，用于展示加载态）
+ * @returns 成员搜索输入框
+ */
+function MemberSearchInput({
+  value,
+  onChange,
+  onSearch,
+  loading,
+}: {
+  value: string
+  onChange: (value: string) => void
+  onSearch: (value: string) => void
+  loading: boolean
+}) {
+  const [draft, setDraft] = useState(value)
+
+  // 外部清空 / 恢复搜索词时同步输入框
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  return (
+    <PersonSearchBox
+      width={320}
+      value={draft}
+      onChange={(next: string) => {
+        setDraft(next)
+        // 清空立即同步受控值，使「结束匹配」等依赖搜索词的状态及时收回
+        if (next === '') onChange('')
+      }}
+      onSearch={(v: string) => {
+        onChange(v)
+        onSearch(v)
+      }}
+      loading={loading}
+    />
+  )
 }
 
 /**
@@ -711,10 +802,10 @@ export default function OrgAdminView({
         },
       },
       {
-        // 党委学校端：点击「职位」表头弹出当前组织的全部职位，可多选筛选
+        // 党委学校端：点击「身份」表头弹出当前组织的全部职位，可多选筛选
         title: partyScoreColumns ? (
           <MultiSelectHeaderFilter
-            title={t('adminOrg.colPosition')}
+            title={t('adminOrg.colIdentity')}
             allLabel={t('common.all')}
             options={memberPositionOptions}
             value={positionFilter}
@@ -724,7 +815,7 @@ export default function OrgAdminView({
             }}
           />
         ) : (
-          t('adminOrg.colPosition')
+          t('adminOrg.colIdentity')
         ),
         key: 'position',
         width: 200,
@@ -837,15 +928,8 @@ export default function OrgAdminView({
             <ErrorState message={orgsError} />
           ) : (
             <>
-              <Input.Search
-                allowClear
-                size="small"
-                style={{ marginBottom: 8 }}
-                prefix={<SearchOutlined />}
-                placeholder={t('adminOrg.searchPlaceholder')}
-                value={orgSearch}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setOrgSearch(e.target.value)}
-              />
+              {/* 搜索草稿留在组件内部并防抖，避免每输入一个字符就重建组织树（代码要求 26） */}
+              <OrgTreeSearchBox value={orgSearch} onChange={setOrgSearch} />
               <Spin spinning={orgsLoading}>
                 {/* 以「数据是否就绪」作为 key：组织数据到达后强制重挂载 Tree。
                     rc-tree 在 treeData 为空（数据未加载）时挂载会忽略随后传入的受控
@@ -955,10 +1039,10 @@ export default function OrgAdminView({
               </Popconfirm>
             </div>
           )}
-          {/* 成员 ID 搜索（固定在表头内，随卡片表头始终可见，不随表格滚动） */}
+          {/* 成员 ID 搜索（固定在表头内，随卡片表头始终可见，不随表格滚动）；
+              输入草稿留在组件内，仅回车 / 搜索 / 清空时提交，避免逐字符重渲染成员表（代码要求 26） */}
           <div className="org-member-actions">
-            <PersonSearchBox
-              width={320}
+            <MemberSearchInput
               value={search.query}
               onChange={search.setQuery}
               onSearch={(value: string) => {

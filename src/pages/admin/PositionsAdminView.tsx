@@ -136,21 +136,31 @@ export default function PositionsAdminView() {
   }
 
   // ============ 新建 / 编辑 ============
-  const openCreate = () => {
-    setModal({ mode: 'create' })
+  // 弹窗打开、表单挂载后再回填：Modal 关闭时会卸载 Form（destroyOnHidden），
+  // 若在 setModal 后立即调用 form 方法会触发 antd「useForm 未连接 Form」开发警告
+  useEffect(() => {
+    if (!modal) return
+    if (modal.mode === 'edit' && modal.position) {
+      const position = modal.position
+      form.setFieldsValue({
+        usage_scope: position.usage_scope,
+        code: position.code,
+        organization_id: position.organization_id,
+        name: position.name,
+        description: position.description ?? undefined,
+      })
+      return
+    }
     form.resetFields()
     form.setFieldValue('usage_scope', 'self_only')
+  }, [modal, form])
+
+  const openCreate = () => {
+    setModal({ mode: 'create' })
   }
 
   const openEdit = (position: PositionDetail) => {
     setModal({ mode: 'edit', position })
-    form.setFieldsValue({
-      usage_scope: position.usage_scope,
-      code: position.code,
-      organization_id: position.organization_id,
-      name: position.name,
-      description: position.description ?? undefined,
-    })
   }
 
   const submit = async () => {
@@ -168,11 +178,11 @@ export default function PositionsAdminView() {
         })
         message.success(t('adminPositions.createSuccess'))
       } else {
-        // description 为空时省略该字段：后端将 None 视为「保留原值」
+        // 描述始终提交：留空即清空（不再省略字段保留原值）
         await updatePosition(modal.position!.code, {
           usage_scope: values.usage_scope,
           name: values.name.trim(),
-          ...(values.description?.trim() ? { description: values.description.trim() } : {}),
+          description: values.description?.trim() ?? '',
         })
         message.success(t('adminPositions.updateSuccess'))
       }
@@ -391,11 +401,7 @@ export default function PositionsAdminView() {
               { value: 'self_and_children', label: t('adminPositions.scopeSelfAndChildren') },
             ]} />
           </Form.Item>
-          <Form.Item
-            name="description"
-            label={t('adminPositions.fieldDesc')}
-            extra={t('adminPositions.descKeepHint')}
-          >
+          <Form.Item name="description" label={t('adminPositions.fieldDesc')}>
             <Input.TextArea rows={3} maxLength={POSITION_DESC_MAX_LENGTH} showCount />
           </Form.Item>
         </Form>

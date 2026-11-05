@@ -1918,6 +1918,55 @@ h3 {
   }
 }
 
+/*
+ * 学校端总览滚动：本页自身作为滚动容器，左侧菜单固定不动，右侧内容整体上滑。
+ * 容器高度 = 一屏可用高度（顶栏 56px + 内容区上下内边距 48px），
+ * 组织概览区域也取同样高度，因此最多只能滚到统计卡片完全移出、
+ * 组织概览（标题 + 组织树 + 下级统计表）占满整屏的位置。
+ */
+.school-overview-view {
+  height: calc(100vh - 104px);
+  max-height: calc(100vh - 104px);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 固定高度的滚动容器内子项不收缩：最大滚动距离恰为上方统计卡片高度 */
+.school-overview-view > * {
+  flex: none;
+}
+
+/* 组织概览区域：与滚动容器等高，作为最后一个滚动目标 */
+.school-org-region {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 104px);
+  min-height: 0;
+}
+
+.school-org-region > .school-section-title {
+  flex: none;
+}
+
+/* 组织概览卡片占据区域剩余高度（标题下方），内部组织树 / 统计表各自滚动 */
+.school-org-section {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.school-org-section > .admin-org-view {
+  height: 100%;
+  max-height: 100%;
+}
+
+/* 窄屏：组织树与成员表在区域内部上下堆叠，仍由卡片占据区域剩余高度 */
+@media (max-width: 1100px) {
+  .school-org-section > .admin-org-view {
+    height: 100%;
+    max-height: 100%;
+  }
+}
+
 @media (max-width: 720px) {
   .leave-form-grid {
     grid-template-columns: 1fr;
@@ -3373,7 +3422,7 @@ h3 {
   margin-top: 8px;
 }
 
-/* 党委支部端：本支部概况（红色背景统计区，与学院端工作台保持一致） */
+/* 支部端：本支部概况（红色背景统计区，与学院端工作台保持一致） */
 .branch-overview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -3408,7 +3457,7 @@ h3 {
   color: inherit;
 }
 
-/* 党委支部端：等级分布（横向柱状图） */
+/* 支部端：等级分布（横向柱状图） */
 .branch-chart-list {
   display: flex;
   flex-direction: column;
@@ -3467,7 +3516,7 @@ h3 {
   color: var(--ink);
 }
 
-/* 党委支部端 / 党委学院端：待办事项 */
+/* 支部端 / 党委学院端：待办事项 */
 .branch-todo-list {
   margin: 0;
   padding: 0;
@@ -3533,7 +3582,7 @@ h3 {
   color: var(--ink-secondary);
 }
 
-/* 党委支部端：党员概览表格 */
+/* 支部端：党员概览表格 */
 .branch-member-score {
   font-weight: 600;
   color: var(--ink);
@@ -3682,13 +3731,20 @@ h3 {
   color: var(--ink);
 }
 
+/* 学校端总览统计：8 项指标两行四列，窄屏自动降为两列 */
 .school-overview {
-  display: flex;
-  gap: 56px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px 24px;
   padding: 18px 24px;
-  margin-bottom: 26px;
   border-radius: 10px;
   background: #fdf3d8;
+}
+
+@media (max-width: 900px) {
+  .school-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .school-overview-item {
@@ -3716,80 +3772,6 @@ h3 {
   font-weight: 600;
 }
 
-.school-rank-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.school-rank-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  padding: 10px 18px;
-  border: 0;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.03);
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-/* 排名行可点击：悬停/键盘聚焦给出可跳转的反馈（点击跳转组织概览定位该党委） */
-.school-rank-row:hover {
-  background: rgba(0, 0, 0, 0.07);
-}
-
-.school-rank-row:focus-visible {
-  /* 学校端主色（与门户 accent 一致） */
-  outline: 2px solid #08979c;
-  outline-offset: 2px;
-}
-
-.school-rank-name {
-  flex: none;
-  width: 140px;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-/* 排名条形轨道：只承载条形，宽度由父级 flex 平均分配，保证每行可用宽度一致 */
-.school-rank-track {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 学校端各二级党委排名条形统一蓝色，不按名次区分颜色 */
-.school-rank-bar {
-  height: 14px;
-  border-radius: 3px;
-  background: #1677ff;
-}
-
-/* 分数文本独立成列并右对齐、定宽 + 等宽数字：
-   分数位数不同（如 70.035 与 70）时也不会挤压条形宽度 */
-.school-rank-score {
-  flex: none;
-  width: 76px;
-  margin-left: 12px;
-  text-align: right;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--ink);
-}
-
 :root[data-theme='dark'] .school-overview {
   background: rgba(250, 140, 22, 0.18);
-}
-
-:root[data-theme='dark'] .school-rank-row {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-:root[data-theme='dark'] .school-rank-row:hover {
-  background: rgba(255, 255, 255, 0.12);
 }

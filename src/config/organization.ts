@@ -41,8 +41,8 @@ export const SCHOOL_COLLEGE_PARENT_ORG_ID = 2
 /** 党委学校端「组织成员管理」模块 key（组织概览的「查看详细」跳转目标） */
 export const SCHOOL_ORG_ADMIN_MODULE_KEY = 'school_m2'
 
-/** 党委学校端「组织概览」模块 key（同时用作会话状态 key，记忆选中组织与树展开态） */
-export const SCHOOL_ORG_OVERVIEW_MODULE_KEY = 'school_m6'
+/** 党委学校端「组织概览」区域（内嵌在总览页）的会话状态 key，记忆选中组织与树展开态 */
+export const SCHOOL_ORG_OVERVIEW_UI_KEY = 'school_org_overview'
 
 /**
  * 党委学院端「学院支部管理」模块 key。
@@ -101,3 +101,10 @@ export const MEMBER_MATCH_ONLY_MAX_PAGES = 5
 
 /** 数据表格每页最大行数（代码要求 12：表格每页最多 100 行） */
 export const MEMBER_TABLE_PAGE_SIZE = 100
+
+/**
+ * 组织树搜索框输入防抖时长（毫秒）。
+ * 输入草稿保留在搜索组件内部，停顿后再更新过滤关键词，避免每敲一个字符就重建组织树并重渲染整页
+ * （代码要求 26）。
+ */
+export const ORG_SEARCH_DEBOUNCE_MS = 300

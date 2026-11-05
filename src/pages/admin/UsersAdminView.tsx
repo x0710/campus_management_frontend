@@ -519,7 +519,7 @@ export default function UsersAdminView() {
         },
       },
       {
-        // 用户的组织任职：组织名 + 职位，数据来自 GET /organization-members?uids=
+        // 用户的组织任职：组织名/身份（职位名称，如「中共党员（ZGDY）」），数据来自 GET /organization-members?uids=
         title: t('adminUsers.colOrgPos'),
         key: 'org_pos',
         width: 260,
@@ -536,7 +536,7 @@ export default function UsersAdminView() {
                   key={`${o.organization_id}-${o.position}`}
                   title={`${o.organization_name} / ${positionLabel(o.position)}${o.workplace ? ' / ' + o.workplace : ''}`}
                 >
-                  {o.organization_name}·{positionLabel(o.position)}
+                  {o.organization_name}/{positionLabel(o.position)}
                 </Tag>
               ))}
             </span>

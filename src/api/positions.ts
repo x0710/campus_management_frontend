@@ -55,7 +55,7 @@ export async function createPosition(body: PositionCreateRequest): Promise<strin
   return res.data
 }
 
-/** PATCH /api/positions/{code} 更新职位（code 不可改；description 省略表示保留原值） */
+/** PATCH /api/positions/{code} 更新职位（code 不可改；description 省略表示保留原值，传空字符串表示清空） */
 export async function updatePosition(code: string, body: PositionUpdateRequest): Promise<void> {
   await http.patch(`/positions/${code}`, body)
   invalidate('GET /positions')

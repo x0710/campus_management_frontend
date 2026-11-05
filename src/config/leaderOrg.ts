@@ -14,7 +14,7 @@ export const MEMBER_DETAIL_PAGE_SIZE = 100
 
 /**
  * 成员详情页的「只读来源」模块 key：
- * 从这些模块（老师端班级管理 teacher_m3、党委支部端支部管理 branch_m5、
+ * 从这些模块（老师端班级管理 teacher_m3、支部端支部管理 branch_m5、
  * 党委学院端学院支部管理 academy_m5）进入成员详情时隐藏成绩/违规编辑入口，
  * 这些入口只做成员信息查询，避免展示无权限的编辑按钮。
  */
@@ -40,7 +40,7 @@ export const MEMBER_DETAIL_BASIC_EDIT_FROM_MODULES: string[] = [
 
 /**
  * 成员详情页隐藏「请假 / 违规信息 / 奖学金及补助」三个 Tab 的来源模块 key：
- * 党委支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5、
+ * 支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5、
  * 党委学校端组织管理 school_m2 的组织管理只关注成员基础资料与成绩，
  * 不需要这三块业务数据，因此从这些来源进入成员详情时不展示对应 Tab。
  */
@@ -52,7 +52,7 @@ export const MEMBER_DETAIL_HIDDEN_EXTRA_TABS_FROM_MODULES: string[] = [
 
 /**
  * 成员详情页展示「获得加分总数 + 加分申请记录」的来源模块 key：
- * 党委支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5、
+ * 支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5、
  * 党委学校端组织管理 school_m2 进入成员详情时：
  * - 不展示「详细信息」Tab；
  * - 把「成绩信息」Tab 改为「获得加分总数」（基础分 70 + 党建活动加分合计），
@@ -66,7 +66,7 @@ export const MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES: string[] = [
 
 /**
  * 成员详情页「基本信息」隐藏「系统角色」「组织任职」卡片的来源模块 key：
- * 党委支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5 的成员详情
+ * 支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5 的成员详情
  * 只需展示成员资料与党员信息，不再展示系统角色与组织任职（标题与内容整体不渲染）。
  * 注：组织任职数据仍会请求，因为「党员信息」卡片（所属支部 / 政治面貌）依赖它。
  */

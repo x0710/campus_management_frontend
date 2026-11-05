@@ -9,7 +9,7 @@ import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
  * - 领导端传入全部组织（listAllOrganizations）；
  * - 老师端传入本人所在组织（listUserOrganizations），接口与数据范围都不变；
  * - 党委学院端「学院支部管理」传入本学院子树并保留组织树；
- * - 党委支部端「支部管理」传 showOrgTree=false（支部为最底层组织，无需树），仅展示成员表。
+ * - 支部端「支部管理」传 showOrgTree=false（支部为最底层组织，无需树），仅展示成员表。
  *
  * 成员 ID 搜索（各门户通用，逻辑见 composables/useMemberSearch）：输入用户 ID 后经
  * GET /api/organization-members?uids= 定位其所属组织 → 展开组织树到该组织并选中

@@ -87,7 +87,7 @@ export default function App() {
           {/* 党员端成绩申报详情：首页「近期记录」点击进入，
               沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route path="party-scores/:id" element={<PartyScoreDetailPage />} />
-          {/* 审批指标（审批模板）详情：党委支部端「指标」列表点击进入，
+          {/* 审批指标（审批模板）详情：支部端「指标」列表点击进入，
               沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route
             path="approval-templates/:id"

@@ -27,7 +27,7 @@ import ErrorState from '../../../components/ErrorState'
 const { Text } = Typography
 
 /**
- * 「获得加分总数」Tab（党委支部端 / 学院端 / 学校端成员详情专用）：
+ * 「获得加分总数」Tab（支部端 / 学院端 / 学校端成员详情专用）：
  * 顶部展示「基础分 70 + 党建活动加分 = 获得加分总数」；
  * 下方分页列出该成员的全部加分申请（GET /api/party-scores?user_id=成员），
  * 点击行通过 GET /api/party-scores/{id} 查看详情（含附件下载地址，代码要求 14）。
