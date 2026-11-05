@@ -296,7 +296,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           <Button onClick={() => {
             invalidate()
             useAuthStore.getState().restoreAuth()
-            navigate('/', { replace: true })
+            navigate(originalAuth.returnTo ?? '/', { replace: true })
           }}>
             {t('adminUsers.restoreAccount', { name: originalAuth.username })}
           </Button>

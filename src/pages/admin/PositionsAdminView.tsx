@@ -18,7 +18,6 @@ import {
   Descriptions,
   Form,
   Input,
-  InputNumber,
   Modal,
   Popconfirm,
   Spin,
@@ -40,6 +39,7 @@ import {
 import type { PositionUsageScope, PositionDetail } from '../../api/types/positions'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import OrganizationSelect from '../../components/OrganizationSelect'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   POSITION_CODE_MAX_LENGTH,
@@ -369,15 +369,12 @@ export default function PositionsAdminView() {
           </Form.Item>
           <Form.Item
             name="organization_id"
-            label={t('adminPositions.fieldOrg')}
+            label={t('adminPositions.fieldOrganization')}
             rules={[{ required: true, message: t('adminPositions.orgRequired') }]}
           >
-            <InputNumber
+            <OrganizationSelect
               disabled={modal?.mode === 'edit'}
-              min={1}
-              precision={0}
               placeholder={t('adminPositions.orgPlaceholder')}
-              style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item

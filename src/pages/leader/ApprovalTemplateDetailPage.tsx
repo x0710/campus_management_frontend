@@ -401,7 +401,7 @@ export default function ApprovalTemplateDetailPage() {
                   <Row gutter={16}>
                     <Col span={24}>
                       <Form.Item label={t('approvalTemplate.fieldOrganization')}>
-                        <OrganizationName id={detail.organization_id} />
+                        <OrganizationName id={detail.organization_id} showTree />
                       </Form.Item>
                     </Col>
                     <Col span={24}>
@@ -449,7 +449,7 @@ export default function ApprovalTemplateDetailPage() {
                 <>
                   <Descriptions column={1} bordered size="small">
                     <Descriptions.Item label={t('approvalTemplate.fieldOrganization')}>
-                      <OrganizationName id={detail.organization_id} />
+                      <OrganizationName id={detail.organization_id} showTree />
                     </Descriptions.Item>
                     <Descriptions.Item label={t('approvalTemplate.fieldName')}>
                       {detail.name}

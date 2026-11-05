@@ -28,7 +28,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import {
   createUsers,
   deleteUser,
@@ -49,6 +49,7 @@ import UsablePositionSelect from '../../components/UsablePositionSelect'
 import { getCurrentUser, impersonateUser } from '../../api/auth'
 import { invalidate } from '../../api/cache'
 import { useAuthStore } from '../../store/auth'
+import { useUiStateStore } from '../../store/uiState'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import PersonSearchBox from '../../components/PersonSearchBox'
@@ -84,9 +85,9 @@ interface ParsedUser {
 }
 
 /** 草稿留在搜索组件内，避免每次按键重渲染整张用户表格。 */
-function UserListSearch({ onSearch }: { onSearch: (value: string) => void }) {
+function UserListSearch({ onSearch, initialValue }: { onSearch: (value: string) => void; initialValue: string }) {
   const t = useT()
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(initialValue)
 
   return (
     <PersonSearchBox
@@ -107,17 +108,27 @@ export default function UsersAdminView() {
   const t = useT()
   const { message, modal } = AntdApp.useApp()
   const navigate = useNavigate()
+  const location = useLocation()
   const { portalKey } = useParams<{ portalKey: string }>()
+
+  const listKey = `${portalKey}:admin_m1`
+  const [savedList] = useState(() => useUiStateStore.getState().userLists[listKey])
+  const [viewToken] = useState(() => useAuthStore.getState().token)
 
   const [rows, setRows] = useState<UserInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(savedList?.page ?? 1)
   const [total, setTotal] = useState(0)
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useState(savedList?.keyword ?? '')
   // 学号精确筛选（对应后端 ids 查询参数）
-  const [uidFilter, setUidFilter] = useState('')
-  const [status, setStatus] = useState<UserStatus | 'all'>('all')
+  const [uidFilter, setUidFilter] = useState(savedList?.uidFilter ?? '')
+  const [status, setStatus] = useState<UserStatus | 'all'>(savedList?.status ?? 'all')
+  useEffect(() => {
+    if (useAuthStore.getState().token !== viewToken) return
+    useUiStateStore.getState().setUserListState(listKey, { page, keyword, uidFilter, status })
+  }, [listKey, page, keyword, uidFilter, status, viewToken])
+
   // 列表重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
   const [reload, setReload] = useState<{ seq: number; force: boolean }>({
     seq: 0,
@@ -178,14 +189,14 @@ export default function UsersAdminView() {
         token: result.token,
         username: result.user,
         lastLoginAt: result.last_login_at,
-      })
+      }, `${location.pathname}${location.search}${location.hash}`)
       navigate('/', { replace: true })
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
     } finally {
       setSwitchingUid(null)
     }
-  }, [navigate, reportError])
+  }, [navigate, reportError, location.pathname, location.search, location.hash])
 
   // 基础数据：组织、职位（新建弹窗下拉用）与当前 uid
   useEffect(() => {
@@ -615,7 +626,7 @@ export default function UsersAdminView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminUsers.title')}</h3>
           <div className="approval-toolbar">
-            <UserListSearch onSearch={onSearchPerson} />
+            <UserListSearch onSearch={onSearchPerson} initialValue={uidFilter || keyword} />
             <Select
               value={status}
               style={{ width: 120 }}

@@ -33,7 +33,16 @@ export interface MemberSearchState {
   matchOnly: boolean
 }
 
+export interface UserListState {
+  page: number
+  keyword: string
+  uidFilter: string
+  status: 'all' | 'active' | 'disabled'
+}
+
 interface UiState {
+  userLists: Partial<Record<string, UserListState>>
+  setUserListState: (moduleKey: string, state: UserListState) => void
   reset: () => void
   /** 各组织视图当前选中的组织 ID，按模块 key 记忆（如 admin_m3 / leader_m3 / teacher_m3），null 表示未选中 */
   selectedOrgIds: Partial<Record<string, number | null>>
@@ -59,8 +68,11 @@ interface UiState {
 export const useUiStateStore = create<UiState>()((set) => ({
   reset: () => set({
     selectedOrgIds: {}, collapsedOrgTrees: {}, expandedOrgTreeKeys: {},
-    memberPages: {}, memberSearchStates: {},
+    memberPages: {}, memberSearchStates: {}, userLists: {},
   }),
+  userLists: {},
+  setUserListState: (moduleKey, state) =>
+    set((s) => ({ userLists: { ...s.userLists, [moduleKey]: state } })),
   selectedOrgIds: {},
   setSelectedOrgId: (moduleKey, id) =>
     set((s) => ({ selectedOrgIds: { ...s.selectedOrgIds, [moduleKey]: id } })),
@@ -83,7 +95,24 @@ export const useUiStateStore = create<UiState>()((set) => ({
     }),
 }))
 
-// 同步重置，确保新身份的页面首次渲染前已移除上个账号的搜索结果。
+/** 仅暂存原账号的视图数据，不缓存接口响应，不与代登录账号共享。 */
+function snapshotUi() {
+  const { selectedOrgIds, collapsedOrgTrees, expandedOrgTreeKeys, memberPages, memberSearchStates, userLists } = useUiStateStore.getState()
+  return { selectedOrgIds, collapsedOrgTrees, expandedOrgTreeKeys, memberPages, memberSearchStates, userLists }
+}
+let originalUi: { token: string; view: ReturnType<typeof snapshotUi> } | null = null
+
+// 同步切换视图状态，确保新身份首次渲染前移除上个账号的数据。
 useAuthStore.subscribe((state, previous) => {
-  if (state.token !== previous.token) useUiStateStore.getState().reset()
+  if (state.token === previous.token) return
+  if (!previous.originalAuth && state.originalAuth) {
+    originalUi = { token: state.originalAuth.token, view: snapshotUi() }
+  }
+  if (previous.originalAuth && !state.originalAuth && originalUi?.token === state.token) {
+    useUiStateStore.setState(originalUi.view)
+    originalUi = null
+  } else {
+    useUiStateStore.getState().reset()
+    if (!state.originalAuth) originalUi = null
+  }
 })

@@ -158,7 +158,7 @@ export default function ApprovalTemplateManageView() {
         title: t('approvalTemplate.fieldOrganization'),
         dataIndex: 'organization_id',
         key: 'organization_id',
-        render: (id: number) => <OrganizationName id={id} />,
+        render: (id: number) => <OrganizationName id={id} showTree />,
       },
       {
         title: t('approvalTemplate.colEnabled'),

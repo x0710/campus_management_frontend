@@ -21,28 +21,58 @@ function remember() {
 }
 function assertEmpty() {
   const ui = useUiStateStore.getState()
-  for (const key of ['selectedOrgIds', 'collapsedOrgTrees', 'expandedOrgTreeKeys', 'memberPages', 'memberSearchStates']) {
+  for (const key of ['selectedOrgIds', 'collapsedOrgTrees', 'expandedOrgTreeKeys', 'memberPages', 'memberSearchStates', 'userLists']) {
     assert.deepEqual(ui[key], {}, key)
   }
 }
 
-test('登录、代登录、恢复身份、退出均同步清空页面状态；普通账号更新保留状态', () => {
+test('代登录隔离视图，恢复原账号还原视图；普通登录和退出清空状态', () => {
   const auth = useAuthStore.getState()
   auth.setAuth({ token: 'admin', username: 'admin', lastLoginAt: '2026-01-01' })
   remember()
   auth.finishPasswordChange()
   assert.equal(useUiStateStore.getState().memberPages.admin_m3, 7)
-  auth.impersonate({ token: 'member', username: 'member', lastLoginAt: null })
+  const originalView = useUiStateStore.getState()
+  auth.impersonate({ token: 'member', username: 'member', lastLoginAt: null }, '/portal/admin/admin_m1?filter=all#users')
   assertEmpty()
   remember()
+  useUiStateStore.getState().setMemberPage('admin_m3', 99)
+  assert.equal(useAuthStore.getState().originalAuth.returnTo, '/portal/admin/admin_m1?filter=all#users')
   auth.restoreAuth()
   assert.equal(useAuthStore.getState().token, 'admin')
-  assertEmpty()
+  assert.equal(useUiStateStore.getState().memberPages.admin_m3, 7)
+  assert.deepEqual(useUiStateStore.getState().memberSearchStates, originalView.memberSearchStates)
   remember()
   auth.clearAuth()
   assertEmpty()
   remember()
   auth.setAuth({ token: 'other', username: 'other', lastLoginAt: null })
+  assertEmpty()
+  auth.clearAuth()
+})
+
+test('连续切换目标账号保留最初的返回位置和用户列表筛选', () => {
+  const auth = useAuthStore.getState()
+  auth.setAuth({ token: 'root', username: 'root', lastLoginAt: '2026-01-01' })
+  const list = { page: 4, keyword: '张', uidFilter: '', status: 'active' }
+  useUiStateStore.getState().setUserListState('admin:admin_m1', list)
+  auth.impersonate({ token: 'first', username: 'first', lastLoginAt: null }, '/portal/admin/admin_m1')
+  assertEmpty()
+  auth.impersonate({ token: 'second', username: 'second', lastLoginAt: null }, '/portal/party')
+  assert.equal(useAuthStore.getState().originalAuth.returnTo, '/portal/admin/admin_m1')
+  auth.restoreAuth()
+  assert.deepEqual(useUiStateStore.getState().userLists['admin:admin_m1'], list)
+  auth.clearAuth()
+})
+
+test('代登录退出后丢弃原视图，后续账号不能恢复旧状态', () => {
+  const auth = useAuthStore.getState()
+  auth.setAuth({ token: 'root', username: 'root', lastLoginAt: '2026-01-01' })
+  remember()
+  auth.impersonate({ token: 'member', username: 'member', lastLoginAt: null }, '/portal/admin/admin_m1')
+  auth.clearAuth()
+  auth.setAuth({ token: 'next', username: 'next', lastLoginAt: '2026-01-01' })
+  auth.restoreAuth()
   assertEmpty()
   auth.clearAuth()
 })

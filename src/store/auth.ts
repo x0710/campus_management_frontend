@@ -8,8 +8,8 @@ export interface AuthSnapshot {
 }
 
 interface AuthState {
-  originalAuth: (AuthSnapshot & { mustChangePassword: boolean }) | null
-  impersonate: (snapshot: AuthSnapshot) => void
+  originalAuth: (AuthSnapshot & { mustChangePassword: boolean; returnTo?: string }) | null
+  impersonate: (snapshot: AuthSnapshot, returnTo?: string) => void
   restoreAuth: () => void
   /** JWT，null 表示未登录 */
   token: string | null
@@ -35,19 +35,23 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       originalAuth: null,
-      impersonate: (snapshot) => set((state) => ({
+      impersonate: (snapshot, returnTo) => set((state) => ({
         originalAuth: state.originalAuth ?? (state.token && state.username ? {
           token: state.token,
           username: state.username,
           lastLoginAt: state.lastLoginAt,
           mustChangePassword: state.mustChangePassword,
+          returnTo: returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : undefined,
         } : null),
         ...snapshot,
         // 代登录不应触发目标用户首次登录改密。
         mustChangePassword: false,
       })),
       restoreAuth: () => set((state) => state.originalAuth ? {
-        ...state.originalAuth,
+        token: state.originalAuth.token,
+        username: state.originalAuth.username,
+        lastLoginAt: state.originalAuth.lastLoginAt,
+        mustChangePassword: state.originalAuth.mustChangePassword,
         originalAuth: null,
       } : {}),
       token: null,
