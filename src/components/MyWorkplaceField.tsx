@@ -59,7 +59,7 @@ export default function MyWorkplaceField({ memberId, workplace, onSaved }: Props
         confirmLoading={saving}
         cancelButtonProps={{ disabled: saving }}
         closable={!saving}
-        maskClosable={!saving}
+        mask={{ closable: !saving }}
         keyboard={!saving}
         onCancel={() => { if (!submitting.current) setOpen(false) }}
         onOk={() => void save()}

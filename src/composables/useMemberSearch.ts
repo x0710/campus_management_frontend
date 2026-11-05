@@ -50,6 +50,8 @@ import {
   MEMBER_SEARCH_MAX_PAGES,
 } from '../config/organization'
 import { useT } from '../i18n'
+import { useRequestSequence } from './useRequestSequence'
+import { useAuthStore } from '../store/auth'
 import { useUiStateStore } from '../store/uiState'
 import { listOrgChainIds } from '../utils/orgTree'
 import { isUidTerm } from '../utils/personSearch'
@@ -345,6 +347,8 @@ export function useMemberSearch({
   const t = useT()
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
+  const locateRequests = useRequestSequence()
+  const [sessionToken] = useState(() => useAuthStore.getState().token)
   const setMemberSearchState = useUiStateStore((s) => s.setMemberSearchState)
 
   // 跨路由返回（如从成员详情页返回组织架构）时恢复上一次的搜索状态
@@ -380,6 +384,8 @@ export function useMemberSearch({
    */
   const locate = useCallback(
     async (hit: MemberSearchHit) => {
+      const isCurrent = locateRequests.begin()
+      if (!isCurrent()) return
       // 「单独查看匹配人员」模式：只高亮目标行，不切换组织、不扫描页码
       if (matchOnlyRef.current) {
         setHitUid(hit.uid)
@@ -390,6 +396,7 @@ export function useMemberSearch({
       const page = resolveMemberPage
         ? ((await resolveMemberPage(hit.targetId, hit.uid)) ?? 1)
         : ((await findMemberPage(hit.targetId, hit.uid, memberPageSize)) ?? 1)
+      if (!isCurrent()) return
       setHitUid(hit.uid)
       setLocateTick((n) => n + 1)
       // 无论组织是否变化都清掉名称过滤并展开祖先链，保证组织树能滚动定位到该组织节点
@@ -404,7 +411,7 @@ export function useMemberSearch({
         onSelectOrg(hit.targetId)
       }
     },
-    [activeOrgId, memberPageSize, onLoadPage, onClearFilter, orgs, onSelectOrg, resolveMemberPage],
+    [activeOrgId, memberPageSize, onLoadPage, onClearFilter, orgs, onSelectOrg, resolveMemberPage, locateRequests],
   )
 
   /** 清空姓名搜索结果条与候选页游标（空搜索 / 学号搜索 / 无命中时复用），并退出「只看匹配人员」 */
@@ -627,7 +634,7 @@ export function useMemberSearch({
    * 无任何匹配状态时删除该模块的记录（相当于结束匹配）。
    */
   useEffect(() => {
-    if (!persistKey) return
+    if (!persistKey || sessionToken !== useAuthStore.getState().token) return
     const active = query.trim() !== '' || matches.length > 0 || hitUid !== null || matchOnly
     if (!active) {
       setMemberSearchState(persistKey, null)
@@ -647,6 +654,7 @@ export function useMemberSearch({
     })
   }, [
     persistKey,
+    sessionToken,
     setMemberSearchState,
     query,
     resultTotal,

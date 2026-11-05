@@ -1,4 +1,5 @@
-import { usePositionLabel } from '../../composables/usePositionLabel'
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import { usePositionFormatter, usePositionLabel } from '../../composables/usePositionLabel'
 import { BellOutlined, EditOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, Descriptions, Empty, Form, Input, Modal, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
 import axios from 'axios'
@@ -7,6 +8,7 @@ import { getApprovalTemplateDetail, mockApprovalTemplate, queryApprovalTemplates
 import { getMyRoles } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import { deleteNotice, markNoticeRead, markNoticeUnread, queryNotices } from '../../api/notices'
+import { getPosition } from '../../api/positions'
 import { listUserOrganizations } from '../../api/organizations'
 import { getMyProfile, updateUser } from '../../api/users'
 import type { ApprovalStep, ApprovalTemplate, MockApprovalApprover } from '../../api/types/approvalmodel'
@@ -25,7 +27,6 @@ import { PARTY_NOTICE_PAGE_SIZE } from '../../config/partyDeclaration'
 import { PARTY_POLITICAL_STATUS_NAMES } from '../../config/partyProfile'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { usePartyProfiles } from '../../composables/usePartyProfiles'
-import { usePositionNames } from '../../composables/usePositionNames'
 import { useUserNames } from '../../composables/useUserNames'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
@@ -49,11 +50,17 @@ function ProfileDescriptions() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const username = useAuthStore((s) => s.username)
-  const positionNames = usePositionNames()
-  const positionLabel = usePositionLabel()
+  const [positionNames, setPositionNames] = useState<Map<string, string>>(new Map())
+  const [positionsError, setPositionsError] = useState<string | null>(null)
+  const positionLabel = usePositionFormatter(positionNames)
   const { name, organizations } = useCurrentIdentity()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [roles, setRoles] = useState<UserRoleInfo[]>([])
+  const [rolesError, setRolesError] = useState<string | null>(null)
+  const [orgsError, setOrgsError] = useState<string | null>(null)
+  const [extrasLoading, setExtrasLoading] = useState(false)
+  const requests = useRequestSequence()
+  const extrasRequests = useRequestSequence()
   const [orgs, setOrgs] = useState<UserOrganization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -69,31 +76,55 @@ function ProfileDescriptions() {
     notFound: partyProfilesNotFound,
   } = usePartyProfiles(user ? [user.id] : [])
 
+  const loadExtras = useCallback(async (userId: number) => {
+    const isCurrent = extrasRequests.begin()
+    setExtrasLoading(true)
+    setRolesError(null)
+    setOrgsError(null)
+    setPositionsError(null)
+    setPositionNames(new Map())
+    const [roleResult, orgResult] = await Promise.allSettled([
+      getMyRoles(), listUserOrganizations(userId),
+    ])
+    if (!isCurrent()) return
+    if (roleResult.status === 'fulfilled') setRoles(roleResult.value)
+    else setRolesError(extractErrorReason(roleResult.reason, t))
+    if (orgResult.status === 'fulfilled') {
+      setOrgs(orgResult.value)
+      const codes = [...new Set(orgResult.value.map((org) => org.position).filter(Boolean))]
+      const details = await Promise.allSettled(codes.map((code) => getPosition(code)))
+      if (!isCurrent()) return
+      const names = new Map<string, string>()
+      for (const detail of details) {
+        if (detail.status === 'fulfilled') names.set(detail.value.code, detail.value.name)
+        else setPositionsError(extractErrorReason(detail.reason, t))
+      }
+      setPositionNames(names)
+    } else setOrgsError(extractErrorReason(orgResult.reason, t))
+    setExtrasLoading(false)
+  }, [extrasRequests, t])
+
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
       const profile = await getMyProfile()
+      if (!isCurrent()) return
       setUser(profile)
-
-      // 角色 / 组织任职单个失败不阻塞档案主体展示
-      const [roleItems, orgItems] = await Promise.all([
-        getMyRoles().catch(() => []),
-        listUserOrganizations(profile.id).catch(() => []),
-      ])
-      setRoles(roleItems)
-      setOrgs(orgItems)
+      void loadExtras(profile.id)
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      if (!isCurrent() || (axios.isAxiosError(err) && err.response?.status === 401)) return
       setError(extractErrorReason(err, t))
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [t])
+  }, [requests, loadExtras, t])
 
   useEffect(() => {
     void load()
-  }, [load])
+    return () => { requests.invalidate(); extrasRequests.invalidate() }
+  }, [load, requests, extrasRequests])
 
   /** 打开基本信息编辑弹窗：仅回填手机号与邮箱 */
   const openBasicEdit = () => {
@@ -164,7 +195,7 @@ function ProfileDescriptions() {
 
   return (
     <>
-      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'stretch', width: '100%' }}>
         <Card
           size="small"
@@ -236,7 +267,9 @@ function ProfileDescriptions() {
       </Card>
 
       <Card size="small" title={t('profile.rolesTitle')}>
-        {roles.length === 0 ? (
+        {rolesError ? (
+          <ErrorState message={rolesError} onRetry={() => user && void loadExtras(user.id)} />
+        ) : extrasLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : roles.length === 0 ? (
           <span>{t('profile.noData')}</span>
         ) : (
           <Space size={[8, 8]} wrap>
@@ -251,12 +284,17 @@ function ProfileDescriptions() {
       </Card>
 
       <Card size="small" title={t('profile.orgsTitle')}>
-        {orgs.length === 0 ? (
+        {positionsError && (
+          <ErrorState message={positionsError} onRetry={() => user && void loadExtras(user.id)} style={{ marginBottom: 12 }} />
+        )}
+        {orgsError ? (
+          <ErrorState message={orgsError} onRetry={() => user && void loadExtras(user.id)} />
+        ) : extrasLoading ? <Skeleton active paragraph={{ rows: 2 }} /> : orgs.length === 0 ? (
           <span>{t('profile.noData')}</span>
         ) : (
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
             {orgs.map((org) => (
-              <Card key={org.id} size="small" bordered style={{ background: 'transparent' }}>
+              <Card key={org.id} size="small" variant="outlined" style={{ background: 'transparent' }}>
                 <Descriptions column={2} size="small">
                   <Descriptions.Item label={t('profile.organization')}>
                     {org.organization_name}

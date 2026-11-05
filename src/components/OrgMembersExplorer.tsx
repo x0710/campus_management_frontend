@@ -1,3 +1,5 @@
+import { useRequestSequence } from '../composables/useRequestSequence'
+import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
 /**
  * 组织成员浏览器（可复用组件，代码要求 1）：
  * 左侧「组织树（可搜索）」+ 右侧「成员表（支持翻页/跳页/总数）」，
@@ -55,6 +57,7 @@ import { usePositionLabel } from '../composables/usePositionLabel'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
+import { useAuthStore } from '../store/auth'
 import { useUiStateStore } from '../store/uiState'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../utils/partyScore'
 import { groupOrganizationMembers, type UserMemberRow } from '../utils/userOrganization'
@@ -168,8 +171,10 @@ export default function OrgMembersExplorer({
   const [orgAverageLoading, setOrgAverageLoading] = useState(false)
 
   /** 加载指定组织的成员（force=true 绕过会话缓存） */
+  const memberRequests = useRequestSequence()
   const loadMembers = useCallback(
     async (orgId: number, page: number, force?: boolean) => {
+      const isCurrent = memberRequests.begin()
       setMembersLoading(true)
       setMembersError(null)
       try {
@@ -182,6 +187,7 @@ export default function OrgMembersExplorer({
               { page: current, page_size: memberPageSize },
               force,
             )
+            if (!isCurrent()) return
             all.push(...res.data)
             // 已到末页（total_pages 不含 0）或不足一页时结束
             if (current >= res.total_pages || res.data.length < memberPageSize) break
@@ -191,28 +197,27 @@ export default function OrgMembersExplorer({
           return
         }
         const res = await queryOrgMembers(orgId, { page, page_size: memberPageSize }, force)
+        if (!isCurrent()) return
         setMembers(res.data)
         setMemberTotal(res.total)
       } catch (err) {
         // 401 由 http 拦截器统一处理登录态，此处不重复提示
-        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) {
           setMembersError(extractErrorReason(err, t))
         }
       } finally {
-        setMembersLoading(false)
+        if (isCurrent()) setMembersLoading(false)
       }
     },
-    [memberPageSize, partyScoreColumns, t],
+    [memberPageSize, partyScoreColumns, t, memberRequests],
   )
 
   // 实际查询成员的组织：
   // 展示组织树时取用户在树中选中的组织；不展示组织树时固定为唯一组织（orgs[0]）
   const activeOrgId = showOrgTree ? selectedId : (orgs[0]?.id ?? null)
 
-  // 自动选中首个组织（老师端/学院端通常只有一个/少数组织，避免多一次点击）。
-  // autoSelectFirstWithMembers 开启时按组织树顺序（广度优先：根 → 下级）探测成员总数，
-  // 选中第一个有直属成员的组织；全部为空时回退根节点。
-  // 探测与成员表首页使用同一组参数，命中会话缓存，不会额外多打一次接口。
+  // 保留组织列表顺序，最多同时探测 4 个组织；找到成员后停止后续批次。
+  // 使用成员读取接口，兼容树中部分组织仅可见但没有成员读取权限的情况。
   useEffect(() => {
     if (!showOrgTree) return
     if (!autoSelectFirst || selectedId !== null || orgs.length === 0) return
@@ -222,23 +227,18 @@ export default function OrgMembersExplorer({
     }
 
     let cancelled = false
+    const token = useAuthStore.getState().token
+    const isCancelled = () => cancelled || token !== useAuthStore.getState().token
     void (async () => {
-      for (const org of orgs) {
+      const first = await firstMatchingInBatches(orgs, async (org) => {
         try {
-          const res = await queryOrgMembers(
-            org.id,
-            { page: 1, page_size: memberPageSize },
-          )
-          if (cancelled) return
-          if (res.total > 0) {
-            setSelectedId(fromModuleKey, org.id)
-            return
-          }
+          const res = await queryOrgMembers(org.id, { page: 1, page_size: memberPageSize })
+          return res.total > 0
         } catch {
-          if (cancelled) return
+          return false
         }
-      }
-      if (!cancelled) setSelectedId(fromModuleKey, orgs[0].id)
+      }, 4, isCancelled)
+      if (!isCancelled()) setSelectedId(fromModuleKey, first?.id ?? orgs[0].id)
     })()
 
     return () => {
@@ -402,6 +402,8 @@ export default function OrgMembersExplorer({
   // 切换组织后加载成员：默认回到第 1 页；搜索命中按目标页；首次进入沿用上次页码（跨路由返回恢复）
   useEffect(() => {
     if (activeOrgId === null) {
+      memberRequests.invalidate()
+      setMembersLoading(false)
       setMembers([])
       setMemberTotal(0)
       return
@@ -411,8 +413,10 @@ export default function OrgMembersExplorer({
     firstOrgLoadRef.current = false
     setMemberPage(fromModuleKey, targetPage)
     void loadMembers(activeOrgId, targetPage)
+    return () => memberRequests.invalidate()
   }, [
     activeOrgId,
+    memberRequests,
     loadMembers,
     consumePendingPage,
     fromModuleKey,

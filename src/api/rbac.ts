@@ -53,12 +53,14 @@ export async function createRole(body: RoleCreateRequest): Promise<number> {
 export async function updateRole(id: number, body: RoleUpdateRequest): Promise<void> {
   await http.patch(`/rbac/roles/${id}`, body)
   invalidate('GET /rbac/roles')
+  invalidate('GET /rbac/users/roles')
 }
 
 /** DELETE /api/rbac/roles/{id} 删除角色（级联清除用户/权限关联） */
 export async function deleteRole(id: number): Promise<void> {
   await http.delete(`/rbac/roles/${id}`)
   invalidate('GET /rbac/roles')
+  invalidate('GET /rbac/users/')
   invalidate(`GET /rbac/roles/${id}/permissions`)
   invalidate(`GET /rbac/roles/${id}/data-scopes`)
 }

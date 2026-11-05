@@ -63,7 +63,7 @@ export default function CounselingBookingView() {
         <h3 className="panel-card-title">{t('counseling.title')}</h3>
       </header>
       <div className="panel-card-body">
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={16} style={{ width: '100%' }}>
           <Alert type="warning" showIcon title={t('common.mockHint')} />
 
           {/* 左侧预约表单 + 右侧预约须知；窄屏下须知卡自动落到下方 */}

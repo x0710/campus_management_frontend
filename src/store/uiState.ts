@@ -4,6 +4,7 @@
  * 与 settings/auth 不同，这些状态不需要跨刷新保留，只需跨路由切换保留。
  */
 import { create } from 'zustand'
+import { useAuthStore } from './auth'
 import type { MemberSearchHit } from '../composables/useMemberSearch'
 
 /**
@@ -33,6 +34,7 @@ export interface MemberSearchState {
 }
 
 interface UiState {
+  reset: () => void
   /** 各组织视图当前选中的组织 ID，按模块 key 记忆（如 admin_m3 / leader_m3 / teacher_m3），null 表示未选中 */
   selectedOrgIds: Partial<Record<string, number | null>>
   setSelectedOrgId: (moduleKey: string, id: number | null) => void
@@ -55,6 +57,10 @@ interface UiState {
 }
 
 export const useUiStateStore = create<UiState>()((set) => ({
+  reset: () => set({
+    selectedOrgIds: {}, collapsedOrgTrees: {}, expandedOrgTreeKeys: {},
+    memberPages: {}, memberSearchStates: {},
+  }),
   selectedOrgIds: {},
   setSelectedOrgId: (moduleKey, id) =>
     set((s) => ({ selectedOrgIds: { ...s.selectedOrgIds, [moduleKey]: id } })),
@@ -76,3 +82,8 @@ export const useUiStateStore = create<UiState>()((set) => ({
       return { memberSearchStates: next }
     }),
 }))
+
+// 同步重置，确保新身份的页面首次渲染前已移除上个账号的搜索结果。
+useAuthStore.subscribe((state, previous) => {
+  if (state.token !== previous.token) useUiStateStore.getState().reset()
+})

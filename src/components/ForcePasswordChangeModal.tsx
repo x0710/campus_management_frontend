@@ -71,7 +71,7 @@ export default function ForcePasswordChangeModal() {
       width={440}
       /* 强制弹窗：不可关闭，必须完成改密 */
       closable={false}
-      maskClosable={false}
+      mask={{ closable: false }}
       keyboard={false}
       destroyOnHidden
       footer={

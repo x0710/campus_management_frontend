@@ -25,7 +25,7 @@ import axios from 'axios'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { invalidate } from '../api/cache'
-import { changeMyPassword, getCurrentUser, getMyRoles } from '../api/auth'
+import { changeMyPassword, getCurrentUser } from '../api/auth'
 import { getMyProfile } from '../api/users'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
@@ -40,6 +40,8 @@ import {
 } from '../config/portals'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
+import { useSharedResource } from '../composables/useSharedResource'
+import { myRolesResource } from '../store/referenceData'
 import { useSettingsStore } from '../store/settings'
 import PortalNoticeBell from './PortalNoticeBell'
 
@@ -83,9 +85,10 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   // 真实姓名：登录态只带账户名，姓名需经 GET /api/users/me 获取（走会话缓存，不重复请求）
   const [realName, setRealName] = useState<string | null>(null)
   // 当前用户可访问的门户 key：由角色查询结果映射而来
-  const [portalKeys, setPortalKeys] = useState<PortalKey[]>([])
+  const { data: roles } = useSharedResource(myRolesResource)
+  const portalKeys = useMemo(() => getAccessiblePortalKeys(roles), [roles])
   // 是否为超级管理员：超管保留全部门户切换入口（与原先行为一致）
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const isSuperAdmin = roles.some(isSuperAdminRole)
   // 「重置密码」弹窗：本人改密（需旧密码校验）
   const [resetOpen, setResetOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -99,23 +102,6 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
       })
       .catch(() => {
         // 姓名仅用于顶栏展示，取不到时静默回退账户名，不打断用户（401 由全局拦截器处理）
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    getMyRoles()
-      .then((roles) => {
-        if (cancelled) return
-        // 按角色及上下级关系解析门户，上级角色同时获得下级门户选项
-        setIsSuperAdmin(roles.some(isSuperAdminRole))
-        setPortalKeys(getAccessiblePortalKeys(roles))
-      })
-      .catch(() => {
-        // 角色仅用于门户切换菜单；查询失败时保持空列表，不打断顶栏展示
       })
     return () => {
       cancelled = true
@@ -197,15 +183,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   }, [t, profileModuleKey])
 
   /** 下拉展开时强制刷新角色，避免后端角色变更后仍显示旧菜单 */
-  const refreshPortalKeys = async () => {
-    try {
-      const roles = await getMyRoles(true)
-      setIsSuperAdmin(roles.some(isSuperAdminRole))
-      setPortalKeys(getAccessiblePortalKeys(roles))
-    } catch {
-      // 刷新失败时保留原菜单，不打断用户操作
-    }
-  }
+  const refreshPortalKeys = () => { void myRolesResource.load(true) }
 
   /** 打开「重置密码」弹窗并清空上次输入 */
   const openResetPassword = () => {

@@ -55,7 +55,7 @@ export default function PartyScoreDeductionButton({ userId, onSaved }: {
     <Modal open={open} title={t('partyDeduction.action')} confirmLoading={saving}
       onOk={() => void submit()} onCancel={() => { if (!saving) setOpen(false) }}
       okText={t('partyDeduction.confirm')} okButtonProps={{ danger: true }}
-      cancelButtonProps={{ disabled: saving }} closable={!saving} maskClosable={!saving}>
+      cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }}>
       <Alert type="warning" showIcon title={t('partyDeduction.hint')} style={{ marginBottom: 16 }} />
       <Form form={form} layout="vertical">
         <Form.Item label={t('partyDeduction.target')}><span>{names.get(userId) || `#${userId}`}</span></Form.Item>

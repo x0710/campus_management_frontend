@@ -119,7 +119,7 @@ export default function SecondClassCreditsView() {
           <h3 className="panel-card-title">{t('credits.title')}</h3>
         </header>
         <div className="panel-card-body">
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Alert type="warning" showIcon title={t('common.mockHint')} />
 
             {/* 总学分进度 */}
@@ -143,7 +143,7 @@ export default function SecondClassCreditsView() {
                   />
                 </Col>
                 <Col xs={24} sm={16}>
-                  <Space direction="vertical" size={12}>
+                  <Space orientation="vertical" size={12}>
                     <Statistic title={t('credits.totalTitle')} value={totalEarned} suffix={`/ ${TOTAL_REQUIRED}`} />
                     <Statistic title={t('credits.required')} value={TOTAL_REQUIRED} />
                     <Statistic title={t('credits.earned')} value={totalEarned} />

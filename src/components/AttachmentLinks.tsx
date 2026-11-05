@@ -39,7 +39,7 @@ function AttachmentItem({ url, index }: { url: string; index: number }) {
   }
 
   return (
-    <Space direction="vertical" size={4} align="center">
+    <Space orientation="vertical" size={4} align="center">
       <Image
         src={url}
         alt={`${t('common.attachment')} ${index + 1}`}

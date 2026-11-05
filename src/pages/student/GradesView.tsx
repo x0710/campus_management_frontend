@@ -289,7 +289,7 @@ export default function GradesView() {
               onRetry={() => setReload((r) => ({ seq: r.seq + 1, force: true }))}
             />
           ) : (
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={16} style={{ width: '100%' }}>
               <Row gutter={16}>
                 <Col xs={24} sm={8}>
                   <Card size="small">

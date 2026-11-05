@@ -1,3 +1,6 @@
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import { useSharedResource } from '../../composables/useSharedResource'
+import { myRolesResource } from '../../store/referenceData'
 import {
   KeyOutlined,
   MinusCircleOutlined,
@@ -41,7 +44,7 @@ import type { RoleInfo } from '../../api/types/rbac'
 import { listAllOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
 import UsablePositionSelect from '../../components/UsablePositionSelect'
-import { getCurrentUser, getMyRoles, impersonateUser } from '../../api/auth'
+import { getCurrentUser, impersonateUser } from '../../api/auth'
 import { invalidate } from '../../api/cache'
 import { useAuthStore } from '../../store/auth'
 import { extractErrorReason } from '../../api/common'
@@ -119,11 +122,14 @@ export default function UsersAdminView() {
     force: false,
   })
 
+  const [rolesError, setRolesError] = useState<string | null>(null)
+  const requests = useRequestSequence()
   const [roleMap, setRoleMap] = useState<Map<number, RoleInfo[]>>(new Map())
   // 组织 / 职位选项：仅用于新建用户弹窗（编辑入口已移到成员详情页，见 MemberDetailPage）
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
   const [myUid, setMyUid] = useState<number | null>(null)
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const { data: myRoles } = useSharedResource(myRolesResource)
+  const isSuperAdmin = myRoles.some((role) => role.code === 'super_admin')
   const [switchingUid, setSwitchingUid] = useState<number | null>(null)
 
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
@@ -179,14 +185,6 @@ export default function UsersAdminView() {
     }
   }, [navigate, reportError])
 
-  useEffect(() => {
-    let cancelled = false
-    void getMyRoles().then((roles) => {
-      if (!cancelled) setIsSuperAdmin(roles.some((role) => role.code === 'super_admin'))
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
   // 基础数据：组织、职位（新建弹窗下拉用）与当前 uid
   useEffect(() => {
     void (async () => {
@@ -204,8 +202,11 @@ export default function UsersAdminView() {
   }, [])
 
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
+    setRolesError(null)
+    setRoleMap(new Map())
     try {
       const res = await queryUsers(
         {
@@ -217,38 +218,44 @@ export default function UsersAdminView() {
         },
         reload.force,
       )
+      if (!isCurrent()) return
       setRows(res.data)
       setTotal(res.total)
 
-      // 批量查角色：后端在 uids 首位为本人时只返回本人，故把本人排到末尾
-      const me = await getCurrentUser().catch(() => null)
+      // 按当前页查询；查询他人需 admin，不能通过调整本人位置绕过权限检查。
       const uids = res.data.map((u) => u.uid)
-      if (me) uids.sort((a, b) => (a === me.uid ? 1 : b === me.uid ? -1 : 0))
       if (uids.length) {
         try {
-          const userRoles = await queryUserRoles(uids)
+          const userRoles = await queryUserRoles(uids, reload.force)
+          if (!isCurrent()) return
           const map = new Map<number, RoleInfo[]>()
-          for (const r of userRoles) {
-            const arr = map.get(r.uid)
-            const { uid, ...role } = r
+          for (const role of userRoles) {
+            const arr = map.get(role.uid)
             if (arr) arr.push(role)
-            else map.set(r.uid, [role])
+            else map.set(role.uid, [role])
           }
           setRoleMap(map)
-        } catch {
-          // 角色查询失败不阻塞用户列表
+        } catch (err) {
+          if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) {
+            const reason = extractErrorReason(err, t)
+            setRolesError(axios.isAxiosError(err) && err.response?.status === 403
+              ? `${reason} ${t('adminUsers.rolesPermissionHint')}` : reason)
+          }
         }
       }
     } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) setError(extractErrorReason(err, t))
+      if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) {
+        setError(extractErrorReason(err, t))
+      }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [page, keyword, uidFilter, status, reload.seq, reload.force, t])
+  }, [page, keyword, uidFilter, status, reload.force, t, requests])
 
   useEffect(() => {
     void load()
-  }, [load])
+    return () => requests.invalidate()
+  }, [load, reload.seq, requests])
 
   /**
    * 人员搜索：提交后按输入内容筛选列表。
@@ -501,6 +508,7 @@ export default function UsersAdminView() {
         title: t('adminUsers.fieldRoles'),
         key: 'roles',
         render: (_, record) => {
+          if (rolesError) return <span className="cell-sub">{t('common.loadFailed')}</span>
           const list = roleMap.get(record.uid)
           if (!list || list.length === 0) return <span className="cell-sub">—</span>
           return list.map((r) => (
@@ -586,6 +594,7 @@ export default function UsersAdminView() {
     [
       t,
       roleMap,
+      rolesError,
       userOrgs,
       positionLabel,
       actingUid,
@@ -633,6 +642,15 @@ export default function UsersAdminView() {
           </div>
         </header>
         <div className="panel-card-body">
+          {rolesError && !error && (
+            <Alert
+              type="warning"
+              showIcon
+              title={t('adminUsers.rolesLoadFailed')}
+              description={rolesError}
+              style={{ marginBottom: 12 }}
+            />
+          )}
           {error ? (
             <ErrorState
               message={error}

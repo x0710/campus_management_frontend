@@ -91,19 +91,15 @@ export default function StudentProfileView() {
         }),
       )
 
-      // 4) 并发补齐职位详情（职位接口当前可能异常，单个失败不影响其它，保留原始 code）
-      const orgItems: OrgItem[] = await Promise.all(
-        userOrgs.map(async (uo) => {
-          const item: OrgItem = { ...uo }
-          if (!uo.position) return item
-          try {
-            item.positionDetail = await getPosition(uo.position)
-          } catch (err) {
-            item.positionError = extractErrorReason(err, t)
-          }
-          return item
-        }),
-      )
+      // 4) 按任职记录中的职位编码补齐名称与说明，单项失败不阻塞其他任职。
+      const orgItems = await Promise.all(userOrgs.map(async (uo): Promise<OrgItem> => {
+        if (!uo.position) return { ...uo }
+        try {
+          return { ...uo, positionDetail: await getPosition(uo.position) }
+        } catch (err) {
+          return { ...uo, positionError: extractErrorReason(err, t) }
+        }
+      }))
 
       setUser(detail)
       setRoles(roleItems)
@@ -152,7 +148,7 @@ export default function StudentProfileView() {
         ) : error ? (
           <ErrorState message={error} />
         ) : user ? (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             {/* 基本信息与头像并排：基本信息自适应占据剩余宽度，头像固定在右侧；窄屏自动换行 */}
             <div
               style={{
@@ -257,12 +253,12 @@ export default function StudentProfileView() {
               {orgs.length === 0 ? (
                 <Text type="secondary">{t('profile.noData')}</Text>
               ) : (
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                   {orgs.map((uo) => (
                     <Card
                       key={uo.id}
                       size="small"
-                      bordered
+                      variant="outlined"
                       style={{ background: 'transparent' }}
                     >
                       <Descriptions column={2} size="small">

@@ -2,6 +2,8 @@
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import { queryUserRoles } from './rbac'
+import { CanceledError } from 'axios'
+import { useAuthStore } from '../store/auth'
 import type { PaginatedResponse } from './types/common'
 import type { UserRoleInfo } from './types/rbac'
 import type {
@@ -61,7 +63,9 @@ export function getCredential(uid: number): Promise<UserInfo> {
  * @returns 当前用户角色列表
  */
 export async function getMyRoles(force?: boolean): Promise<UserRoleInfo[]> {
+  const token = useAuthStore.getState().token
   const me = await getCurrentUser()
+  if (token !== useAuthStore.getState().token) throw new CanceledError('Session changed')
   const roles = await queryUserRoles([me.uid], force)
   return roles.filter((role) => role.uid === me.uid)
 }

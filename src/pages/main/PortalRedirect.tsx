@@ -30,16 +30,18 @@ export default function PortalRedirect() {
 
   useEffect(() => {
     let cancelled = false
+    const token = useAuthStore.getState().token
+    const isCurrent = () => !cancelled && token === useAuthStore.getState().token
     getMyRoles()
       .then((roles) => {
-        if (cancelled) return
+        if (!isCurrent()) return
         // 按角色分流：支部书记（branch_secretary）→ 支部端；
         // 党委委员（secretary）→ 学院端；校级党委（PARTY_SCH）→ 学校端；其余默认党员端
         const portalKey = resolveDefaultPortalKey(roles)
         navigate(`/portal/${portalKey}`, { replace: true })
       })
       .catch((err) => {
-        if (cancelled) return
+        if (!isCurrent()) return
         // 先清空接口会话缓存再清登录态，避免下一位用户看到上一位用户的数据（代码要求 17）
         invalidate()
         clearAuth()
