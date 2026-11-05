@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../../composables/usePositionLabel'
 /** 学生端个人信息：汇总用户基本资料、角色、组织任职。所有数据均来自会话级缓存，避免重复请求。 */
 
 import {
@@ -12,6 +13,7 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ErrorState from '../../components/ErrorState'
 import UserProfileEditModal from '../../components/UserProfileEditModal'
+import MyWorkplaceField from '../../components/MyWorkplaceField'
 import { getCurrentUser } from '../../api/auth'
 import { getRole, queryUserRoleRelations } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
@@ -43,6 +45,7 @@ interface OrgItem extends UserOrganization {
 /** 学生端个人信息：汇总用户基本资料、角色、组织任职。所有数据均来自会话级缓存，避免重复请求。 */
 export default function StudentProfileView() {
   const t = useT()
+  const positionLabel = usePositionLabel()
   const locale = useSettingsStore((s) => s.locale)
 
   const [user, setUser] = useState<UserDetail | null>(null)
@@ -269,7 +272,7 @@ export default function StudentProfileView() {
                         <Descriptions.Item label={t('profile.position')}>
                           {uo.positionDetail ? (
                             <Space>
-                              <Tag color="geekblue">{uo.positionDetail.name}</Tag>
+                              <Tag color="geekblue">{positionLabel(uo.position, uo.positionDetail.name)}</Tag>
                               {uo.positionDetail.description ? (
                                 <Text type="secondary" style={{ marginLeft: 4 }}>
                                   {uo.positionDetail.description}
@@ -278,7 +281,7 @@ export default function StudentProfileView() {
                             </Space>
                           ) : uo.position ? (
                             <Space>
-                              <Tag color="default">{uo.position}</Tag>
+                              <Tag color="default">{positionLabel(uo.position)}</Tag>
                               {uo.positionError ? (
                                 <Text type="danger" style={{ fontSize: 12 }}>
                                   ({uo.positionError})
@@ -290,7 +293,13 @@ export default function StudentProfileView() {
                           )}
                         </Descriptions.Item>
                         <Descriptions.Item label={t('profile.workplace')} span={2}>
-                          {uo.workplace ?? t('profile.noData')}
+                          <MyWorkplaceField
+                            memberId={uo.id}
+                            workplace={uo.workplace}
+                            onSaved={(workplace) => setOrgs((items) => items.map((item) =>
+                              item.id === uo.id ? { ...item, workplace } : item,
+                            ))}
+                          />
                         </Descriptions.Item>
                       </Descriptions>
                     </Card>

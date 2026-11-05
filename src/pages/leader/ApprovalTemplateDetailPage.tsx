@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../../composables/usePositionLabel'
 /**
  * 领导端：审批指标（审批模板）详情页。
  *
@@ -83,6 +84,7 @@ interface TemplateInfoFormValues {
 
 export default function ApprovalTemplateDetailPage() {
   const t = useT()
+  const positionLabel = usePositionLabel()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
@@ -144,7 +146,7 @@ export default function ApprovalTemplateDetailPage() {
           setPositionOptions(
             res.data.map((position) => ({
               value: position.code,
-              label: position.name || position.code,
+              label: position.name,
             })),
           )
         }
@@ -263,7 +265,7 @@ export default function ApprovalTemplateDetailPage() {
         key: 'position',
         width: 130,
         render: (value: string | null) =>
-          value ? positionNameMap.get(value) ?? value : <span className="cell-sub">—</span>,
+          value ? positionLabel(value, positionNameMap.get(value)) : <span className="cell-sub">—</span>,
       },
       {
         title: t('approvalTemplate.colStepAssignee'),
@@ -319,7 +321,7 @@ export default function ApprovalTemplateDetailPage() {
         ),
       },
     ],
-    [t, positionNameMap, deletingStepId, doDeleteStep],
+    [t, positionNameMap, positionLabel, deletingStepId, doDeleteStep],
   )
 
   return (
@@ -515,7 +517,7 @@ export default function ApprovalTemplateDetailPage() {
           mode={stepModal?.mode ?? 'create'}
           templateId={detail.id}
           step={stepModal?.step ?? null}
-          positionOptions={positionOptions}
+          positionOptions={positionOptions.map((option) => ({ ...option, label: positionLabel(option.value, option.label) }))}
           positionsLoading={positionsLoading}
           onCancel={() => setStepModal(null)}
           onSaved={() => {

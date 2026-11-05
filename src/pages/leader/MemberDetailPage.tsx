@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../../composables/usePositionLabel'
 /**
  * 成员详情页（领导端「组织概览」、老师端「班级管理」、党委各端支部管理、
  * 管理端「组织架构」与党委学校端「组织管理」共用，渲染在 PortalWorkspace 布局壳内）。
@@ -526,6 +527,7 @@ function BasicInfoPanel({
   const [partyForm] = Form.useForm<PartyProfileFormValues>()
   // 职位详情接口不可用时的兜底映射：编码 → 名称（未命中仍显示编码）
   const positionNames = usePositionNames()
+  const positionLabel = usePositionLabel()
 
   // 仅依赖成员 ID（而非整个 user 对象），避免成员详情重新拉取后因对象引用变化而重复请求
   const memberId = user?.id
@@ -912,7 +914,7 @@ function BasicInfoPanel({
                                     return (
                                       <Space key={code} size={4}>
                                         <Tag color={detail ? 'geekblue' : 'default'}>
-                                          {detail?.name ?? positionNames.get(code) ?? code}
+                                          {positionLabel(code, detail?.name)}
                                         </Tag>
                                         {detail?.description ? (
                                           <Text type="secondary" style={{ marginLeft: 4 }}>

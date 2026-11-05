@@ -32,7 +32,7 @@ import { assignUserRoles, queryUserRoleRelations } from '../../api/rbac'
 import { getUser, updateUser } from '../../api/users'
 import type { UserDetail, Gender } from '../../api/types/users'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
-import { usePositionNames } from '../../composables/usePositionNames'
+import { usePositionLabel } from '../../composables/usePositionLabel'
 import { useT } from '../../i18n'
 import { normalizeGender } from '../../utils/gender'
 
@@ -86,8 +86,8 @@ export default function UserEditPanel({
   const [orgBusy, setOrgBusy] = useState<string | null>(null)
 
   const reportError = useErrorFeedback()
-  // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，未命中回退编码）
-  const positionNames = usePositionNames()
+  // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，管理员附带编号）
+  const positionLabel = usePositionLabel()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -227,10 +227,10 @@ export default function UserEditPanel({
         dataIndex: 'position',
         key: 'position',
         width: 150,
-        // 显示职位名称（映射失败时回退编码），悬停展示原始编码便于核对
+        // 显示职位名称（名称缺失时显示未知），管理员附带编号便于核对
         render: (v: string) => (
-          <Tooltip title={v}>
-            <Tag color="blue">{positionNames.get(v) ?? v}</Tag>
+          <Tooltip title={positionLabel(v)}>
+            <Tag color="blue">{positionLabel(v)}</Tag>
           </Tooltip>
         ),
       },
@@ -259,7 +259,7 @@ export default function UserEditPanel({
         ),
       },
     ],
-    [t, orgBusy, positionNames],
+    [t, orgBusy, positionLabel],
   )
 
   if (loading || !detail) {

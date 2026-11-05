@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../../composables/usePositionLabel'
 import { BellOutlined, EditOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, Descriptions, Empty, Form, Input, Modal, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
 import axios from 'axios'
@@ -32,6 +33,7 @@ import { useSettingsStore } from '../../store/settings'
 import { formatDateOnly, formatDateTime } from '../../utils/datetime'
 import { normalizeGender } from '../../utils/gender'
 import OrganizationName from '../../components/OrganizationName'
+import MyWorkplaceField from '../../components/MyWorkplaceField'
 
 /**
  * 党员端：我的（我的成绩记录 / 年度评价报告 / 消息通知 / 审批指南 / 关于井大大先锋）。
@@ -48,6 +50,7 @@ function ProfileDescriptions() {
   const locale = useSettingsStore((s) => s.locale)
   const username = useAuthStore((s) => s.username)
   const positionNames = usePositionNames()
+  const positionLabel = usePositionLabel()
   const { name, organizations } = useCurrentIdentity()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [roles, setRoles] = useState<UserRoleInfo[]>([])
@@ -261,14 +264,20 @@ function ProfileDescriptions() {
                   <Descriptions.Item label={t('profile.position')}>
                     {org.position ? (
                       <Tag color="geekblue">
-                        {positionNames.get(org.position) ?? org.position}
+                        {positionLabel(org.position)}
                       </Tag>
                     ) : (
                       t('profile.noData')
                     )}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('profile.workplace')} span={2}>
-                    {org.workplace ?? t('profile.noData')}
+                    <MyWorkplaceField
+                      memberId={org.id}
+                      workplace={org.workplace}
+                      onSaved={(workplace) => setOrgs((items) => items.map((item) =>
+                        item.id === org.id ? { ...item, workplace } : item,
+                      ))}
+                    />
                   </Descriptions.Item>
                 </Descriptions>
               </Card>
@@ -338,7 +347,7 @@ function Placeholder() {
  */
 function ApprovalGuide() {
   const t = useT()
-  const positionNames = usePositionNames()
+  const positionLabel = usePositionLabel()
   const [templates, setTemplates] = useState<ApprovalTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -482,7 +491,7 @@ function ApprovalGuide() {
           size="small"
           items={steps.map((step) => {
             const role = step.position
-              ? positionNames.get(step.position) ?? step.position
+              ? positionLabel(step.position)
               : step.assignee_value ?? t('partyProfile.guideRoleUnset')
             const approver = approvers.find((item) => item.step_order === step.step_no)
             const parts = []

@@ -1,8 +1,8 @@
 /**
  * 党员端：首页（先锋指数概览 + 近期成绩申报记录）。
  * 顶部「姓名 | 组织链路」：经 useCurrentIdentity 取当前登录用户的真实姓名与任职组织，
- * 再取首个任职组织的组织树，按「根 → 当前组织」顺序展示完整链路
- * （如：井冈山大学 | 学院党委 | 数理学院党委 | 物理系学生党支部）；
+ * 从任职组织树中选择 ID 为 2 的组织下最深的链路，仅展示其子组织，
+ * 按「当前组织 → 上级组织」顺序展示（如：物理系学生党支部 | 数理学院党委）；
  * 姓名取不到时回退账户名，组织无任职时回退占位符（不使用业务数据做默认填充）。
  *
  * 加载期间展示骨架屏而非占位符/半成品名称，避免刷新时出现「— → 支部 → 学校」的跳变。
@@ -30,7 +30,7 @@ import {
   PARTY_RECENT_RECORD_LIMIT,
   PARTY_SCORE_APPLICATION_STATUS_COLOR,
 } from '../../config/partyDeclaration'
-import { PARTY_HOME_ORG_FALLBACK_NAME } from '../../config/organization'
+import { SCHOOL_COLLEGE_PARENT_ORG_ID } from '../../config/organization'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 
@@ -41,7 +41,7 @@ function formatRecordDate(value: string): string {
   return `${date.getMonth() + 1}.${date.getDate()}`
 }
 
-/** 顶部组织链路：按「根 → 当前组织」顺序记录每一级组织名称 */
+/** 顶部组织链路：仅包含组织 2 的子组织，按「当前组织 → 上级组织」排列。 */
 type PartyOrgChain = string[]
 
 export default function PartyHomeView() {
@@ -54,7 +54,6 @@ export default function PartyHomeView() {
   const username = useAuthStore((s) => s.username)
   const {
     name,
-    organizations,
     organizationIds,
     loading: identityLoading,
   } = useCurrentIdentity()
@@ -64,7 +63,6 @@ export default function PartyHomeView() {
   const [orgChain, setOrgChain] = useState<PartyOrgChain | null>(null)
   /** 组织信息是否仍在解析：为 true 时顶部整体展示骨架屏，避免占位符/半成品名称闪现 */
   const [orgLoading, setOrgLoading] = useState(true)
-  const firstOrganizationId = organizationIds[0]
 
   // 姓名：真实姓名优先，取不到时回退账户名，最后回退占位符
   const displayName = name?.trim() || username || t('common.unknown')
@@ -85,30 +83,31 @@ export default function PartyHomeView() {
       }
     }
 
-    if (firstOrganizationId === undefined) {
+    if (organizationIds.length === 0) {
       setOrgChain(null)
       setOrgLoading(false)
       return
     }
 
     setOrgLoading(true)
-    getOrganizationTree(firstOrganizationId)
-      .then((chain) => {
+    Promise.all(
+      organizationIds.map((id) => getOrganizationTree(id).catch(() => [])),
+    )
+      .then((chains) => {
         if (cancelled) return
-        // 完整展示「根 → 当前组织」链路（含学院党委容器节点），与需求格式一致
-        const names = chain.map((node) => node.name).filter(Boolean)
+        // 不能只取首个任职：它可能属于行政等其他组织体系。
+        // 组织 2 是展示范围的根，根节点自身及其上级均不显示。
+        const eligibleChains = chains
+          .map((chain) => {
+            const rootIndex = chain.findIndex((node) => node.id === SCHOOL_COLLEGE_PARENT_ORG_ID)
+            return rootIndex < 0 ? [] : chain.slice(rootIndex + 1)
+          })
+          .filter((chain) => chain.length > 0)
+          .sort((a, b) => b.length - a.length)
+        const names = (eligibleChains[0] ?? []).slice().reverse()
+          .map((node) => node.name).filter(Boolean)
+        // 无法确认属于组织 2 时不使用其他任职或固定学校名称兜底。
         setOrgChain(names.length > 0 ? names : null)
-      })
-      .catch(() => {
-        if (cancelled) return
-        // 组织树不可读（普通党员可能无 organization.read）：上级组织回退根组织名称，
-        // 支部名称仍取已解析出的任职组织，避免把已知的支部名覆盖成「井冈山大学」
-        const branch = organizations[0]
-        setOrgChain(
-          branch && branch !== PARTY_HOME_ORG_FALLBACK_NAME
-            ? [PARTY_HOME_ORG_FALLBACK_NAME, branch]
-            : [PARTY_HOME_ORG_FALLBACK_NAME],
-        )
       })
       .finally(() => {
         if (!cancelled) setOrgLoading(false)
@@ -117,7 +116,7 @@ export default function PartyHomeView() {
     return () => {
       cancelled = true
     }
-  }, [firstOrganizationId, identityLoading, organizations])
+  }, [organizationIds, identityLoading])
 
   /** 近期记录：创建时间倒序后截取固定条数 */
   const recentRecords = useMemo(
@@ -159,7 +158,7 @@ export default function PartyHomeView() {
                 <span className="party-profile-separator">|</span>
                 <span
                   className={
-                    index === displayOrgChain.length - 1
+                    index === 0
                       ? 'party-branch-name'
                       : 'party-parent-org'
                   }

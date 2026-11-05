@@ -158,9 +158,9 @@ export async function getRoleDataScopes(roleId: number): Promise<RoleDataScopeIn
 }
 
 /**
- * PUT /api/rbac/roles/{role_id}/data-scopes 覆盖式配置角色数据范围（先清空旧配置再批量写入）。
+ * PUT /api/rbac/roles/{role_id}/data-scopes 完整替换角色数据范围；使用完整权限码独立配置，历史资源名为默认值。
  * @param roleId 角色 ID（必填）
- * @param scopes 数据范围配置项数组（必填；传空数组表示清空该角色的全部数据范围）
+ * @param scopes 要保留的全部配置（包含未编辑的旧配置；空数组清空全部）
  * @returns Promise<void> 无返回值，请求成功即代表覆盖完成
  */
 export async function assignRoleDataScopes(

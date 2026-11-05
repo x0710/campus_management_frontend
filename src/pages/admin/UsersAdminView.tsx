@@ -48,7 +48,7 @@ import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
-import { usePositionNames } from '../../composables/usePositionNames'
+import { usePositionLabel } from '../../composables/usePositionLabel'
 import { useUserOrganizations } from '../../composables/useUserOrganizations'
 import { useT } from '../../i18n'
 import { isUidTerm } from '../../utils/personSearch'
@@ -129,8 +129,8 @@ export default function UsersAdminView() {
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
   const pageUids = useMemo(() => rows.map((u) => u.uid), [rows])
   const userOrgs = useUserOrganizations(pageUids)
-  // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，未命中回退编码）
-  const positionNames = usePositionNames()
+  // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，管理员附带编号）
+  const positionLabel = usePositionLabel()
 
   // 点击行进入成员详情页（与组织架构共用同一页面，?from=admin_m1 让侧栏保持高亮本模块）
   const openDetail = useCallback(
@@ -526,9 +526,9 @@ export default function UsersAdminView() {
               {list.map((o) => (
                 <Tag
                   key={`${o.organization_id}-${o.position}`}
-                  title={`${o.organization_name} / ${o.position}${o.workplace ? ' / ' + o.workplace : ''}`}
+                  title={`${o.organization_name} / ${positionLabel(o.position)}${o.workplace ? ' / ' + o.workplace : ''}`}
                 >
-                  {o.organization_name}·{positionNames.get(o.position) ?? o.position}
+                  {o.organization_name}·{positionLabel(o.position)}
                 </Tag>
               ))}
             </span>
@@ -587,7 +587,7 @@ export default function UsersAdminView() {
       t,
       roleMap,
       userOrgs,
-      positionNames,
+      positionLabel,
       actingUid,
       myUid,
       openResetPassword,

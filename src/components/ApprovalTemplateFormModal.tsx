@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../composables/usePositionLabel'
 /**
  * 审批模板表单弹窗（可复用组件）：一个弹窗承载「新增 / 编辑 / 查看详情」三种模式。
  * - create：空表单（默认值填充，不使用业务数据），提交 POST /api/approvals/templates；
@@ -113,6 +114,7 @@ export default function ApprovalTemplateFormModal({
   onStepsChanged,
 }: ApprovalTemplateFormModalProps) {
   const t = useT()
+  const positionLabel = usePositionLabel()
   const { message } = AntdApp.useApp()
   const locale = useSettingsStore((s) => s.locale)
   const { portalKey } = useParams<{ portalKey?: string }>()
@@ -200,7 +202,7 @@ export default function ApprovalTemplateFormModal({
       .then((res) => {
         if (cancelledRef.cancelled) return
         setPositionOptions(
-          res.data.map((p) => ({ value: p.code, label: p.name || p.code })),
+          res.data.map((p) => ({ value: p.code, label: p.name })),
         )
       })
       .catch((err) => {
@@ -346,7 +348,7 @@ export default function ApprovalTemplateFormModal({
         width: 130,
         // 角色列展示职位名称（position 存的是职位编码）
         render: (v: string | null) =>
-          v ? (positionNameMap.get(v) ?? v) : <span className="cell-sub">—</span>,
+          v ? positionLabel(v, positionNameMap.get(v)) : <span className="cell-sub">—</span>,
       },
       {
         title: t('approvalTemplate.colStepAssignee'),
@@ -401,7 +403,7 @@ export default function ApprovalTemplateFormModal({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, deletingStepId, positionNameMap],
+    [t, deletingStepId, positionNameMap, positionLabel],
   )
 
   const title =
@@ -586,7 +588,7 @@ export default function ApprovalTemplateFormModal({
           mode={stepModal?.mode ?? 'create'}
           templateId={templateId}
           step={stepModal?.step}
-          positionOptions={positionOptions}
+          positionOptions={positionOptions.map((option) => ({ ...option, label: positionLabel(option.value, option.label) }))}
           positionsLoading={positionsLoading}
           onCancel={() => setStepModal(null)}
           onSaved={() => {

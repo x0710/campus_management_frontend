@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../composables/usePositionLabel'
 /**
  * 审批步骤表单弹窗（可复用组件）：新增 / 编辑审批模板下的一个步骤。
  * - create：空表单（默认值填充，不使用业务数据），提交 POST /api/approvals/templates/{template_id}/steps；
@@ -60,6 +61,7 @@ export default function ApprovalTemplateStepModal({
   onSaved,
 }: ApprovalTemplateStepModalProps) {
   const t = useT()
+  const positionLabel = usePositionLabel()
   const { message } = AntdApp.useApp()
   const [form] = Form.useForm<StepFormValues>()
   const [saving, setSaving] = useState(false)
@@ -131,6 +133,7 @@ export default function ApprovalTemplateStepModal({
             showSearch
             loading={positionsLoading}
             options={positionOptions}
+            labelRender={({ value, label }) => label ?? positionLabel(String(value))}
             placeholder={t('approvalTemplate.fieldStepPositionPlaceholder')}
             optionFilterProp="label"
           />

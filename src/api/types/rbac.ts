@@ -84,17 +84,17 @@ export type DataScope = 'all' | 'self_only' | 'org' | 'org_and_child' | 'custom'
 
 /** 角色单条数据范围配置（GET /api/rbac/roles/{role_id}/data-scopes 返回元素） */
 export interface RoleDataScopeInfo {
-  /** 资源标识，通常取权限编码的最前列，如权限 student.read 对应资源 student */
+  /** 完整权限码（如 student.read）；历史资源名（如 student）为兼容默认值 */
   resource: string
-  /** 数据权限范围 */
-  scope: DataScope
+  /** 数据权限范围；历史 self 等价于 self_only */
+  scope: DataScope | 'self'
   /** 仅 scope='custom' 时有值：逗号分隔的组织 ID 白名单，如 "1,2,3"；其余情况为 null */
   scope_value: string | null
 }
 
 /** 角色数据范围配置项（PUT /api/rbac/roles/{role_id}/data-scopes 请求体数组元素） */
 export interface RoleDataScopeRequest {
-  /** 资源标识（必填，不能为空） */
+  /** 配置键：推荐完整权限码，也接受历史资源名；不支持通配符 */
   resource: string
   /** 数据权限范围（必填） */
   scope: DataScope

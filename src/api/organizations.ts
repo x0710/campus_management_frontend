@@ -14,6 +14,7 @@ import type {
   OrganizationQuery,
   OrganizationTreeNode,
   UserOrganization,
+  WorkplaceUpdateRequest,
 } from './types/organizations'
 
 /** GET /api/organizations 分页查询组织（会话内缓存；force=true 手动刷新绕过缓存） */
@@ -201,5 +202,17 @@ export async function listUserOrganizationsBatch(
  */
 export function listUserOrganizations(uid: number, force?: boolean): Promise<UserOrganization[]> {
   return listUserOrganizationsBatch([uid], force)
+}
+
+/** 修改任职工作地点；本人仅需登录，他人需 organization.member.update 及相应数据范围。 */
+export async function updateMemberWorkplace(
+  memberId: number,
+  workplace: string | null,
+): Promise<void> {
+  const body: WorkplaceUpdateRequest = { workplace }
+  await http.patch(`/organization-members/${memberId}/workplace`, body)
+  invalidate('GET /organization-members')
+  invalidate('GET /organizations')
+  invalidate('GET /user-positions')
 }
 

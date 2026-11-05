@@ -22,7 +22,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { MemberSearchHit } from '../composables/useMemberSearch'
-import { usePositionNames } from '../composables/usePositionNames'
+import { usePositionLabel } from '../composables/usePositionLabel'
 import { useUserNames } from '../composables/useUserNames'
 import { useUserOrganizations } from '../composables/useUserOrganizations'
 import { MEMBER_TABLE_PAGE_SIZE } from '../config/organization'
@@ -89,7 +89,7 @@ export default function MatchedMembersTable({
   const pageUids = useMemo(() => pageRows.map((r) => r.uid), [pageRows])
   const names = useUserNames(pageUids)
   const userOrgs = useUserOrganizations(pageUids)
-  const positionNames = usePositionNames()
+  const positionLabel = usePositionLabel()
 
   // 命中行随页渲染出来后滚动到可视区中部（命中项可能位于长列表深处）
   useEffect(() => {
@@ -120,8 +120,8 @@ export default function MatchedMembersTable({
       return (
         <Space wrap size={[8, 4]}>
           {codes.map((code) => (
-            <Tooltip key={code} title={code}>
-              <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+            <Tooltip key={code} title={positionLabel(code)}>
+              <Tag color="blue">{positionLabel(code)}</Tag>
             </Tooltip>
           ))}
         </Space>
@@ -182,7 +182,7 @@ export default function MatchedMembersTable({
         ),
       },
     ]
-  }, [t, names, userOrgs, positionNames, onOpenMember])
+  }, [t, names, userOrgs, positionLabel, onOpenMember])
 
   return (
     <Table<MemberSearchHit>

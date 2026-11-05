@@ -51,7 +51,7 @@ import {
 } from '../api/partyScores'
 import type { OrganizationMember } from '../api/types/organizations'
 import { findMemberPage, useMemberSearch } from '../composables/useMemberSearch'
-import { usePositionNames } from '../composables/usePositionNames'
+import { usePositionLabel } from '../composables/usePositionLabel'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
@@ -258,8 +258,8 @@ export default function OrgMembersExplorer({
   // 成员表展示行：同一成员在当前组织有多个职位时合并为一行（避免出现两个一样的人）
   const memberRows = useMemo(() => groupOrganizationMembers(members), [members])
   const allMemberIds = useMemo(() => memberRows.map((m) => m.user_id), [memberRows])
-  // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，未命中回退编码）
-  const positionNames = usePositionNames()
+  // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，管理员附带编号）
+  const positionLabel = usePositionLabel()
 
   /** 职位筛选可选项：当前组织全量成员中实际出现的职位（支持多选） */
   const positionOptions = useMemo(() => {
@@ -269,9 +269,9 @@ export default function OrgMembersExplorer({
       if (code) codes.add(code)
     }
     return [...codes]
-      .map((code) => ({ value: code, label: positionNames.get(code) ?? code }))
+      .map((code) => ({ value: code, label: positionLabel(code) }))
       .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
-  }, [members, positionNames])
+  }, [members, positionLabel])
 
   /**
    * 职位筛选 + 分数排序后的全量成员行。
@@ -553,15 +553,15 @@ export default function OrgMembersExplorer({
           ),
           key: 'position',
           width: 200,
-          // 同一组织多个职位：职位栏并列展示全部职位（映射失败时回退编码），悬停展示原始编码
+          // 同一组织多个职位：职位栏并列展示全部职位（名称缺失时显示未知），管理员附带编号
           render: (_, record) =>
             record.positions.length === 0 ? (
               '—'
             ) : (
               <Space wrap size={[8, 4]}>
                 {record.positions.map((code) => (
-                  <Tooltip key={code} title={code}>
-                    <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+                  <Tooltip key={code} title={positionLabel(code)}>
+                    <Tag color="blue">{positionLabel(code)}</Tag>
                   </Tooltip>
                 ))}
               </Space>
@@ -610,15 +610,15 @@ export default function OrgMembersExplorer({
         title: t('adminOrg.colPosition'),
         key: 'position',
         width: 200,
-        // 同一组织多个职位：职位栏并列展示全部职位（映射失败时回退编码）
+        // 同一组织多个职位：职位栏并列展示全部职位（名称缺失时显示未知）
         render: (_, record) =>
           record.positions.length === 0 ? (
             '—'
           ) : (
             <Space wrap size={[8, 4]}>
               {record.positions.map((code) => (
-                <Tooltip key={code} title={code}>
-                  <Tag color="blue">{positionNames.get(code) ?? code}</Tag>
+                <Tooltip key={code} title={positionLabel(code)}>
+                  <Tag color="blue">{positionLabel(code)}</Tag>
                 </Tooltip>
               ))}
             </Space>
@@ -646,7 +646,7 @@ export default function OrgMembersExplorer({
   }, [
     t,
     memberNames,
-    positionNames,
+    positionLabel,
     openMember,
     partyScoreColumns,
     partyScores,

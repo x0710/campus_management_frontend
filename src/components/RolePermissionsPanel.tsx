@@ -1,14 +1,13 @@
 /**
  * 角色权限分配子页面（非弹窗，可复用组件）：
  * 从角色列表进入后，以页面内的子页面展示「分配权限」与「配置数据范围」——
- * 勾选权限后，在同行选择该权限所属资源的数据范围，点保存一并提交。
+ * 勾选权限后，在同行选择该权限的数据范围，点保存一并提交。
  * - 打开时并行拉取全部权限、角色已分配权限、角色已有数据范围配置；
  * - 顶部搜索框：输入停止 RBAC_PERM_SEARCH_DEBOUNCE_MS 后对本地缓存的权限列表做
  *   编码/名称的模糊匹配（子序列也算命中，如 `coll` → `college.read`），不额外发请求；
- * - 数据范围按「资源」维度生效（资源 = 权限编码第一段，见后端契约），
- *   因此同一资源下的多个权限共用同一数据范围；
+ * - 数据范围按完整权限码独立配置，未配置时显示历史资源默认值。
  * - 保存：先 PUT permissions 覆盖权限，再 PUT data-scopes 覆盖数据范围
- *   （仅提交已勾选权限对应的资源），成功后回调 onSaved（代码要求 13）。
+ *   （保留未编辑的全部配置），成功后回调 onSaved（代码要求 13）。
  */
 import {
   ArrowLeftOutlined,
@@ -38,7 +37,6 @@ import { extractErrorReason } from '../api/common'
 import type {
   DataScope,
   Permission as PermInfo,
-  RoleDataScopeRequest,
   RoleInfo,
 } from '../api/types/rbac'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
@@ -51,13 +49,7 @@ import {
 import { useT } from '../i18n'
 import ErrorState from './ErrorState'
 
-/** 单条资源的已编辑数据范围 */
-interface ScopeConfig {
-  /** 数据范围枚举 */
-  scope: DataScope
-  /** 自定义组织 ID 白名单（仅 scope='custom' 有效） */
-  scopeValue: string
-}
+import { parseRoleDataScopes, serializeRoleDataScopes, type ScopeConfig } from '../utils/roleDataScopes'
 
 interface RolePermissionsPanelProps {
   /** 目标角色（必填；返回列表后再次进入会重新挂载，内部状态自然重置） */
@@ -69,7 +61,7 @@ interface RolePermissionsPanelProps {
 }
 
 /**
- * 取权限编码对应的数据范围资源：取第一段（后端契约 `organization.member.read` → `organization`）。
+ * 取历史资源默认值的键；仅用于兼容旧配置，新编辑使用完整权限码。
  * @param code 权限编码（必填，如 college.read）
  * @returns 资源标识（无分隔符时返回原编码）
  */
@@ -168,13 +160,7 @@ export default function RolePermissionsPanel({
         setSelected(ids)
         setInitialSelected(ids)
 
-        const map: Record<string, ScopeConfig> = {}
-        for (const item of currentScopes) {
-          map[item.resource] = {
-            scope: item.scope,
-            scopeValue: item.scope_value ?? '',
-          }
-        }
+        const map = parseRoleDataScopes(currentScopes)
         setScopeMap(map)
         setInitialScopeMap(map)
       } catch (err) {
@@ -212,25 +198,22 @@ export default function RolePermissionsPanel({
     [perms, keyword],
   )
 
-  /** 已勾选权限涉及的资源（用于提交与脏检查） */
-  const selectedResources = useMemo(() => {
-    const resources = new Set<string>()
-    for (const item of perms) {
-      if (selectedSet.has(item.id)) resources.add(permissionResource(item.code))
-    }
-    return [...resources].sort()
-  }, [perms, selectedSet])
+  // PUT 是完整替换：比较并保留所有配置，包括历史默认值和暂未授权的权限配置。
+  const scopeKeys = useMemo(
+    () => [...new Set([...Object.keys(scopeMap), ...Object.keys(initialScopeMap)])].sort(),
+    [scopeMap, initialScopeMap],
+  )
 
-  /** 是否存在未保存修改（权限集合或已选资源的数据范围发生变化） */
+  /** 是否存在未保存修改（权限集合或任意数据范围发生变化） */
   const dirty = useMemo(() => {
     if (selected.length !== initialSelected.length) return true
     const initial = new Set(initialSelected)
     if (!selected.every((id) => initial.has(id))) return true
     return (
-      scopeSignature(scopeMap, selectedResources) !==
-      scopeSignature(initialScopeMap, selectedResources)
+      scopeSignature(scopeMap, scopeKeys) !==
+      scopeSignature(initialScopeMap, scopeKeys)
     )
-  }, [selected, initialSelected, scopeMap, initialScopeMap, selectedResources])
+  }, [selected, initialSelected, scopeMap, initialScopeMap, scopeKeys])
 
   /** 已勾选的权限明细（不受搜索过滤影响，用于顶部「已分配」展示） */
   const selectedPerms = useMemo(
@@ -243,7 +226,7 @@ export default function RolePermissionsPanel({
     setSelected((prev) => prev.filter((item) => item !== id))
   }
 
-  /** 写入/清空某个资源的数据范围（null 表示改为「未配置」） */
+  /** 写入/清空单项权限的精确范围（null 表示恢复默认值） */
   const updateScope = (resource: string, next: ScopeConfig | null) => {
     setScopeMap((prev) => {
       const copy = { ...prev }
@@ -262,7 +245,7 @@ export default function RolePermissionsPanel({
 
   /** 保存：校验自定义范围后，先覆盖权限、再覆盖数据范围 */
   const submit = async () => {
-    for (const resource of selectedResources) {
+    for (const resource of Object.keys(scopeMap)) {
       const config = scopeMap[resource]
       if (config?.scope === 'custom' && !config.scopeValue.trim()) {
         message.error(t('adminRoles.dsCustomRequired'))
@@ -271,17 +254,7 @@ export default function RolePermissionsPanel({
     }
     setSaving(true)
     try {
-      const scopes: RoleDataScopeRequest[] = selectedResources
-        .filter((resource) => scopeMap[resource] !== undefined)
-        .map((resource) => {
-          const config = scopeMap[resource]
-          return {
-            resource,
-            scope: config.scope,
-            scope_value:
-              config.scope === 'custom' ? config.scopeValue.trim() : null,
-          }
-        })
+      const scopes = serializeRoleDataScopes(scopeMap)
       await assignRolePermissions(role.id, selected)
       await assignRoleDataScopes(role.id, scopes)
       message.success(t('adminRoles.assignSuccess'))
@@ -315,17 +288,25 @@ export default function RolePermissionsPanel({
       key: 'scope',
       width: 260,
       render: (_, record) => {
-        const resource = permissionResource(record.code)
-        const config = scopeMap[resource]
-        const disabled = !selectedSet.has(record.id)
+        const resource = record.code
+        const explicit = scopeMap[resource]
+        const inherited = scopeMap[permissionResource(record.code)]
+        const config = explicit ?? inherited
+        // 接口不接受通配符配置键；通配权限仍可勾选授权。
+        const wildcard = resource.includes('*')
+        const disabled = !selectedSet.has(record.id) || wildcard
         return (
           <div className="rbac-scope-cell">
-            <Tooltip title={`${t('adminRoles.dsResource')}: ${resource}`}>
+            <Tooltip title={wildcard ? t('adminRoles.dsWildcard') : `${t('adminRoles.fieldCode')}: ${resource}`}>
               <Select<DataScope>
                 allowClear
-                value={config?.scope}
+                value={explicit?.scope}
                 disabled={disabled}
-                placeholder={t('adminRoles.dsNotConfigured')}
+                placeholder={wildcard
+                  ? t('adminRoles.dsWildcard')
+                  : t('adminRoles.dsInherited', {
+                      scope: scopeOptions.find((option) => option.value === (inherited?.scope ?? 'self_only'))?.label ?? '',
+                    })}
                 style={{ width: '100%' }}
                 options={scopeOptions}
                 onChange={(value) =>
@@ -348,7 +329,7 @@ export default function RolePermissionsPanel({
                 )}
               />
             </Tooltip>
-            {config?.scope === 'custom' && (
+            {!wildcard && config?.scope === 'custom' && (
               <Input
                 value={config.scopeValue}
                 disabled={disabled}

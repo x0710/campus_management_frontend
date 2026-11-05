@@ -1,3 +1,4 @@
+import { usePositionLabel } from '../composables/usePositionLabel'
 import { Select } from 'antd'
 import type { SelectProps } from 'antd'
 import { useEffect, useState } from 'react'
@@ -12,6 +13,7 @@ export default function UsablePositionSelect(props: Props) {
 }
 
 function OrganizationPositionSelect({ organizationId, ...props }: Props) {
+  const positionLabel = usePositionLabel()
   const [options, setOptions] = useState<{ value: string; label: string }[]>([])
   const [loading, setLoading] = useState(Boolean(organizationId))
   const reportError = useErrorFeedback()
@@ -20,11 +22,11 @@ function OrganizationPositionSelect({ organizationId, ...props }: Props) {
     if (!organizationId) return
     listAllPositions(false, { usable_in_organization_id: organizationId })
       .then((positions) => {
-        if (!cancelled) setOptions(positions.map((p) => ({ value: p.code, label: `${p.name}（${p.code}）` })))
+        if (!cancelled) setOptions(positions.map((p) => ({ value: p.code, label: p.name })))
       })
       .catch((err) => { if (!cancelled) reportError(err) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [organizationId, reportError])
-  return <Select {...props} options={options} loading={loading} disabled={!organizationId || loading} showSearch optionFilterProp="label" />
+  return <Select {...props} labelRender={({ value, label }) => label ?? positionLabel(String(value))} options={options.map((option) => ({ ...option, label: positionLabel(option.value, option.label) }))} loading={loading} disabled={!organizationId || loading} showSearch optionFilterProp="label" />
 }

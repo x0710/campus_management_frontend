@@ -36,6 +36,11 @@ export interface UserOrganization extends OrganizationMember {
   organization_name: string
 }
 
+/** PATCH /organization-members/{id}/workplace：字段必传，null 表示清空。 */
+export interface WorkplaceUpdateRequest {
+  workplace: string | null
+}
+
 /**
  * 批量人数统计条件（POST /organizations/member-counts 请求体单项）。
  * 接口要求每批 1～100 项，每项必须包含 org_id。
