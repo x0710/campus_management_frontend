@@ -5,6 +5,8 @@
  * 再按 ID 请求 GET /api/party-scores/{id} 补齐附件下载地址（详情走会话缓存）。
  * 调用方负责传入当前记录与模板名称映射，并控制弹窗关闭。
  */
+import PartyScoreDeductionInfo from './PartyScoreDeductionInfo'
+import { isPartyScoreDeduction } from '../utils/partyScore'
 import { Descriptions, Modal, Button } from 'antd'
 import { useEffect, useState } from 'react'
 import { extractErrorReason } from '../api/common'
@@ -80,7 +82,7 @@ export default function PartyScoreDetailModal({
             {detail.id}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyDeclaration.colDeclType')}>
-            {detail.template_id !== undefined
+            {isPartyScoreDeduction(detail) ? t('partyDeduction.type') : detail.template_id != null
               ? templateNames?.get(detail.template_id) ?? detail.template_id
               : t('common.unknown')}
           </Descriptions.Item>
@@ -94,7 +96,7 @@ export default function PartyScoreDetailModal({
             {detail.reason?.trim() ? detail.reason : '—'}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyDeclaration.detailInstance')}>
-            {detail.approval_instance_id}
+            {detail.approval_instance_id ?? '—'}
           </Descriptions.Item>
           <Descriptions.Item label={t('partyDeclaration.colCreatedAt')}>
             {formatDateTime(detail.created_at, locale)}
@@ -115,12 +117,12 @@ export default function PartyScoreDetailModal({
             )}
           </Descriptions.Item>
         </Descriptions>
-        <div className="party-declaration-records">
+        {isPartyScoreDeduction(detail) ? <PartyScoreDeductionInfo record={detail} /> : <div className="party-declaration-records">
           <div className="party-declaration-records-title">
             {t('partyDeclaration.flowSectionTitle')}
           </div>
           <PartyScoreApprovalRecords instanceId={detail.approval_instance_id} force />
-        </div>
+        </div>}
         </>
       ) : null}
     </Modal>

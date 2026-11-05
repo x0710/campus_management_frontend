@@ -14,6 +14,7 @@
  *
  * 先锋指数由 computePartyScoreSummary 计算：基础分 70 + 加分项（封顶 30），总分封顶 100，减分固定 0。
  */
+import { isPartyScoreDeduction } from '../../utils/partyScore'
 import { Skeleton, Spin, Tag } from 'antd'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
@@ -201,13 +202,13 @@ export default function PartyHomeView() {
                     {formatRecordDate(record.created_at)}
                   </span>
                   <span className="party-record-act">
-                    {record.template_id !== undefined
+                    {isPartyScoreDeduction(record) ? t('partyDeduction.type') : record.template_id != null
                       ? templateNames.get(record.template_id) ?? record.template_id
                       : t('common.unknown')}
                   </span>
                   {/* 近期记录只展示审核状态，不展示申请分数，避免被误认为已获得成绩 */}
                   <span className="party-record-status">
-                    {status ? (
+                    {isPartyScoreDeduction(record) ? <Tag color="error">{t('partyDeduction.success')}</Tag> : status ? (
                       <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
                         {t(`partyDeclaration.applicationStatus_${status}`)}
                       </Tag>

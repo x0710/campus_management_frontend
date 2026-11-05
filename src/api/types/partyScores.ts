@@ -24,7 +24,7 @@ export interface PartyScore {
   /** 加分申请 ID */
   id: number
   /** 审批模板 ID（仅详情接口返回；列表项可能不含） */
-  template_id?: number
+  template_id?: number | null
   /** 申请人用户 ID */
   user_id: number
   /** 申请加分（DecimalText 字符串，可正可负，如 "5" / "-2.5"） */
@@ -32,7 +32,9 @@ export interface PartyScore {
   /** 审批核定分数（DecimalText 字符串）；未审批通过时为 null */
   approved_score: string | null
   /** 关联的审批实例 ID */
-  approval_instance_id: number
+  approval_instance_id: number | null
+  /** 直接扣分操作人；加分申请为空 */
+  operator_id?: number | null
   /** 创建时间（RFC3339） */
   created_at: string
   /** 更新时间（RFC3339） */
@@ -46,7 +48,7 @@ export interface PartyScore {
 /** GET /api/party-scores/{id} 加分申请详情（api.json: PartyScoreDetail） */
 export interface PartyScoreDetail extends PartyScore {
   /** 审批模板 ID（详情必返回） */
-  template_id: number
+  template_id: number | null
   /** 附件下载地址列表（后端已签发地址，可直接打开下载） */
   file_urls: string[]
   /** 申请加分原因（详情必返回，可为空串） */
@@ -64,6 +66,17 @@ export interface PartyScoreQuery extends PageQuery {
   user_id?: number
   /** 按关联审批实例 ID 精确筛选 */
   approval_instance_id?: number
+}
+
+/** 上级直接扣分，score 为正数字符串，服务端以负数计入积分。 */
+export interface PartyScoreDeductRequest {
+  user_id: number
+  score: string
+  reason: string
+}
+
+export interface PartyScoreDeductResponse {
+  id: number
 }
 
 /** POST /api/party-scores 创建加分申请请求体 */

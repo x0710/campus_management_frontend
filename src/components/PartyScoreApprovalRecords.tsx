@@ -18,7 +18,7 @@ import ErrorState from './ErrorState'
 
 interface PartyScoreApprovalRecordsProps {
   /** 审批实例 ID（必填） */
-  instanceId: number
+  instanceId: number | null
   /** 强制绕过缓存重新请求（打开详情时传 true，保证展示最新意见） */
   force?: boolean
   /**
@@ -63,6 +63,12 @@ export default function PartyScoreApprovalRecords({
     let cancelled = false
     setLoading(true)
     setError(null)
+    if (instanceId === null) {
+      setRecords([])
+      setLoading(false)
+      onRecordsLoaded?.([])
+      return
+    }
     getApprovalRecords(instanceId, force)
       .then((list) => {
         if (!cancelled) {

@@ -27,7 +27,9 @@ http.interceptors.response.use(
     if (
       axios.isAxiosError(error) &&
       error.response?.status === 401 &&
-      error.config?.url !== '/login'
+      error.config?.url !== '/login' &&
+      // 切换身份前的在途请求不能清除新会话。
+      error.config?.headers?.Authorization === `Bearer ${useAuthStore.getState().token}`
     ) {
       // 先清空接口会话缓存再清登录态，避免下一位登录用户读到上一位用户的数据（代码要求 17）
       invalidate()

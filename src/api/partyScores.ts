@@ -32,6 +32,8 @@ import type {
   PartyScoreCreateRequest,
   PartyScoreCreateResponse,
   PartyScoreDetail,
+  PartyScoreDeductRequest,
+  PartyScoreDeductResponse,
   PartyOrganizationScoreAverage,
   PartyOrganizationScoreAverageQuery,
   PartyScoreTotalItem,
@@ -91,6 +93,14 @@ export function queryPartyScores(params: PartyScoreQuery = {}, force?: boolean) 
  */
 export function getPartyScore(id: number, force?: boolean) {
   return cachedGet<PartyScoreDetail>(`/party-scores/${id}`, undefined, { force })
+}
+
+/** 直接扣分，无审批实例；成功后刷新记录与各处积分统计缓存。 */
+export async function deductPartyScore(data: PartyScoreDeductRequest) {
+  const res = await http.post<PartyScoreDeductResponse>('/party-scores/deductions', data)
+  invalidate('GET /party-scores')
+  invalidate('GET /party/scores')
+  return res.data
 }
 
 /**

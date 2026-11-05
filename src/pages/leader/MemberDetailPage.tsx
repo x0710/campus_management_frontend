@@ -32,6 +32,9 @@
  * - 错误提示经 extractErrorReason 附带 HTTP 状态码与中文原因（要求 9），按钮/选项带悬停提示（要求 10）；
  * - 常量集中在 config/，文案走 i18n。
  */
+import PartyScoreDeductionButton from '../../components/PartyScoreDeductionButton'
+import PartyScoreDeductionInfo from '../../components/PartyScoreDeductionInfo'
+import { isPartyScoreDeduction } from '../../utils/partyScore'
 import {
   ArrowLeftOutlined,
   BankOutlined,
@@ -1758,6 +1761,14 @@ function PartyScoreTab({
         width: 100,
       },
       {
+        title: t('partyDeclaration.colDeclType'),
+        key: 'record_type',
+        width: 120,
+        render: (_, row) => <Tag color={isPartyScoreDeduction(row) ? 'error' : 'success'}>
+          {t(isPartyScoreDeduction(row) ? 'partyDeduction.type' : 'partyDeduction.bonusType')}
+        </Tag>,
+      },
+      {
         title: t('memberDetail.partyScoreColRequested'),
         dataIndex: 'requested_score',
         key: 'requested_score',
@@ -1808,6 +1819,10 @@ function PartyScoreTab({
   return (
     <>
       <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+        <PartyScoreDeductionButton key={uid} userId={uid} onSaved={() => {
+          setPage(1)
+          setReload((r) => ({ seq: r.seq + 1, force: true }))
+        }} />
         <Tooltip title={t('memberDetail.partyScoreRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}
@@ -1831,7 +1846,7 @@ function PartyScoreTab({
           },
           {
             key: 'bonus',
-            label: t('memberDetail.partyScoreBonusScore'),
+            label: t('partyDeduction.netScore'),
             children: bonusText === null ? '—' : formatPartyScore(bonusText),
           },
           {
@@ -1896,7 +1911,7 @@ function PartyScoreTab({
                   {
                     key: 'template',
                     label: t('memberDetail.partyScoreTemplate'),
-                    children: detail.template_id,
+                    children: isPartyScoreDeduction(detail) ? t('partyDeduction.type') : detail.template_id,
                   },
                   {
                     key: 'requested',
@@ -1916,7 +1931,7 @@ function PartyScoreTab({
                   {
                     key: 'instance',
                     label: t('memberDetail.partyScoreColInstance'),
-                    children: detail.approval_instance_id,
+                    children: detail.approval_instance_id ?? '—',
                   },
                   {
                     key: 'created',
@@ -1945,12 +1960,12 @@ function PartyScoreTab({
                   },
                 ]}
               />
-              <section className="party-approval-section" style={{ marginTop: 16 }}>
+              {isPartyScoreDeduction(detail) ? <PartyScoreDeductionInfo record={detail} /> : <section className="party-approval-section" style={{ marginTop: 16 }}>
                 <h4 className="party-approval-section-title">
                   {t('memberDetail.partyScoreApprovalFlow')}
                 </h4>
                 <PartyScoreApprovalRecords instanceId={detail.approval_instance_id} force />
-              </section>
+              </section>}
             </>
           )}
         </Spin>

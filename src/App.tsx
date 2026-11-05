@@ -41,7 +41,7 @@ function RequireAuth() {
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
-  return <Outlet />
+  return <Outlet key={token} />
 }
 
 export default function App() {

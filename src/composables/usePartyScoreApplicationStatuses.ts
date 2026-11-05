@@ -57,7 +57,7 @@ export function usePartyScoreApplicationStatuses(
     }
 
     // 同一审批实例只请求一次审批记录；同一模板只请求一次步骤
-    const instanceIds = [...new Set(records.map((record) => record.approval_instance_id))]
+    const instanceIds = [...new Set(records.map((record) => record.approval_instance_id).filter((id): id is number => id != null))]
     const templateIds = [
       ...new Set(
         records
@@ -92,7 +92,7 @@ export function usePartyScoreApplicationStatuses(
       ),
       // 自动通过环节（审批人为申请人本人）没有审批记录，需额外读取本人审批步骤；
       // 读取失败时按空集合降级，退回原有「同意记录」判定
-      queryMyApprovalSteps().catch((): ApprovalInstanceStep[] => []),
+      instanceIds.length ? queryMyApprovalSteps().catch((): ApprovalInstanceStep[] => []) : Promise.resolve([]),
     ]).then(([recordResults, templateResults, mySteps]) => {
       if (cancelled) return
       const recordsByInstance = new Map<number, ApprovalRecordItem[] | null>(recordResults)
@@ -103,16 +103,16 @@ export function usePartyScoreApplicationStatuses(
       const resolved = new Map<number, PartyScoreApplicationStatus>()
       for (const record of records) {
         const templateSteps =
-          record.template_id !== undefined
+          record.template_id != null
             ? stepsByTemplate.get(record.template_id) ?? null
             : null
         resolved.set(
           record.id,
           resolvePartyScoreApplicationStatus(
             record,
-            recordsByInstance.get(record.approval_instance_id) ?? null,
+            recordsByInstance.get(record.approval_instance_id ?? 0) ?? null,
             templateSteps,
-            selfApprovedStepOrders.get(record.approval_instance_id) ?? null,
+            selfApprovedStepOrders.get(record.approval_instance_id ?? 0) ?? null,
           ),
         )
       }

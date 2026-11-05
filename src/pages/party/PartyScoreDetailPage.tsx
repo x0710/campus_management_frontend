@@ -23,6 +23,8 @@
  *   GET /api/approvals/{id}/records            审批意见流转（用于展示与状态判定）
  *   GET /api/approvals                         本人审批步骤（识别自动通过的环节）
  */
+import PartyScoreDeductionInfo from '../../components/PartyScoreDeductionInfo'
+import { isPartyScoreDeduction } from '../../utils/partyScore'
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Descriptions, Skeleton, Spin, Tag } from 'antd'
 import axios from 'axios'
@@ -215,6 +217,7 @@ export default function PartyScoreDetailPage() {
    */
   const applicationStatus = useMemo<PartyScoreApplicationStatus | null>(() => {
     if (!detail) return null
+    if (isPartyScoreDeduction(detail)) return 'approved'
     if (
       approvalRecords === null ||
       templateSteps === undefined ||
@@ -232,7 +235,7 @@ export default function PartyScoreDetailPage() {
 
   /** 申报类型展示文案：优先模板名称，取不到时回退模板 ID */
   const templateLabel = detail
-    ? detail.template_id !== undefined
+    ? isPartyScoreDeduction(detail) ? t('partyDeduction.type') : detail.template_id != null
       ? templateNames.get(detail.template_id) ?? detail.template_id
       : t('common.unknown')
     : '—'
@@ -347,7 +350,7 @@ export default function PartyScoreDetailPage() {
           </section>
 
           {/* 右栏：审核内容 */}
-          <section className="panel-card">
+          {isPartyScoreDeduction(detail) ? <section className="panel-card"><div className="panel-card-body"><PartyScoreDeductionInfo record={detail} /></div></section> : <section className="panel-card">
             <header className="panel-card-header">
               <h3 className="panel-card-title">
                 {t('partyDeclaration.reviewSectionTitle')}
@@ -408,7 +411,7 @@ export default function PartyScoreDetailPage() {
                 />
               </section>
             </div>
-          </section>
+          </section>}
         </div>
       ) : null}
     </div>

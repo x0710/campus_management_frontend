@@ -41,7 +41,9 @@ import type { RoleInfo } from '../../api/types/rbac'
 import { listAllOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
 import UsablePositionSelect from '../../components/UsablePositionSelect'
-import { getCurrentUser } from '../../api/auth'
+import { getCurrentUser, getMyRoles, impersonateUser } from '../../api/auth'
+import { invalidate } from '../../api/cache'
+import { useAuthStore } from '../../store/auth'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import PersonSearchBox from '../../components/PersonSearchBox'
@@ -76,6 +78,25 @@ interface ParsedUser {
   error?: string
 }
 
+/** 草稿留在搜索组件内，避免每次按键重渲染整张用户表格。 */
+function UserListSearch({ onSearch }: { onSearch: (value: string) => void }) {
+  const t = useT()
+  const [value, setValue] = useState('')
+
+  return (
+    <PersonSearchBox
+      className="admin-search"
+      value={value}
+      onChange={(next) => {
+        setValue(next)
+        if (next === '') onSearch('')
+      }}
+      onSearch={onSearch}
+      placeholder={t('adminUsers.searchPlaceholder')}
+    />
+  )
+}
+
 /** 管理端：用户与账户（列表/新建/详细（详情页内编辑）/重置密码/删除） */
 export default function UsersAdminView() {
   const t = useT()
@@ -89,8 +110,6 @@ export default function UsersAdminView() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
-  // 人员搜索框内容（学号或姓名）；提交后按学号(ids)/姓名(keyword)二选一筛选
-  const [searchInput, setSearchInput] = useState('')
   // 学号精确筛选（对应后端 ids 查询参数）
   const [uidFilter, setUidFilter] = useState('')
   const [status, setStatus] = useState<UserStatus | 'all'>('all')
@@ -104,6 +123,8 @@ export default function UsersAdminView() {
   // 组织 / 职位选项：仅用于新建用户弹窗（编辑入口已移到成员详情页，见 MemberDetailPage）
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
   const [myUid, setMyUid] = useState<number | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [switchingUid, setSwitchingUid] = useState<number | null>(null)
 
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
   const pageUids = useMemo(() => rows.map((u) => u.uid), [rows])
@@ -137,6 +158,34 @@ export default function UsersAdminView() {
   const [batchPreview, setBatchPreview] = useState<ParsedUser[] | null>(null)
 
   const reportError = useErrorFeedback()
+
+  const switchAccount = useCallback(async (uid: number) => {
+    setSwitchingUid(uid)
+    try {
+      const currentToken = useAuthStore.getState().token
+      const result = await impersonateUser(uid)
+      if (useAuthStore.getState().token !== currentToken) return
+      invalidate()
+      useAuthStore.getState().impersonate({
+        token: result.token,
+        username: result.user,
+        lastLoginAt: result.last_login_at,
+      })
+      navigate('/', { replace: true })
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
+    } finally {
+      setSwitchingUid(null)
+    }
+  }, [navigate, reportError])
+
+  useEffect(() => {
+    let cancelled = false
+    void getMyRoles().then((roles) => {
+      if (!cancelled) setIsSuperAdmin(roles.some((role) => role.code === 'super_admin'))
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   // 基础数据：组织、职位（新建弹窗下拉用）与当前 uid
   useEffect(() => {
@@ -222,19 +271,6 @@ export default function UsersAdminView() {
       setUidFilter('')
     }
     setPage(1)
-  }
-
-  /**
-   * 搜索框输入变化：同步输入值；清空输入即清空筛选，恢复完整列表。
-   * @param value 输入框最新值（必填）
-   */
-  const onChangePersonInput = (value: string) => {
-    setSearchInput(value)
-    if (value === '') {
-      setKeyword('')
-      setUidFilter('')
-      setPage(1)
-    }
   }
 
   const orgOptions = useMemo(
@@ -502,13 +538,26 @@ export default function UsersAdminView() {
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: 230,
+        width: isSuperAdmin ? 330 : 230,
         render: (_, record) => (
           <div className="approval-actions">
             {/* 「详细」进入成员详情页：资料 / 系统角色 / 组织任职的编辑入口都在详情页内（与组织架构一致） */}
             <Button type="link" size="small" onClick={() => openDetail(record.uid)}>
               {t('memberDetail.detail')}
             </Button>
+            {isSuperAdmin && myUid !== null && myUid !== record.uid && (
+              <Popconfirm
+                title={t('adminUsers.switchConfirm', { name: record.name || String(record.uid) })}
+                okText={t('adminUsers.switchAccount')}
+                cancelText={t('approval.cancel')}
+                onConfirm={() => switchAccount(record.uid)}
+                okButtonProps={{ loading: switchingUid === record.uid }}
+              >
+                <Button type="link" size="small" disabled={switchingUid !== null} loading={switchingUid === record.uid}>
+                  {t('adminUsers.switchAccount')}
+                </Button>
+              </Popconfirm>
+            )}
             <Button
               type="link"
               size="small"
@@ -543,6 +592,9 @@ export default function UsersAdminView() {
       myUid,
       openResetPassword,
       openDetail,
+      isSuperAdmin,
+      switchingUid,
+      switchAccount,
     ],
   )
 
@@ -552,13 +604,7 @@ export default function UsersAdminView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminUsers.title')}</h3>
           <div className="approval-toolbar">
-            <PersonSearchBox
-              className="admin-search"
-              value={searchInput}
-              onChange={onChangePersonInput}
-              onSearch={onSearchPerson}
-              placeholder={t('adminUsers.searchPlaceholder')}
-            />
+            <UserListSearch onSearch={onSearchPerson} />
             <Select
               value={status}
               style={{ width: 120 }}

@@ -19,6 +19,11 @@ export function login(data: LoginRequest) {
   return http.post<LoginResponse>('/login', data).then((res) => res.data)
 }
 
+/** 仅超级管理员可签发目标用户令牌，不更新目标账户登录时间。 */
+export function impersonateUser(uid: number) {
+  return http.post<LoginResponse>(`/credentials/${uid}/impersonate`).then((res) => res.data)
+}
+
 /**
  * GET /api/credentials 分页查询账户认证信息（权限 credential.read，会话内缓存）。
  * @param params 分页与用户名/状态筛选参数

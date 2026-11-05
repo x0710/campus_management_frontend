@@ -18,6 +18,7 @@
  * 后端加分接口不提供申报时段 / 事由 / 撤回 / 删除，故页面不展示这些字段与操作。
  * 按代码要求 4，接口细节只写在注释里，不进入页面文案。
  */
+import { isPartyScoreDeduction } from '../../utils/partyScore'
 import { ReloadOutlined } from '@ant-design/icons'
 import { App as AntdApp, Button, Form, Input, InputNumber, Select, Spin, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -319,7 +320,7 @@ export default function PartyDeclarationView() {
         key: 'template_id',
         width: 200,
         render: (_, row) =>
-          row.template_id !== undefined
+          isPartyScoreDeduction(row) ? t('partyDeduction.type') : row.template_id != null
             ? templateNameById.get(row.template_id) ?? row.template_id
             : t('common.unknown'),
       },
@@ -360,6 +361,7 @@ export default function PartyDeclarationView() {
         align: 'center',
         render: (_, record) => {
           const status = statuses.get(record.id)
+          if (isPartyScoreDeduction(record)) return <Tag color="error">{t('partyDeduction.success')}</Tag>
           return status ? (
             <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
               {t(`partyDeclaration.applicationStatus_${status}`)}

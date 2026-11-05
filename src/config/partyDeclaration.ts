@@ -54,9 +54,6 @@ export const PARTY_SCORE_MAX_BONUS = 30
 /** 先锋指数总分展示上限 */
 export const PARTY_SCORE_MAX_TOTAL = 100
 
-/** 当前减分项固定值（后端暂无减分计算，先固定为 0） */
-export const PARTY_SCORE_DEDUCTION = 0
-
 /** 先锋指数等级分数线：总分 ≥ 该值即进入对应等级（先锋 ≥ 90 / 示范 ≥ 80 / 进位 ≥ 70，其余为警示） */
 export const PARTY_GRADE_PIONEER_MIN = 90
 export const PARTY_GRADE_DEMONSTRATION_MIN = 80

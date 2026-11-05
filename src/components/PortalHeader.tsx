@@ -74,6 +74,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const location = useLocation()
   const username = useAuthStore((s) => s.username) // 账户名（登录态自带，作为姓名的兜底展示）
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const originalAuth = useAuthStore((s) => s.originalAuth)
   const locale = useSettingsStore((s) => s.locale)
   const setLocale = useSettingsStore((s) => s.setLocale)
   const theme = useSettingsStore((s) => s.theme)
@@ -313,6 +314,15 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
         </Tooltip>
         <PortalNoticeBell />
 
+        {originalAuth && (
+          <Button onClick={() => {
+            invalidate()
+            useAuthStore.getState().restoreAuth()
+            navigate('/', { replace: true })
+          }}>
+            {t('adminUsers.restoreAccount', { name: originalAuth.username })}
+          </Button>
+        )}
         <Dropdown
           trigger={['click']}
           menu={{

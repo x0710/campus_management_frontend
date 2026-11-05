@@ -779,6 +779,9 @@ const messages = {
       viewUser: '查看用户',
     },
     adminUsers: {
+      switchAccount: '切换账号',
+      switchConfirm: '确认以「{name}」的身份进入系统？可在顶栏切回管理员账号。',
+      restoreAccount: '切回管理员（{name}）',
       title: '用户与账户',
       newUser: '新建用户',
       create: '创建',
@@ -1273,6 +1276,12 @@ const messages = {
       statDeduction: '减分',
       recentRecords: '近期记录',
       recordsEmpty: '暂无成绩申报记录',
+    },
+    partyDeduction: {
+      bonusType: '加分申请', netScore: '加减分合计', action: '扣分', confirm: '确认扣分', target: '扣分对象', score: '扣除分值', reason: '扣分原因',
+      scoreRequired: '请输入大于零的扣分分值', reasonRequired: '请填写扣分原因',
+      hint: '仅可对权限范围内的下级组织成员扣分，提交后立即生效，无需审批。',
+      success: '扣分已生效', effective: '扣分已生效，无需审批', operator: '操作人', type: '直接扣分',
     },
     partyDeclaration: {
       submit: '我要申报',
@@ -2275,6 +2284,9 @@ const messages = {
       viewUser: 'View user',
     },
     adminUsers: {
+      switchAccount: 'Switch account',
+      switchConfirm: 'Continue as {name}? You can return to your administrator account from the header.',
+      restoreAccount: 'Return to administrator ({name})',
       title: 'Users & Accounts',
       newUser: 'New user',
       create: 'Create',
@@ -2770,6 +2782,12 @@ const messages = {
       statDeduction: 'Deduction',
       recentRecords: 'Recent records',
       recordsEmpty: 'No score declarations yet',
+    },
+    partyDeduction: {
+      bonusType: 'Bonus application', netScore: 'Net points', action: 'Deduct points', confirm: 'Confirm deduction', target: 'Member', score: 'Points to deduct', reason: 'Reason',
+      scoreRequired: 'Enter a deduction greater than zero', reasonRequired: 'Enter a reason',
+      hint: 'Only subordinate organization members within your permission scope can be deducted. Takes effect immediately without approval.',
+      success: 'Deduction applied', effective: 'Deduction applied without approval', operator: 'Operator', type: 'Direct deduction',
     },
     partyDeclaration: {
       submit: 'New Declaration',

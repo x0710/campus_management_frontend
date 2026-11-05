@@ -8,6 +8,9 @@ export interface AuthSnapshot {
 }
 
 interface AuthState {
+  originalAuth: (AuthSnapshot & { mustChangePassword: boolean }) | null
+  impersonate: (snapshot: AuthSnapshot) => void
+  restoreAuth: () => void
   /** JWT，null 表示未登录 */
   token: string | null
   username: string | null
@@ -31,12 +34,29 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
+      originalAuth: null,
+      impersonate: (snapshot) => set((state) => ({
+        originalAuth: state.originalAuth ?? (state.token && state.username ? {
+          token: state.token,
+          username: state.username,
+          lastLoginAt: state.lastLoginAt,
+          mustChangePassword: state.mustChangePassword,
+        } : null),
+        ...snapshot,
+        // 代登录不应触发目标用户首次登录改密。
+        mustChangePassword: false,
+      })),
+      restoreAuth: () => set((state) => state.originalAuth ? {
+        ...state.originalAuth,
+        originalAuth: null,
+      } : {}),
       token: null,
       username: null,
       lastLoginAt: null,
       mustChangePassword: false,
       setAuth: ({ token, username, lastLoginAt }) =>
         set((state) => ({
+          originalAuth: null,
           token,
           username,
           lastLoginAt,
@@ -49,6 +69,7 @@ export const useAuthStore = create<AuthState>()(
       finishPasswordChange: () => set({ mustChangePassword: false }),
       clearAuth: () =>
         set({
+          originalAuth: null,
           token: null,
           username: null,
           lastLoginAt: null,

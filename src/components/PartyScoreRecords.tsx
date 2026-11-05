@@ -4,6 +4,7 @@
  * 数据来自当前用户 GET /api/party-scores（见 useMyPartyScores），
  * 展示申报编号 / 申报类型 / 申请加分 / 核定分数 / 创建时间，点击行打开详情弹窗。
  */
+import { isPartyScoreDeduction } from '../utils/partyScore'
 import { Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useMemo, useState } from 'react'
@@ -63,7 +64,7 @@ export default function PartyScoreRecords() {
         key: 'template_id',
         width: 200,
         render: (_, row) =>
-          row.template_id !== undefined
+          isPartyScoreDeduction(row) ? t('partyDeduction.type') : row.template_id != null
             ? templateNames.get(row.template_id) ?? row.template_id
             : t('common.unknown'),
       },

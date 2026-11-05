@@ -12,7 +12,6 @@ import {
   PARTY_GRADE_PIONEER_MIN,
   PARTY_GRADE_PROGRESS_MIN,
   PARTY_SCORE_BASE,
-  PARTY_SCORE_DEDUCTION,
   PARTY_SCORE_MAX_BONUS,
   PARTY_SCORE_MAX_TOTAL,
   type PartyScoreApplicationStatus,
@@ -241,7 +240,7 @@ export function getPartyScoreGrade(total: number): PartyScoreGradeInfo {
  * 根据当前用户的加分申请记录计算先锋指数汇总。
  * 加分项只累加已核定通过的正分数（approved_score 非空且大于 0），
  * 并限制在 PARTY_SCORE_MAX_BONUS；总分 = 基础分 + 加分项，最高 PARTY_SCORE_MAX_TOTAL。
- * 减分项暂固定为 PARTY_SCORE_DEDUCTION（当前为 0）。
+ * 减分项累计已生效的负分，基础分与封顶加分相加后再扣减。
  * @param records 当前用户的加分申请记录数组（可为空）
  * @returns PartyScoreSummary 汇总结果
  */
@@ -254,13 +253,22 @@ export function computePartyScoreSummary(records: PartyScore[]): PartyScoreSumma
   }, 0)
 
   const bonus = Math.min(bonusRaw, PARTY_SCORE_MAX_BONUS)
-  const total = Math.min(PARTY_SCORE_BASE + bonus, PARTY_SCORE_MAX_TOTAL)
+  const deduction = records.reduce((sum, record) => {
+    const score = Number(record.approved_score)
+    return Number.isFinite(score) && score < 0 ? sum - score : sum
+  }, 0)
+  const total = Math.min(PARTY_SCORE_BASE + bonus - deduction, PARTY_SCORE_MAX_TOTAL)
 
   return {
     total,
     base: PARTY_SCORE_BASE,
     bonus,
     bonusMax: PARTY_SCORE_MAX_BONUS,
-    deduction: PARTY_SCORE_DEDUCTION,
+    deduction,
   }
+}
+
+/** 扣分记录直接生效，不关联审批实例。 */
+export function isPartyScoreDeduction(record: Pick<PartyScore, 'approved_score' | 'approval_instance_id'>): boolean {
+  return record.approval_instance_id == null && isNegativePartyScore(record.approved_score)
 }
