@@ -3793,3 +3793,22 @@ h3 {
 :root[data-theme='dark'] .school-rank-row:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+
+/* 用户与账户：直接展示最近切换的账户，保持在列表上方。 */
+.recent-accounts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.recent-account-name {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

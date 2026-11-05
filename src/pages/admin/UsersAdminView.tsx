@@ -1,3 +1,4 @@
+import { useAccountSwitch } from '../../composables/useAccountSwitch'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 import { isVisibleUserRole } from '../../config/rbac'
 import { useRequestSequence } from '../../composables/useRequestSequence'
@@ -5,6 +6,7 @@ import { useSharedResource } from '../../composables/useSharedResource'
 import { myRolesResource } from '../../store/referenceData'
 import {
   KeyOutlined,
+  MoreOutlined,
   MinusCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -14,6 +16,7 @@ import {
   Alert,
   App as AntdApp,
   Button,
+  Dropdown,
   Form,
   Input,
   Modal,
@@ -22,13 +25,14 @@ import {
   Table,
   Tag,
   TreeSelect,
+  Tooltip,
   type FormListFieldData,
   type FormListOperation,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import {
   createUsers,
   deleteUser,
@@ -46,12 +50,13 @@ import type { RoleInfo } from '../../api/types/rbac'
 import { listAllOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
 import UsablePositionSelect from '../../components/UsablePositionSelect'
-import { getCurrentUser, impersonateUser } from '../../api/auth'
-import { invalidate } from '../../api/cache'
+import { getCurrentUser } from '../../api/auth'
 import { useAuthStore } from '../../store/auth'
 import { useUiStateStore } from '../../store/uiState'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
+import OrganizationName from '../../components/OrganizationName'
+import RecentAccountSwitcher from '../../components/RecentAccountSwitcher'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { usePositionLabel } from '../../composables/usePositionLabel'
@@ -108,7 +113,6 @@ export default function UsersAdminView() {
   const t = useT()
   const { message, modal } = AntdApp.useApp()
   const navigate = useNavigate()
-  const location = useLocation()
   const { portalKey } = useParams<{ portalKey: string }>()
 
   const listKey = `${portalKey}:admin_m1`
@@ -140,10 +144,11 @@ export default function UsersAdminView() {
   const [roleMap, setRoleMap] = useState<Map<number, RoleInfo[]>>(new Map())
   // 组织 / 职位选项：仅用于新建用户弹窗（编辑入口已移到成员详情页，见 MemberDetailPage）
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
+  const organizationCodes = useMemo(() => new Map(organizations.map((org) => [org.id, org.code])), [organizations])
   const [myUid, setMyUid] = useState<number | null>(null)
   const { data: myRoles } = useSharedResource(myRolesResource)
   const isSuperAdmin = myRoles.some((role) => role.code === 'super_admin')
-  const [switchingUid, setSwitchingUid] = useState<number | null>(null)
+  const { switchAccount, switchingUid } = useAccountSwitch()
 
   // 当前页用户的组织任职（走会话缓存，与组织架构页共用）
   const pageUids = useMemo(() => rows.map((u) => u.uid), [rows])
@@ -177,26 +182,6 @@ export default function UsersAdminView() {
   const [batchPreview, setBatchPreview] = useState<ParsedUser[] | null>(null)
 
   const reportError = useErrorFeedback()
-
-  const switchAccount = useCallback(async (uid: number) => {
-    setSwitchingUid(uid)
-    try {
-      const currentToken = useAuthStore.getState().token
-      const result = await impersonateUser(uid)
-      if (useAuthStore.getState().token !== currentToken) return
-      invalidate()
-      useAuthStore.getState().impersonate({
-        token: result.token,
-        username: result.user,
-        lastLoginAt: result.last_login_at,
-      }, `${location.pathname}${location.search}${location.hash}`)
-      navigate('/', { replace: true })
-    } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
-    } finally {
-      setSwitchingUid(null)
-    }
-  }, [navigate, reportError, location.pathname, location.search, location.hash])
 
   // 基础数据：组织、职位（新建弹窗下拉用）与当前 uid
   useEffect(() => {
@@ -547,9 +532,9 @@ export default function UsersAdminView() {
               {list.map((o) => (
                 <Tag
                   key={`${o.organization_id}-${o.position}`}
-                  title={`${o.organization_name} / ${positionLabel(o.position)}${o.workplace ? ' / ' + o.workplace : ''}`}
+                  title={`${o.organization_name}${organizationCodes.get(o.organization_id) ? `（${organizationCodes.get(o.organization_id)}）` : ''} / ${positionLabel(o.position)}${o.workplace ? ' / ' + o.workplace : ''}`}
                 >
-                  {o.organization_name}·{positionLabel(o.position)}
+                  <OrganizationName id={o.organization_id} fallbackName={o.organization_name} code={organizationCodes.get(o.organization_id)} />·{positionLabel(o.position)}
                 </Tag>
               ))}
             </span>
@@ -559,7 +544,7 @@ export default function UsersAdminView() {
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: isSuperAdmin ? 330 : 230,
+        width: isSuperAdmin ? 300 : 200,
         render: (_, record) => (
           <div className="approval-actions">
             {/* 「详细」进入成员详情页：资料 / 系统角色 / 组织任职的编辑入口都在详情页内（与组织架构一致） */}
@@ -571,7 +556,7 @@ export default function UsersAdminView() {
                 title={t('adminUsers.switchConfirm', { name: record.name || String(record.uid) })}
                 okText={t('adminUsers.switchAccount')}
                 cancelText={t('approval.cancel')}
-                onConfirm={() => switchAccount(record.uid)}
+                onConfirm={() => switchAccount(record.uid, record.name)}
                 okButtonProps={{ loading: switchingUid === record.uid }}
               >
                 <Button type="link" size="small" disabled={switchingUid !== null} loading={switchingUid === record.uid}>
@@ -587,18 +572,28 @@ export default function UsersAdminView() {
             >
               {t('adminUsers.resetPassword')}
             </Button>
-            {myUid !== record.uid && (
-              <Popconfirm
-                title={t('adminUsers.deleteConfirm')}
-                okText={t('adminOrg.delete')}
-                cancelText={t('approval.cancel')}
-                okButtonProps={{ danger: true, loading: actingUid === record.uid }}
-                onConfirm={() => void doDelete(record.uid)}
+            {myUid !== null && myUid !== record.uid && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [{ key: 'delete', label: t('adminOrg.delete'), danger: true }],
+                  onClick: ({ key }) => {
+                    if (key !== 'delete') return
+                    modal.confirm({
+                      title: t('adminUsers.deleteConfirm'),
+                      content: `${record.name || record.uid} (${record.uid})`,
+                      okText: t('adminOrg.delete'),
+                      cancelText: t('approval.cancel'),
+                      okButtonProps: { danger: true },
+                      onOk: () => doDelete(record.uid),
+                    })
+                  },
+                }}
               >
-                <Button type="link" size="small" danger>
-                  {t('adminOrg.delete')}
-                </Button>
-              </Popconfirm>
+                <Tooltip title={t('adminUsers.moreActions')}>
+                  <Button type="text" size="small" icon={<MoreOutlined />} loading={actingUid === record.uid} aria-label={t('adminUsers.moreActions')} />
+                </Tooltip>
+              </Dropdown>
             )}
           </div>
         ),
@@ -609,8 +604,10 @@ export default function UsersAdminView() {
       roleMap,
       rolesError,
       userOrgs,
+      organizationCodes,
       positionLabel,
       actingUid,
+      modal,
       myUid,
       openResetPassword,
       openDetail,
@@ -654,6 +651,7 @@ export default function UsersAdminView() {
             </Button>
           </div>
         </header>
+        {isSuperAdmin && <RecentAccountSwitcher />}
         <div className="panel-card-body">
           {rolesError && !error && (
             <Alert

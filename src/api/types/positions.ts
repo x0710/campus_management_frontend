@@ -4,7 +4,7 @@
  */
 import type { PageQuery } from './common'
 
-export type PositionUsageScope = 'self_only' | 'self_and_children'
+export type PositionUsageScope = 'self_only' | 'self_and_children' | 'self_and_descendants'
 
 /** 职位（api.json: PositionDetailDto，code 为主键） */
 export interface PositionDetail {
@@ -28,7 +28,7 @@ export interface UserPosition extends PositionDetail {
 /** 职位分页查询参数 */
 export interface PositionQuery extends PageQuery {
   keyword?: string
-  /** 按目标组织可任职资格筛选，包含父组织向直属子组织开放的职位。 */
+  /** 按目标组织可任职资格筛选，包含父组织向直属子组织开放的职位，以及祖先组织向全部下级开放的职位。 */
   usable_in_organization_id?: number
   /** 按所属组织 ID 过滤 */
   organization_id?: number

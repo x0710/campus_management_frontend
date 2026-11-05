@@ -15,7 +15,7 @@ export const http = axios.create({
 
 http.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token
-  if (token) {
+  if (token && !config.headers.has('Authorization')) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config

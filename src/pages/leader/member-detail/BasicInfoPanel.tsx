@@ -1,3 +1,4 @@
+import OrganizationName from '../../../components/OrganizationName'
 import { isVisibleUserRole } from '../../../config/rbac'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { usePositionLabel } from '../../../composables/usePositionLabel'
@@ -481,7 +482,7 @@ export default function BasicInfoPanel({
                           {
                             key: 'organization',
                             label: t('profile.organization'),
-                            children: group.organization_name,
+                            children: <OrganizationName id={group.organization_id} fallbackName={group.organization_name} />,
                           },
                           {
                             key: 'position',

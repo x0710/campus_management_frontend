@@ -56,7 +56,6 @@ export default function OrganizationSelect(props: Props) {
         style={{ width: '100%' }}
         treeDataSimpleMode
         treeData={treeData}
-        treeDefaultExpandAll
         showSearch
         allowClear
         treeNodeFilterProp="title"

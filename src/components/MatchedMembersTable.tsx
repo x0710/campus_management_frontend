@@ -1,3 +1,4 @@
+import OrganizationName from './OrganizationName'
 import { isEntryActionTarget } from '../utils/entryInteraction'
 /**
  * 「单独查看匹配人员」表格（可复用组件，代码要求 1）。
@@ -154,7 +155,7 @@ export default function MatchedMembersTable({
         width: 200,
         render: (_, row) => (
           <Tag color="blue" title={row.orgName}>
-            {row.orgName}
+            <OrganizationName id={row.targetId} fallbackName={row.orgName} />
           </Tag>
         ),
       },

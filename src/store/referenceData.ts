@@ -1,4 +1,4 @@
-import { getMyRoles } from '../api/auth'
+import { getMyRoles, getMyPortalPositions } from '../api/auth'
 import { subscribeCacheInvalidation } from '../api/cache'
 import { listAllPositions } from '../api/positions'
 import type { UserRoleInfo } from '../api/types/rbac'
@@ -16,7 +16,14 @@ export const myRolesResource = createSharedResource(
   [] as UserRoleInfo[], 30_000,
 )
 
+export const myPortalPositionsResource = createSharedResource(
+  (force) => useAuthStore.getState().token ? getMyPortalPositions(force) : Promise.resolve([]),
+  [] as { code: string }[], 30_000,
+)
+
 subscribeCacheInvalidation((prefix) => {
+  if (!prefix || ['GET /organization-members', 'GET /organizations', 'GET /positions', 'GET /credentials'].some((path) =>
+    prefix.startsWith(path) || path.startsWith(prefix))) myPortalPositionsResource.invalidate(!prefix)
   if (!prefix || prefix.startsWith('GET /positions') || 'GET /positions'.startsWith(prefix)) {
     positionNamesResource.invalidate(!prefix)
   }

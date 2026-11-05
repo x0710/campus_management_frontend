@@ -41,7 +41,7 @@ import {
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSharedResource } from '../composables/useSharedResource'
-import { myRolesResource } from '../store/referenceData'
+import { myRolesResource, myPortalPositionsResource } from '../store/referenceData'
 import { useSettingsStore } from '../store/settings'
 import PortalNoticeBell from './PortalNoticeBell'
 
@@ -84,10 +84,11 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
 
   // 真实姓名：登录态只带账户名，姓名需经 GET /api/users/me 获取（走会话缓存，不重复请求）
   const [realName, setRealName] = useState<string | null>(null)
-  // 当前用户可访问的门户 key：由角色查询结果映射而来
+  // 当前用户可访问的门户：管理端取系统角色，党委门户取组织任职职位
   const { data: roles } = useSharedResource(myRolesResource)
-  const portalKeys = useMemo(() => getAccessiblePortalKeys(roles), [roles])
-  // 是否为超级管理员：超管保留全部门户切换入口（与原先行为一致）
+  const { data: positions } = useSharedResource(myPortalPositionsResource)
+  const portalKeys = useMemo(() => getAccessiblePortalKeys(roles, positions), [roles, positions])
+  // 是否为超级管理员：保留全部门户切换入口。
   const isSuperAdmin = roles.some(isSuperAdminRole)
   // 「重置密码」弹窗：本人改密（需旧密码校验）
   const [resetOpen, setResetOpen] = useState(false)
@@ -182,8 +183,11 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     ]
   }, [t, profileModuleKey])
 
-  /** 下拉展开时强制刷新角色，避免后端角色变更后仍显示旧菜单 */
-  const refreshPortalKeys = () => { void myRolesResource.load(true) }
+  /** 下拉展开时刷新系统角色与任职职位，避免变更后仍显示旧门户菜单 */
+  const refreshPortalKeys = () => {
+    void myRolesResource.load(true).catch(() => {})
+    void myPortalPositionsResource.load(true).catch(() => {})
+  }
 
   /** 打开「重置密码」弹窗并清空上次输入 */
   const openResetPassword = () => {

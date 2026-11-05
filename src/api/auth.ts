@@ -2,6 +2,7 @@
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import { queryUserRoles } from './rbac'
+import { listUserOrganizations } from './organizations'
 import { CanceledError } from 'axios'
 import { useAuthStore } from '../store/auth'
 import type { PaginatedResponse } from './types/common'
@@ -22,8 +23,10 @@ export function login(data: LoginRequest) {
 }
 
 /** 仅超级管理员可签发目标用户令牌，不更新目标账户登录时间。 */
-export function impersonateUser(uid: number) {
-  return http.post<LoginResponse>(`/credentials/${uid}/impersonate`).then((res) => res.data)
+export function impersonateUser(uid: number, administratorToken?: string) {
+  return http.post<LoginResponse>(`/credentials/${uid}/impersonate`, undefined,
+    administratorToken ? { headers: { Authorization: `Bearer ${administratorToken}` } } : undefined,
+  ).then((res) => res.data)
 }
 
 /**
@@ -68,6 +71,19 @@ export async function getMyRoles(force?: boolean): Promise<UserRoleInfo[]> {
   if (token !== useAuthStore.getState().token) throw new CanceledError('Session changed')
   const roles = await queryUserRoles([me.uid], force)
   return roles.filter((role) => role.uid === me.uid)
+}
+
+/** 本人组织任职中的职位编码，供党委门户判断使用，不要求查询他人的权限。 */
+export async function getMyPortalPositions(force?: boolean): Promise<{ code: string }[]> {
+  const token = useAuthStore.getState().token
+  const assertCurrent = () => {
+    if (token !== useAuthStore.getState().token) throw new CanceledError('Session changed')
+  }
+  const me = await getCurrentUser()
+  assertCurrent()
+  const memberships = await listUserOrganizations(me.uid, force)
+  assertCurrent()
+  return [...new Set(memberships.map((item) => item.position))].map((code) => ({ code }))
 }
 
 /**

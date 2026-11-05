@@ -182,3 +182,66 @@ test('按任职编码查询职位名称，重复查询复用缓存（模拟接�
     useAuthStore.getState().clearAuth()
   }
 })
+
+test('代登录期间快捷切换使用原管理员凭据，普通请求仍使用目标账号凭据', async () => {
+  const { impersonateUser } = await import('../src/api/auth.ts')
+  const previousAdapter = http.defaults.adapter
+  const seen = []
+  http.defaults.adapter = async (config) => {
+    seen.push({ url: config.url, authorization: config.headers.Authorization })
+    return response(config, { token: 'next-target', user: 'next', last_login_at: null })
+  }
+  try {
+    const auth = useAuthStore.getState()
+    auth.setAuth({ token: 'original-admin', username: 'admin', lastLoginAt: '2026-01-01' })
+    auth.impersonate({ token: 'target-member', username: 'member', lastLoginAt: null }, '/portal/admin/admin_m1')
+    await impersonateUser(99, useAuthStore.getState().originalAuth.token)
+    await http.get('/target-account-check')
+    assert.deepEqual(seen, [
+      { url: '/credentials/99/impersonate', authorization: 'Bearer original-admin' },
+      { url: '/target-account-check', authorization: 'Bearer target-member' },
+    ])
+    assert.equal(useAuthStore.getState().token, 'target-member')
+    assert.equal(useAuthStore.getState().originalAuth.returnTo, '/portal/admin/admin_m1')
+  } finally {
+    http.defaults.adapter = previousAdapter
+    useAuthStore.getState().clearAuth()
+  }
+})
+
+test('门户职位来自本人组织任职，新增任职后共享入口数据失效并刷新', async () => {
+  const { getMyPortalPositions } = await import('../src/api/auth.ts')
+  const { addOrgMember } = await import('../src/api/organizations.ts')
+  const { myPortalPositionsResource } = await import('../src/store/referenceData.ts')
+  const previousAdapter = http.defaults.adapter
+  const urls = []
+  let assigned = false
+  http.defaults.adapter = async (config) => {
+    urls.push(config.url)
+    if (config.url === '/credentials/me') return response(config, { uid: 42 })
+    if (config.url === '/organization-members') return response(config, assigned ? [
+      { user_id: 42, organization_id: 10, position: 'party_committee' },
+      { user_id: 42, organization_id: 11, position: 'party_committee' },
+    ] : [])
+    if (config.url === '/organizations/10/members' && config.method === 'post') {
+      assigned = true
+      return response(config, { user_id: 42, position: 'party_committee' })
+    }
+    throw new Error(`Unexpected endpoint: ${config.url}`)
+  }
+  try {
+    useAuthStore.getState().setAuth({ token: 'position-holder', username: 'member', lastLoginAt: '2026-01-01' })
+    await myPortalPositionsResource.load()
+    assert.deepEqual(myPortalPositionsResource.getSnapshot().data, [])
+    await addOrgMember(10, { user_id: 42, position: 'party_committee', workplace: null })
+    await myPortalPositionsResource.load()
+    assert.deepEqual(myPortalPositionsResource.getSnapshot().data, [{ code: 'party_committee' }])
+    assert.deepEqual(await getMyPortalPositions(), [{ code: 'party_committee' }])
+    assert.ok(!urls.some((url) => url.includes('rbac') || url.includes('user-positions')))
+    useAuthStore.getState().clearAuth()
+    assert.deepEqual(myPortalPositionsResource.getSnapshot().data, [])
+  } finally {
+    http.defaults.adapter = previousAdapter
+    useAuthStore.getState().clearAuth()
+  }
+})

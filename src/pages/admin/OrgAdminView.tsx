@@ -58,6 +58,7 @@ import { resetUserPassword } from '../../api/users'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import MatchedMembersTable from '../../components/MatchedMembersTable'
+import OrganizationName from '../../components/OrganizationName'
 import MemberSearchModeToggle from '../../components/MemberSearchModeToggle'
 import MemberSearchNav from '../../components/MemberSearchNav'
 import MultiSelectHeaderFilter from '../../components/MultiSelectHeaderFilter'
@@ -704,7 +705,7 @@ export default function OrgAdminView({
                   color={o.organization_id === selectedId ? 'blue' : 'default'}
                   title={o.organization_name}
                 >
-                  {o.organization_name}
+                  <OrganizationName id={o.organization_id} fallbackName={o.organization_name} code={orgs.find((org) => org.id === o.organization_id)?.code} />
                 </Tag>
               ))}
             </span>
@@ -800,6 +801,7 @@ export default function OrgAdminView({
       actingKey,
       memberNames,
       memberOrgs,
+      orgs,
       positionLabel,
       selectedId,
       partyScoreColumns,
@@ -1114,7 +1116,7 @@ export default function OrgAdminView({
       {/* 添加成员弹窗：UID + 职位 + 工作地点，成功提交后关闭并刷新成员列表 */}
       <Modal
         open={addModalOpen}
-        title={`${t('adminOrg.addMember')}${selectedOrg ? ` · ${selectedOrg.name}` : ''}`}
+        title={`${t('adminOrg.addMember')}${selectedOrg ? ` · ${selectedOrg.name}（${selectedOrg.code}）` : ''}`}
         okText={t('adminOrg.addMember')}
         cancelText={t('approval.cancel')}
         confirmLoading={addingMember}

@@ -29,6 +29,7 @@ import type {
   UserOrganization,
 } from '../../api/types/organizations'
 import UsablePositionSelect from '../../components/UsablePositionSelect'
+import OrganizationName from '../../components/OrganizationName'
 import { assignUserRoles, queryUserRoleRelations } from '../../api/rbac'
 import { getUser, updateUser } from '../../api/users'
 import type { UserDetail, Gender } from '../../api/types/users'
@@ -222,7 +223,8 @@ export default function UserEditPanel({
         title: t('adminUsers.colOrg'),
         dataIndex: 'organization_name',
         key: 'organization_name',
-        width: 200,
+        width: 240,
+        render: (name: string, row) => <OrganizationName id={row.organization_id} fallbackName={name} code={organizations.find((org) => org.id === row.organization_id)?.code} />,
       },
       {
         title: t('adminOrg.colPosition'),
@@ -261,7 +263,7 @@ export default function UserEditPanel({
         ),
       },
     ],
-    [t, orgBusy, positionLabel],
+    [t, orgBusy, positionLabel, organizations],
   )
 
   if (loading || !detail) {

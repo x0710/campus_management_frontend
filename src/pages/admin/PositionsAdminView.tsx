@@ -40,12 +40,14 @@ import type { PositionUsageScope, PositionDetail } from '../../api/types/positio
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
 import OrganizationSelect from '../../components/OrganizationSelect'
+import OrganizationName from '../../components/OrganizationName'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import {
   POSITION_CODE_MAX_LENGTH,
   POSITION_DESC_MAX_LENGTH,
   POSITION_NAME_MAX_LENGTH,
   POSITION_PAGE_SIZE,
+  POSITION_USAGE_SCOPE_LABEL_KEYS,
 } from '../../config/position'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
@@ -211,18 +213,36 @@ export default function PositionsAdminView() {
         render: (v: string) => <Tag color="geekblue">{v}</Tag>,
       },
       {
-        title: t('adminPositions.fieldOrg'),
+        title: t('adminPositions.fieldOrganization'),
         dataIndex: 'organization_id',
         key: 'organization_id',
-        width: 120,
+        width: 220,
+        ellipsis: true,
+        render: (id: number) => <OrganizationName id={id} showTree />,
       },
-      { title: t('adminPositions.fieldUsageScope'), dataIndex: 'usage_scope', render: (scope: PositionUsageScope) => t(scope === 'self_and_children' ? 'adminPositions.scopeSelfAndChildren' : 'adminPositions.scopeSelfOnly') },
+      {
+        title: t('adminPositions.fieldUsageScope'),
+        dataIndex: 'usage_scope',
+        width: 220,
+        onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+        render: (scope: PositionUsageScope) => t(POSITION_USAGE_SCOPE_LABEL_KEYS[scope]),
+      },
       { title: t('adminPositions.fieldName'), dataIndex: 'name', key: 'name', width: 180 },
       {
         title: t('adminPositions.fieldDesc'),
         dataIndex: 'description',
         key: 'description',
-        render: (v: string | null) => v || '—',
+        width: 280,
+        ellipsis: { showTitle: false },
+        render: (value: string | null) => value ? (
+          <Tooltip title={
+            <div style={{ maxHeight: 240, overflowY: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {value}
+            </div>
+          }>
+            <span>{value}</span>
+          </Tooltip>
+        ) : '—',
       },
       {
         title: t('adminPositions.colCreatedAt'),
@@ -310,6 +330,8 @@ export default function PositionsAdminView() {
             ) : (
               <Table<PositionDetail>
               rowKey="code"
+              tableLayout="fixed"
+              scroll={{ x: 1430 }}
               loading={loading}
               columns={columns}
               dataSource={positions}
@@ -385,10 +407,9 @@ export default function PositionsAdminView() {
             <Input maxLength={POSITION_NAME_MAX_LENGTH} />
           </Form.Item>
           <Form.Item name="usage_scope" label={t('adminPositions.fieldUsageScope')} rules={[{ required: true }]}>
-            <Select options={[
-              { value: 'self_only', label: t('adminPositions.scopeSelfOnly') },
-              { value: 'self_and_children', label: t('adminPositions.scopeSelfAndChildren') },
-            ]} />
+            <Select options={Object.entries(POSITION_USAGE_SCOPE_LABEL_KEYS).map(([value, labelKey]) => ({
+              value, label: t(labelKey),
+            }))} />
           </Form.Item>
           <Form.Item
             name="description"
@@ -426,8 +447,8 @@ export default function PositionsAdminView() {
                 },
                 {
                   key: 'organization_id',
-                  label: t('adminPositions.fieldOrg'),
-                  children: detail?.organization_id ?? '—',
+                  label: t('adminPositions.fieldOrganization'),
+                  children: detail ? <OrganizationName id={detail.organization_id} showTree /> : '—',
                 },
                 {
                   key: 'name',
@@ -437,7 +458,7 @@ export default function PositionsAdminView() {
                 {
                   key: 'usage_scope',
                   label: t('adminPositions.fieldUsageScope'),
-                  children: detail ? t(detail.usage_scope === 'self_and_children' ? 'adminPositions.scopeSelfAndChildren' : 'adminPositions.scopeSelfOnly') : '—',
+                  children: detail ? t(POSITION_USAGE_SCOPE_LABEL_KEYS[detail.usage_scope]) : '—',
                 },
                 {
                   key: 'description',
