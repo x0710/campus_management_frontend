@@ -10,7 +10,7 @@
  * 分数与近期记录：经 useMyPartyScores 接真实接口 GET /api/party-scores，
  * 按创建时间倒序取最近 PARTY_RECENT_RECORD_LIMIT 条。
  * 近期记录不再直接展示申请分数（避免被误认为已获得成绩），而是展示审核状态
- * 「审核中 / 申请成功 / 被驳回」；点击记录跳转到独立申报详情页（申请内容 + 审核内容）。
+ * 「审核中 / 申请成功 / 被驳回」；双击记录跳转到独立申报详情页（申请内容 + 审核内容）。
  *
  * 先锋指数由 computePartyScoreSummary 计算：基础分 70 + 加分项（封顶 30），总分封顶 100，减分固定 0。
  */
@@ -195,7 +195,7 @@ export default function PartyHomeView() {
                   className="party-record-item"
                   style={{ cursor: 'pointer' }}
                   title={t('partyDeclaration.rowClickHint')}
-                  onClick={() => openRecordDetail(record)}
+                  onDoubleClick={() => openRecordDetail(record)}
                 >
                   <span className="party-record-date">
                     {formatRecordDate(record.created_at)}

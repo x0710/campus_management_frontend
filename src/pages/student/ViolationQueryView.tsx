@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 学生端：违规记录查询（仅本人违规记录）。
  *
@@ -10,7 +11,7 @@
  * 因此一次性取回（page_size = VIOLATION_FETCH_SIZE）后在前端完成多选筛选与分页。
  *
  * 交互：关键词搜索、严重程度多选、类别多选、手动刷新（force 绕过缓存）、
- * 表格每页 20 行（支持上下页 + 输入页码跳转 + 显示总页数），点击任意一行查看该条违规详情（代码要求 14）。
+ * 表格每页 20 行（支持上下页 + 输入页码跳转 + 显示总页数），双击任意一行查看该条违规详情（代码要求 14）。
  */
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Descriptions, Input, Modal, Select, Spin, Table, Tag, Tooltip } from 'antd'
@@ -127,7 +128,7 @@ export default function ViolationQueryView() {
     [filtered, page],
   )
 
-  /** 点击行：拉取该条违规详情（GET /api/violations/{id}，代码要求 14） */
+  /** 双击行：拉取该条违规详情（GET /api/violations/{id}，代码要求 14） */
   const openDetail = useCallback(
     async (id: number) => {
       setDetailOpen(true)
@@ -265,7 +266,10 @@ export default function ViolationQueryView() {
               locale={{ emptyText: t('common.noData') }}
               scroll={{ x: 780 }}
               onRow={(record: ViolationDto) => ({
-                onClick: () => void openDetail(record.id),
+                onDoubleClick: (event) => {
+                  if (isEntryActionTarget(event.target)) return
+                  void openDetail(record.id)
+                },
                 title: t('studentViolation.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
@@ -284,7 +288,7 @@ export default function ViolationQueryView() {
         </div>
       </section>
 
-      {/* 违规详情：点击行查看（代码要求 14） */}
+      {/* 违规详情：双击行查看（代码要求 14） */}
       <Modal
         open={detailOpen}
         title={t('studentViolation.detailTitle')}

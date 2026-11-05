@@ -263,7 +263,7 @@ export default function AcademyWorkbenchView() {
                     type="button"
                     className="academy-rank-row"
                     aria-label={`${branch.name}：${t('academy.rankJumpHint')}`}
-                    onClick={() => openBranchMembers(branch.id)}
+                    onDoubleClick={() => openBranchMembers(branch.id)}
                   >
                     <span className="academy-rank-name">
                       {index + 1}. {branch.name}

@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 党员端「成绩申报」：申报表单 + 我的申报记录。
  *
@@ -11,7 +12,7 @@
  * 避免连续输入时频繁请求；已选模板与已加载模板名称会被保留，不会因搜索结果缩窄而回退成 ID。
  *
  * 「我的申报记录」展示审核进度（审核中 / 申请成功 / 被驳回，判定口径与首页近期记录一致，
- * 必须所有审批环节完成才算申请成功）；点击记录行跳转到独立申报详情页
+ * 必须所有审批环节完成才算申请成功）；双击记录行跳转到独立申报详情页
  * （复用首页的 PartyScoreDetailPage，展示申请内容 + 审核内容，不再弹窗）。
  *
  * 附件：先上传文件拿 ID，再随创建请求的 files 字段提交，实现申请与附件匹配；
@@ -562,7 +563,10 @@ export default function PartyDeclarationView() {
               dataSource={data}
               scroll={{ x: 880 }}
               onRow={(record) => ({
-                onClick: () => openRecordDetail(record),
+                onDoubleClick: (event) => {
+                  if (isEntryActionTarget(event.target)) return
+                  openRecordDetail(record)
+                },
                 title: t('partyDeclaration.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}

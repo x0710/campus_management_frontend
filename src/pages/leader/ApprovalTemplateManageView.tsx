@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 领导端：审批指标（审批模板）管理（查询 + 新增 + 查看详情 + 编辑 + 删除 + 审批步骤增删改）。
  * 接口：
@@ -11,7 +12,7 @@
  * 说明：后端 business_type 筛选仅支持单值，无法承载代码要求 18 的「类型多选」，
  * 因此本页一次性取回（page_size = APPROVAL_TEMPLATE_FETCH_SIZE）后在前端完成多选筛选与分页；
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
- * 交互：工具栏可按名称、启用状态筛选；点击表格任意一行或「详情」按钮进入独立详情页
+ * 交互：工具栏可按名称、启用状态筛选；双击表格任意一行或「详情」按钮进入独立详情页
  * （/portal/:portalKey/approval-templates/:id?from=<moduleKey>），不再弹窗；新增仍使用弹窗。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -283,7 +284,8 @@ export default function ApprovalTemplateManageView() {
               dataSource={paged}
               locale={{ emptyText: t('common.noData') }}
               onRow={(record: ApprovalTemplate) => ({
-                onClick: (e: React.MouseEvent) => {
+                onDoubleClick: (e: React.MouseEvent) => {
+                  if (isEntryActionTarget(e.target)) return
                   // 点击按钮/气泡确认框时不触发行点击
                   const target = e.target as HTMLElement
                   if (target.closest('button') || target.closest('.ant-popover')) return

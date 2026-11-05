@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Descriptions, Modal, Table, Tag, Tooltip } from 'antd'
@@ -22,7 +23,7 @@ interface LeaveRow {
   status: ApprovalStepStatus
 }
 
-/** 请假信息 Tab：审批实例 → 请假详情，点击行查看请假详情 */
+/** 请假信息 Tab：审批实例 → 请假详情，双击行查看请假详情 */
 export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
   const locale = useSettingsStore((s) => s.locale)
   const [rows, setRows] = useState<LeaveRow[]>([])
@@ -144,7 +145,10 @@ export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
           locale={{ emptyText: t('common.noData') }}
           scroll={{ x: 900 }}
           onRow={(record) => ({
-            onClick: () => setDetail(record),
+            onDoubleClick: (event) => {
+              if (isEntryActionTarget(event.target)) return
+              setDetail(record)
+            },
             title: t('approval.rowClickHint'),
             style: { cursor: 'pointer' },
           })}

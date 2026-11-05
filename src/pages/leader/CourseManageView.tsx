@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 领导端：课程管理（分页查询 + 新增 + 查看详情 + 编辑 + 删除）。
  * 接口：
@@ -7,7 +8,7 @@
  * - PATCH  /api/courses/{id}                                更新（权限 course.update）
  * - DELETE /api/courses/{id}                                删除（权限 course.delete）
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
- * 交互：工具栏可按课程类型筛选；点击表格任意一行或「详情」按钮查看课程详情，
+ * 交互：工具栏可按课程类型筛选；双击表格任意一行或「详情」按钮查看课程详情，
  * 详情弹窗内可切换到编辑模式，编辑保存后弹窗回到详情态并刷新列表（代码要求 13）。
  * 表单弹窗为可复用组件 CourseFormModal（新增/编辑/详情三模式共用）。
  */
@@ -235,7 +236,8 @@ export default function CourseManageView() {
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
               onRow={(record: CourseInfo) => ({
-                onClick: (e: React.MouseEvent) => {
+                onDoubleClick: (e: React.MouseEvent) => {
+                  if (isEntryActionTarget(e.target)) return
                   // 点击按钮/气泡确认框时不触发行点击
                   const target = e.target as HTMLElement
                   if (target.closest('button') || target.closest('.ant-popover')) return

@@ -1,9 +1,10 @@
+import { isEntryActionTarget } from '../utils/entryInteraction'
 /**
  * 「单独查看匹配人员」表格（可复用组件，代码要求 1）。
  *
  * 组织成员按姓名搜索后，可切换到「只看匹配出来的人员」：
  * 用本组件替代组织成员表，一行一个匹配到的用户，不随组织树切换。
- * 展示 UID / 姓名 / 所属组织 / 职位 / 工作地点，点击行或「查看详细」进入成员详情。
+ * 展示 UID / 姓名 / 所属组织 / 职位 / 工作地点，双击行或「查看详细」进入成员详情。
  *
  * 数据来源：
  *   - rows 来自 useMemberSearch 的 matches（已按当前展示组织范围过滤，顺序与结果条一致）；
@@ -194,7 +195,8 @@ export default function MatchedMembersTable({
       locale={{ emptyText: t('common.noData') }}
       scroll={{ x: 900 }}
       onRow={(row) => ({
-        onClick: (e: MouseEvent) => {
+        onDoubleClick: (e: MouseEvent) => {
+          if (isEntryActionTarget(e.target)) return
           // 点击按钮时不触发行点击
           const target = e.target as HTMLElement
           if (target.closest('button')) return

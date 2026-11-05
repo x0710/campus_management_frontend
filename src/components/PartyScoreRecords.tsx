@@ -1,8 +1,9 @@
+import { isEntryActionTarget } from '../utils/entryInteraction'
 /**
  * 党员端：我的成绩记录表格（真实党建加分申请数据）。
  *
  * 数据来自当前用户 GET /api/party-scores（见 useMyPartyScores），
- * 展示申报编号 / 申报类型 / 申请加分 / 核定分数 / 创建时间，点击行打开详情弹窗。
+ * 展示申报编号 / 申报类型 / 申请加分 / 核定分数 / 创建时间，双击行打开详情弹窗。
  */
 import { isPartyScoreDeduction } from '../utils/partyScore'
 import { Table } from 'antd'
@@ -116,7 +117,10 @@ export default function PartyScoreRecords() {
         dataSource={records}
         scroll={{ x: 760 }}
         onRow={(record) => ({
-          onClick: () => setDetail(record),
+          onDoubleClick: (event) => {
+            if (isEntryActionTarget(event.target)) return
+            setDetail(record)
+          },
           title: t('partyDeclaration.rowClickHint'),
           style: { cursor: 'pointer' },
         })}

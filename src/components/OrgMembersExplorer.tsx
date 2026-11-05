@@ -1,9 +1,10 @@
+import { isEntryActionTarget } from '../utils/entryInteraction'
 import { useRequestSequence } from '../composables/useRequestSequence'
 import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
 /**
  * 组织成员浏览器（可复用组件，代码要求 1）：
  * 左侧「组织树（可搜索）」+ 右侧「成员表（支持翻页/跳页/总数）」，
- * 点击成员行或「详情」按钮跳转到成员详情页（成绩/请假/违规信息，代码要求 14）。
+ * 双击成员行或「详情」按钮跳转到成员详情页（成绩/请假/违规信息，代码要求 14）。
  *
  * 由领导端「组织概览」抽出，老师端「班级管理」复用同一套界面：
  * - 领导端传入全部组织（listAllOrganizations）；
@@ -17,7 +18,7 @@ import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
  *
  * 搜索定位与状态记忆：
  * - 命中组织节点在组织树中自动滚动到可视区中部（等展开动画结束后定位，树很长也能直接看到）；
- * - 搜索状态按模块 key 保存在会话 store，点击成员进入详情再返回后继续展示上一次的模糊匹配结果、
+ * - 搜索状态按模块 key 保存在会话 store，双击成员进入详情再返回后继续展示上一次的模糊匹配结果、
  *   当前定位下标与命中页；
  * - 表头提供「结束匹配」按钮，可清空搜索词 / 高亮 / 匹配结果与树定位展开，恢复普通组织浏览。
  *
@@ -520,7 +521,7 @@ export default function OrgMembersExplorer({
     }
   }, [allMemberIds, partyScoreColumns])
 
-  /** 点击成员行 → 进入成员详情页（?from 用于侧栏高亮来源模块） */
+  /** 双击成员行 → 进入成员详情页（?from 用于侧栏高亮来源模块） */
   const openMember = useCallback(
     (uid: number) => {
       navigate(`/portal/${portalKey}/organization-members/${uid}?from=${fromModuleKey}`)
@@ -852,7 +853,8 @@ export default function OrgMembersExplorer({
               locale={{ emptyText: t('common.noData') }}
               scroll={{ x: 860 }}
               onRow={(record: UserMemberRow) => ({
-                onClick: (e: React.MouseEvent) => {
+                onDoubleClick: (e: React.MouseEvent) => {
+                  if (isEntryActionTarget(e.target)) return
                   // 点击按钮/链接时不触发行点击
                   const target = e.target as HTMLElement
                   if (target.closest('button')) return

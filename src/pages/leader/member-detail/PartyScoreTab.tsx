@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import PartyScoreDeductionButton from '../../../components/PartyScoreDeductionButton'
 import PartyScoreDeductionInfo from '../../../components/PartyScoreDeductionInfo'
@@ -30,7 +31,7 @@ const { Text } = Typography
  * 「获得加分总数」Tab（党委支部端 / 学院端 / 学校端成员详情专用）：
  * 顶部展示「基础分 70 + 党建活动加分 = 获得加分总数」；
  * 下方分页列出该成员的全部加分申请（GET /api/party-scores?user_id=成员），
- * 点击行通过 GET /api/party-scores/{id} 查看详情（含附件下载地址，代码要求 14）。
+ * 双击行通过 GET /api/party-scores/{id} 查看详情（含附件下载地址，代码要求 14）。
  */
 export default function PartyScoreTab({
   uid,
@@ -248,7 +249,10 @@ export default function PartyScoreTab({
           locale={{ emptyText: t('memberDetail.partyScoreEmpty') }}
           scroll={{ x: 900 }}
           onRow={(record) => ({
-            onClick: () => void openDetail(record),
+            onDoubleClick: (event) => {
+              if (isEntryActionTarget(event.target)) return
+              void openDetail(record)
+            },
             title: t('memberDetail.partyScoreRowClickHint'),
             style: { cursor: 'pointer' },
           })}

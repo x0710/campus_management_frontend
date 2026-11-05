@@ -1,3 +1,4 @@
+import { isVisibleUserRole } from '../../config/rbac'
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import { usePositionFormatter, usePositionLabel } from '../../composables/usePositionLabel'
 import { BellOutlined, EditOutlined, UserOutlined } from '@ant-design/icons'
@@ -56,6 +57,7 @@ function ProfileDescriptions() {
   const { name, organizations } = useCurrentIdentity()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [roles, setRoles] = useState<UserRoleInfo[]>([])
+  const visibleRoles = roles.filter(isVisibleUserRole)
   const [rolesError, setRolesError] = useState<string | null>(null)
   const [orgsError, setOrgsError] = useState<string | null>(null)
   const [extrasLoading, setExtrasLoading] = useState(false)
@@ -269,11 +271,11 @@ function ProfileDescriptions() {
       <Card size="small" title={t('profile.rolesTitle')}>
         {rolesError ? (
           <ErrorState message={rolesError} onRetry={() => user && void loadExtras(user.id)} />
-        ) : extrasLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : roles.length === 0 ? (
+        ) : extrasLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : visibleRoles.length === 0 ? (
           <span>{t('profile.noData')}</span>
         ) : (
           <Space size={[8, 8]} wrap>
-            {roles.map((role) => (
+            {visibleRoles.map((role) => (
               <Tag key={role.id} color="blue">
                 {role.name || role.code || role.id}
                 {role.description ? ` (${role.description})` : ''}

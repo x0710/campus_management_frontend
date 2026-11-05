@@ -1,8 +1,9 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 学生端：请假申请（表单 + 本人请假记录）。
  * - 填写完请假时间后自动调用 GET /api/leaves/check-conflict 做冲突预检并内联提示；
  * - 提交时再次预检（防时间被改动后状态过期），命中冲突直接拦截；
- * - 点击记录行打开请假详情弹窗（复用 LeaveDetailModal），在弹窗内可撤回 / 删除该申请。
+ * - 双击记录行打开请假详情弹窗（复用 LeaveDetailModal），在弹窗内可撤回 / 删除该申请。
  */
 import { ReloadOutlined } from '@ant-design/icons'
 import {
@@ -76,7 +77,7 @@ export default function LeaveApplyView() {
   const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
     usePaginated<LeaveInfo>(queryLeaves)
 
-  /** 点击记录行打开详情弹窗（携带请假记录 id） */
+  /** 双击记录行打开详情弹窗（携带请假记录 id） */
   const [detailId, setDetailId] = useState<number | null>(null)
   const [acting, setActing] = useState<DetailAction>(null)
 
@@ -368,7 +369,10 @@ export default function LeaveApplyView() {
               dataSource={data}
               scroll={{ x: 760 }}
               onRow={(record) => ({
-                onClick: () => setDetailId(record.id),
+                onDoubleClick: (event) => {
+                  if (isEntryActionTarget(event.target)) return
+                  setDetailId(record.id)
+                },
                 title: t('leaveApply.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
@@ -389,7 +393,7 @@ export default function LeaveApplyView() {
         </div>
       </section>
 
-      {/* 请假详情：点击记录行打开，底部提供「撤回 / 删除」操作 */}
+      {/* 请假详情：双击记录行打开，底部提供「撤回 / 删除」操作 */}
       <LeaveDetailModal
         open={detailId !== null}
         leaveId={detailId}

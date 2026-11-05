@@ -104,6 +104,30 @@ function scopeSignature(map: Record<string, ScopeConfig>, resources: string[]): 
     .join('|')
 }
 
+/** 即时输入只更新搜索框，防抖后才通知权限表，避免每个字符重渲染整页。 */
+function PermissionSearchInput({ onSearch }: { onSearch: (keyword: string) => void }) {
+  const t = useT()
+  const [value, setValue] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(
+      () => onSearch(value.trim().toLowerCase()),
+      RBAC_PERM_SEARCH_DEBOUNCE_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [value, onSearch])
+
+  return (
+    <Input
+      allowClear
+      className="admin-search"
+      prefix={<SearchOutlined />}
+      value={value}
+      placeholder={t('adminRoles.permSearchInAssign')}
+      onChange={(event) => setValue(event.target.value)}
+    />
+  )
+}
+
 export default function RolePermissionsPanel({
   role,
   onCancel,
@@ -126,8 +150,7 @@ export default function RolePermissionsPanel({
   const [scopeMap, setScopeMap] = useState<Record<string, ScopeConfig>>({})
   const [initialScopeMap, setInitialScopeMap] = useState<Record<string, ScopeConfig>>({})
 
-  /** 搜索框即时输入值与防抖后的关键词 */
-  const [searchInput, setSearchInput] = useState('')
+  /** 搜索框防抖后提交的关键词 */
   const [keyword, setKeyword] = useState('')
 
   /** 「已分配权限」区域是否收起（默认展开，收起后仅保留标题与数量） */
@@ -174,15 +197,6 @@ export default function RolePermissionsPanel({
       cancelled = true
     }
   }, [role.id, t])
-
-  // 输入停顿后再生效关键词：避免每敲一个字符就重算整张表
-  useEffect(() => {
-    const timer = setTimeout(
-      () => setKeyword(searchInput.trim().toLowerCase()),
-      RBAC_PERM_SEARCH_DEBOUNCE_MS,
-    )
-    return () => clearTimeout(timer)
-  }, [searchInput])
 
   const selectedSet = useMemo(() => new Set(selected), [selected])
 
@@ -368,14 +382,7 @@ export default function RolePermissionsPanel({
           ) : (
             <>
               <div className="approval-toolbar" style={{ marginBottom: 12 }}>
-                <Input
-                  allowClear
-                  className="admin-search"
-                  prefix={<SearchOutlined />}
-                  value={searchInput}
-                  placeholder={t('adminRoles.permSearchInAssign')}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                />
+                <PermissionSearchInput onSearch={setKeyword} />
                 <span className="rbac-search-count">
                   {t('common.total')} {visiblePerms.length} {t('common.items')}
                 </span>

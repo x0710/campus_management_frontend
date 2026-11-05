@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
@@ -38,7 +39,7 @@ interface RewardingFormValues {
 }
 
 /**
- * 奖学金及补助 Tab：分页展示该成员的奖学金/补助记录，点击行查看详情。
+ * 奖学金及补助 Tab：分页展示该成员的奖学金/补助记录，双击行查看详情。
  * 非只读来源（管理端 / 党委学校端）支持新增、编辑（金额以元输入、提交转分）与删除；
  * readOnly=true（如老师端班级管理进入）时隐藏以上入口，仅作查询。
  */
@@ -266,7 +267,8 @@ export default function RewardingTab({
           locale={{ emptyText: t('common.noData') }}
           scroll={{ x: 890 }}
           onRow={(record) => ({
-            onClick: (e: React.MouseEvent) => {
+            onDoubleClick: (e: React.MouseEvent) => {
+              if (isEntryActionTarget(e.target)) return
               const target = e.target as HTMLElement
               // 点击操作按钮或气泡确认框时不触发行详情
               if (target.closest('button') || target.closest('.ant-popover')) return

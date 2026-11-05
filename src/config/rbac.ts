@@ -46,3 +46,11 @@ export const RBAC_PERM_SEARCH_DEBOUNCE_MS = 800
 
 /** 数据范围「自定义组织 ID」字段最大长度 */
 export const RBAC_DATA_SCOPE_VALUE_MAX_LENGTH = 200
+
+/** 系统内置角色，禁止在角色管理中删除。 */
+export const PROTECTED_ROLE_CODES: readonly string[] = ['super_admin', 'admin', 'basic']
+
+/** basic 为隐式基础身份，不在用户身份展示和选择器中呈现。 */
+export function isVisibleUserRole(role: { code: string }): boolean {
+  return role.code !== 'basic'
+}

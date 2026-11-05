@@ -16,7 +16,7 @@
  *   有下级 → 加载全部组织（listAllOrganizations）取「该组织 + 其全部下级」子树并展示组织树；
  *   无下级 → 仅传该组织本身，由 OrgMembersExplorer 以 showOrgTree=false 仅展示成员表。
  *
- * 复用说明（代码要求 1）：组织树、成员分页表格与「点击成员进入详情页」全部复用公共组件
+ * 复用说明（代码要求 1）：组织树、成员分页表格与「双击成员进入详情页」全部复用公共组件
  * OrgMembersExplorer（showOrgTree=false 时隐藏组织树、以 orgs[0] 为唯一组织）；
  * 成员列表列头统一启用 partyScoreColumns（支部端 / 学院端均以「先锋等级」列代替「工作地点」列，
  * 数据口径为党建加分总分，与支部端「支部管理」一致）；

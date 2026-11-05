@@ -1,3 +1,4 @@
+import { isVisibleUserRole } from '../../config/rbac'
 import {
   App as AntdApp,
   Button,
@@ -75,6 +76,7 @@ export default function UserEditPanel({
   const [loading, setLoading] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
 
+  const hiddenRoleIds = new Set(roles.filter((role) => !isVisibleUserRole(role)).map((role) => role.id))
   const [roleIds, setRoleIds] = useState<number[]>([])
   const [savingRoles, setSavingRoles] = useState(false)
   const [initialRoleIds, setInitialRoleIds] = useState<number[]>([])
@@ -309,9 +311,11 @@ export default function UserEditPanel({
           <Select
             mode="multiple"
             className="user-edit-roles-select"
-            value={roleIds}
-            options={roles.map((r) => ({ value: r.id, label: `${r.name}（${r.code}）` }))}
-            onChange={(v: number[]) => setRoleIds(v)}
+            value={roleIds.filter((id) => !hiddenRoleIds.has(id))}
+            options={roles.filter(isVisibleUserRole).map((r) => ({ value: r.id, label: `${r.name}（${r.code}）` }))}
+            onChange={(v: number[]) => setRoleIds((current) => [
+              ...current.filter((id) => hiddenRoleIds.has(id)), ...v,
+            ])}
             optionFilterProp="label"
           />
           <Button

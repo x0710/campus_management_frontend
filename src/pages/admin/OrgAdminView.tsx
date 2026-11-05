@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 import {
   CloseOutlined,
   DeleteOutlined,
@@ -479,7 +480,7 @@ export default function OrgAdminView({
     setSelectedId(uiKey, keys.length ? Number(keys[0]) : null)
   }
 
-  // 点击成员行 / 「查看详细」跳转到成员详情页（与领导端「组织概览」共用同一页面，
+  // 双击成员行 / 「查看详细」跳转到成员详情页（与领导端「组织概览」共用同一页面，
   // from=uiKey 让侧栏仍高亮当前组织模块，返回时回到本页）
   const openMemberDetail = useCallback(
     (uid: number) => {
@@ -1022,7 +1023,8 @@ export default function OrgAdminView({
                 locale={{ emptyText: t('common.noData') }}
                 scroll={{ x: 960 }}
                 onRow={(record: UserMemberRow) => ({
-                  onClick: (e: React.MouseEvent) => {
+                  onDoubleClick: (e: React.MouseEvent) => {
+                    if (isEntryActionTarget(e.target)) return
                     // 点击按钮/链接时不触发行点击
                     const target = e.target as HTMLElement
                     if (target.closest('button') || target.closest('.ant-popover')) return

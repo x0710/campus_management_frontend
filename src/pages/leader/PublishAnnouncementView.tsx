@@ -1,8 +1,9 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /** 领导端：我发布的通知（列表 + 管理）。
  * - 列表：GET /api/announcements?publisher_id=<当前用户> 分页查询（会话缓存），支持状态筛选；
  * - 新建：点击「发布通知」按钮跳转到独立编辑页（AnnouncementEditorPage，新建态）；
  * - 编辑：操作列「编辑」跳转到独立编辑页（编辑态，内部走 GET/PATCH /api/announcements/{id}）；
- * - 详情：点击表格整行跳转公告详情页（复用主端 AnnouncementDetailPage，按 id 单独请求全文）；
+ * - 详情：双击表格整行跳转公告详情页（复用主端 AnnouncementDetailPage，按 id 单独请求全文）；
  * - 删除：DELETE /api/announcements/{id}，永久移除且不可恢复（与「下线」不同，本页不提供软下线）。
  *
  * 约定（代码要求）：分页每页最多 20 行并可跳页；行内操作按钮阻止冒泡避免误触行点击；
@@ -104,7 +105,7 @@ export default function PublishAnnouncementView() {
     [navigate, portalKey, moduleKey],
   )
 
-  // 跳转公告详情页：复用主端详情页，点击整行触发
+  // 跳转公告详情页：复用主端详情页，双击整行触发
   const openDetail = useCallback(
     (id: number) => {
       const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
@@ -257,7 +258,10 @@ export default function PublishAnnouncementView() {
             locale={{ emptyText: t('common.noData') }}
             scroll={{ x: 960 }}
             onRow={(record) => ({
-              onClick: () => openDetail(record.id),
+              onDoubleClick: (event) => {
+                if (isEntryActionTarget(event.target)) return
+                openDetail(record.id)
+              },
               title: t('announcement.rowClickHint'),
               style: { cursor: 'pointer' },
             })}

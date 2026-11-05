@@ -185,7 +185,7 @@ export default function SchoolOverviewView() {
                     type="button"
                     className="school-rank-row"
                     aria-label={`${item.name}：${t('school.rankJumpHint')}`}
-                    onClick={() => openOrgOverview(item.id)}
+                    onDoubleClick={() => openOrgOverview(item.id)}
                   >
                     <span className="school-rank-name">
                       {index + 1}. {item.name}

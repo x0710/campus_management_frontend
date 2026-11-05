@@ -39,6 +39,7 @@ import RolePermissionsPanel from '../../components/RolePermissionsPanel'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
+import { PROTECTED_ROLE_CODES } from '../../config/rbac'
 
 /** 角色/权限关联表每页条数（代码要求 12：表格每页最多 100 行） */
 const PAGE_SIZE = 100
@@ -211,6 +212,7 @@ export default function RolesAdminView() {
   }
 
   const doDeleteRole = async (role: RoleInfo) => {
+    if (PROTECTED_ROLE_CODES.includes(role.code)) return
     setActingId(role.id)
     try {
       await deleteRole(role.id)
@@ -320,12 +322,13 @@ export default function RolesAdminView() {
             </Button>
             <Popconfirm
               title={t('adminRoles.deleteConfirm')}
+              disabled={PROTECTED_ROLE_CODES.includes(record.code)}
               okText={t('adminRoles.delete')}
               cancelText={t('approval.cancel')}
               okButtonProps={{ danger: true, loading: actingId === record.id }}
               onConfirm={() => void doDeleteRole(record)}
             >
-              <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+              <Button type="link" size="small" danger icon={<DeleteOutlined />} disabled={PROTECTED_ROLE_CODES.includes(record.code)}>
                 {t('adminRoles.delete')}
               </Button>
             </Popconfirm>

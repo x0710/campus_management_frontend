@@ -1,3 +1,4 @@
+import { isVisibleUserRole } from '../../../config/rbac'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { usePositionLabel } from '../../../composables/usePositionLabel'
 import { BankOutlined, EditOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
@@ -91,6 +92,7 @@ export default function BasicInfoPanel({
   onEdit: (section: EditSection) => void
 }) {
   const [roles, setRoles] = useState<RoleInfo[]>([])
+  const visibleRoles = roles.filter(isVisibleUserRole)
   const [orgs, setOrgs] = useState<OrgItem[]>([])
   const [extrasLoading, setExtrasLoading] = useState(false)
   const [extrasError, setExtrasError] = useState<string | null>(null)
@@ -411,11 +413,11 @@ export default function BasicInfoPanel({
               <ErrorState message={extrasError} />
             ) : extrasLoading ? (
               <Skeleton active paragraph={{ rows: 1 }} />
-            ) : roles.length === 0 ? (
+            ) : visibleRoles.length === 0 ? (
               <Text type="secondary">{t('profile.noData')}</Text>
             ) : (
               <Space size={[8, 8]} wrap>
-                {roles.map((role) => (
+                {visibleRoles.map((role) => (
                   <Tag key={role.id} color="blue">
                     {role.name}
                     {role.description ? (

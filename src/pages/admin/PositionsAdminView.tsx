@@ -1,8 +1,9 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 管理端：职位管理
  * - 职位 CRUD（GET/POST /positions，PATCH/DELETE /positions/{code}）
  * - 支持按编码/名称关键字搜索、手动刷新（绕过会话缓存）
- * - 点击表格行查看职位详情（GET /positions/{code}）
+ * - 双击表格行查看职位详情（GET /positions/{code}）
  * code 为主键，创建时指定、创建后不可修改。
  */
 import {
@@ -314,7 +315,8 @@ export default function PositionsAdminView() {
               dataSource={positions}
               locale={{ emptyText: t('common.noData') }}
               onRow={(record: PositionDetail) => ({
-                onClick: (e: React.MouseEvent) => {
+                onDoubleClick: (e: React.MouseEvent) => {
+                  if (isEntryActionTarget(e.target)) return
                   // 点击按钮/链接/气泡时不触发行点击
                   const target = e.target as HTMLElement
                   if (target.closest('button') || target.closest('.ant-popover')) return

@@ -1,4 +1,4 @@
-/** 公告详情页：从列表点击整行跳转过来，单独请求全文并按 Markdown 渲染。
+/** 公告详情页：从列表双击整行跳转过来，单独请求全文并按 Markdown 渲染。
  *  本页作为 PortalWorkspace 布局的子路由渲染，沿用父布局提供的顶栏 + 左侧菜单，
  *  故此处只输出内容区，不再单独渲染 PortalHeader / workspace-body 等壳元素。
  *
@@ -42,7 +42,7 @@ function normalizeStatus(raw: unknown): KnownAnnouncementStatus | 'unknown' {
   return 'unknown'
 }
 
-/** 公告详情页：从列表点击整行跳转过来，单独请求全文 */
+/** 公告详情页：从列表双击整行跳转过来，单独请求全文 */
 export default function AnnouncementDetailPage() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

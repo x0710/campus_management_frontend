@@ -1,3 +1,5 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
+import { isVisibleUserRole } from '../../config/rbac'
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import { useSharedResource } from '../../composables/useSharedResource'
 import { myRolesResource } from '../../store/referenceData'
@@ -138,7 +140,7 @@ export default function UsersAdminView() {
   // 职位编码 → 职位名称（任职接口只返回编码，展示时映射为名称，管理员附带编号）
   const positionLabel = usePositionLabel()
 
-  // 点击行进入成员详情页（与组织架构共用同一页面，?from=admin_m1 让侧栏保持高亮本模块）
+  // 双击行进入成员详情页（与组织架构共用同一页面，?from=admin_m1 让侧栏保持高亮本模块）
   const openDetail = useCallback(
     (uid: number) => {
       navigate(`/portal/${portalKey}/organization-members/${uid}?from=admin_m1`)
@@ -509,7 +511,7 @@ export default function UsersAdminView() {
         key: 'roles',
         render: (_, record) => {
           if (rolesError) return <span className="cell-sub">{t('common.loadFailed')}</span>
-          const list = roleMap.get(record.uid)
+          const list = roleMap.get(record.uid)?.filter(isVisibleUserRole)
           if (!list || list.length === 0) return <span className="cell-sub">—</span>
           return list.map((r) => (
             <Tag key={r.id} color="purple">
@@ -663,9 +665,10 @@ export default function UsersAdminView() {
               columns={columns}
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
-              // 点击行任意位置进入成员详情页（按钮区域不触发，避免与详细/重置/删除冲突）
+              // 双击行任意位置进入成员详情页（按钮区域不触发，避免与详细/重置/删除冲突）
               onRow={(record: UserInfo) => ({
-                onClick: (e: React.MouseEvent) => {
+                onDoubleClick: (e: React.MouseEvent) => {
+                  if (isEntryActionTarget(e.target)) return
                   if ((e.target as HTMLElement).closest('button')) return
                   openDetail(record.uid)
                 },

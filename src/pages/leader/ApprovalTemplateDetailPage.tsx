@@ -2,7 +2,7 @@ import { usePositionLabel } from '../../composables/usePositionLabel'
 /**
  * 领导端：审批指标（审批模板）详情页。
  *
- * 从「指标」模块列表点击整行或「详情」按钮进入，作为 PortalWorkspace 的子路由渲染
+ * 从「指标」模块列表双击整行或「详情」按钮进入，作为 PortalWorkspace 的子路由渲染
  * （路由：/portal/:portalKey/approval-templates/:id?from=<moduleKey>），
  * 不再使用弹窗，刷新后仍可通过 URL 中的指标 ID 恢复。
  *

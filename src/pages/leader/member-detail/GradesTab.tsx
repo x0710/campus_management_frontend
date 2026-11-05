@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
@@ -37,7 +38,7 @@ interface ScoreFormValues {
 }
 
 /**
- * 成绩信息 Tab：展示成员全部成绩，点击行编辑（PATCH /api/examinations/{id}）。
+ * 成绩信息 Tab：展示成员全部成绩，双击行编辑（PATCH /api/examinations/{id}）。
  * readOnly=true（如老师端班级管理进入）时隐藏编辑入口与行点击编辑，仅作查询（代码要求 14）。
  */
 export default function GradesTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
@@ -245,7 +246,8 @@ export default function GradesTab({ uid, t, readOnly }: { uid: number; t: Transl
             readOnly
               ? undefined
               : (record) => ({
-                  onClick: (e: React.MouseEvent) => {
+                  onDoubleClick: (e: React.MouseEvent) => {
+                    if (isEntryActionTarget(e.target)) return
                     const target = e.target as HTMLElement
                     if (target.closest('button')) return
                     void openEdit(record)

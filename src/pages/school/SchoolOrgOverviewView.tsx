@@ -1,10 +1,11 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 党委学校端：组织概览（左侧组织树 + 右侧下级组织统计列表）。
  *
  * 左侧组织树与「组织成员管理」（school_m2）一致：按「学院党委」容器（ID=2）裁剪。
  * 进入页面时不默认选中、也不默认展开任何组织（仅展示折叠的根节点），须由用户先选择组织，
  * 再查询该组织的**直接下级组织**统计；未选择时右侧展示选择提示且不发起统计请求。
- * 点击表格行 / 「查看详细」会跳转到组织成员管理并选中该组织，以便查看该组织的成员
+ * 双击表格行 / 「查看详细」会跳转到组织成员管理并选中该组织，以便查看该组织的成员
  * （成员详细页沿用组织成员管理的跳转链路）。
  * 从「总览」点击某党委的成绩排名也会跳到本页并选中该党委（展开其节点并滚动定位）。
  *
@@ -596,10 +597,11 @@ export default function SchoolOrgOverviewView() {
     if (!current.includes(nextId)) setOrgTreeExpanded(uiKey, [...current, nextId])
   }
 
-  /** 点击表格行与「查看详细」行为一致：跳转到组织成员管理查看该组织成员（代码要求 14） */
+  /** 双击表格行与「查看详细」行为一致：跳转到组织成员管理查看该组织成员（代码要求 14） */
   const onRow = useCallback(
     (record: OrgChildRow) => ({
-      onClick: (e: React.MouseEvent) => {
+      onDoubleClick: (e: React.MouseEvent) => {
+        if (isEntryActionTarget(e.target)) return
         // 点击按钮 / 链接时不触发行点击
         const target = e.target as HTMLElement
         if (target.closest('button')) return

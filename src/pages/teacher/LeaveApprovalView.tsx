@@ -1,10 +1,11 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 请假审批待办（GET /api/approvals + PUT /api/approvals）。
  * 教师端「请假审批」与党委支部端 / 学院端 / 学校端的「审批管理」共用本组件。
  *
  * 审批入口有两处：
  *   1. 列表「操作」列：同意 / 驳回（填写意见后提交）；
- *   2. 点击行打开请假详情弹窗后，弹窗底部同样提供同意 / 驳回（仅等待中/待审批的步骤可用）。
+ *   2. 双击行打开请假详情弹窗后，弹窗底部同样提供同意 / 驳回（仅等待中/待审批的步骤可用）。
  * 提交意见后通过 invalidate('GET /leaves') 失效缓存并刷新列表。
  */
 import { ReloadOutlined } from '@ant-design/icons'
@@ -71,7 +72,7 @@ export default function LeaveApprovalView() {
     decision: ApprovalDecision
   } | null>(null)
   const [commentForm] = Form.useForm<{ comment: string }>()
-  // 请假详情弹窗：点击审批行时用该行的审批实例 ID（即请假记录 approval_id）打开，
+  // 请假详情弹窗：双击审批行时用该行的审批实例 ID（即请假记录 approval_id）打开，
   // 同时保留该行（审批步骤）信息，可在详情弹窗内直接「同意 / 驳回」
   const [detailRow, setDetailRow] = useState<ApprovalInstanceStep | null>(null)
 
@@ -261,7 +262,10 @@ export default function LeaveApprovalView() {
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
               onRow={(record) => ({
-                onClick: () => setDetailRow(record),
+                onDoubleClick: (event) => {
+                  if (isEntryActionTarget(event.target)) return
+                  setDetailRow(record)
+                },
                 title: t('approval.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}

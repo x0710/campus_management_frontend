@@ -78,7 +78,7 @@ export default function App() {
           <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
           {/* /portal/:portalKey/announcements/:id：公告详情，沿用同一界面壳与侧栏 */}
           <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
-          {/* 党建活动加分审批详情：点击审核列表整行或操作列进入，
+          {/* 党建活动加分审批详情：双击审核列表整行或操作列进入，
               沿用同一界面壳与侧栏（?from=<moduleKey>&action=<动作>） */}
           <Route
             path="party-score-approvals/:stepId"
@@ -87,7 +87,7 @@ export default function App() {
           {/* 党员端成绩申报详情：首页「近期记录」点击进入，
               沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route path="party-scores/:id" element={<PartyScoreDetailPage />} />
-          {/* 审批指标（审批模板）详情：党委支部端「指标」列表点击进入，
+          {/* 审批指标（审批模板）详情：党委支部端「指标」列表双击进入，
               沿用同一界面壳与侧栏（?from=<moduleKey>） */}
           <Route
             path="approval-templates/:id"

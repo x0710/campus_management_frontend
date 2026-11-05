@@ -8,7 +8,7 @@
  * 选中态由当前 URL 推导：
  *   - /portal/:portalKey/:moduleKey        -> 高亮 moduleKey
  *   - /portal/:portalKey/announcements/:id -> 高亮 ?from=<moduleKey>（来源模块）
- * 这样从公告列表点击进入详情时，左侧仍能高亮原模块入口。
+ * 这样从公告列表双击进入详情时，左侧仍能高亮原模块入口。
  *
  * 侧栏收起状态持久化到 settings store（localStorage），跨门户与刷新保持。
  */

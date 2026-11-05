@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
@@ -48,7 +49,7 @@ interface ViolationFormValues {
 }
 
 /**
- * 违规信息 Tab：分页展示成员违规记录，点击行查看详细，支持编辑（PATCH /api/violations/{id}）。
+ * 违规信息 Tab：分页展示成员违规记录，双击行查看详细，支持编辑（PATCH /api/violations/{id}）。
  * readOnly=true（如老师端班级管理进入）时隐藏编辑入口，仅可查看详情（代码要求 14）。
  */
 export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
@@ -96,7 +97,7 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
     return () => requests.invalidate()
   }, [load, requests, reload.seq])
 
-  /** 点击行：拉取该条违规详情（GET /api/violations/{id}） */
+  /** 双击行：拉取该条违规详情（GET /api/violations/{id}） */
   const openDetail = useCallback(async (id: number) => {
     setDetailLoading(true)
     try {
@@ -236,7 +237,8 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
           locale={{ emptyText: t('common.noData') }}
           scroll={{ x: 900 }}
           onRow={(record) => ({
-            onClick: (e: React.MouseEvent) => {
+            onDoubleClick: (e: React.MouseEvent) => {
+              if (isEntryActionTarget(e.target)) return
               const target = e.target as HTMLElement
               if (target.closest('button')) return
               void openDetail(record.id)
@@ -256,7 +258,7 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
         />
       )}
 
-      {/* 违规详情：点击行查看（代码要求 14） */}
+      {/* 违规详情：双击行查看（代码要求 14） */}
       <Modal
         open={detail !== null}
         title={t('memberDetail.violationDetailTitle')}

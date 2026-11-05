@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 「校园公告」列表，学生/教师端只读浏览，领导端复用为「公告管理」：
  * - 一次性拉取全量公告（走会话缓存），类型/等级/展示态多选筛选与分页均在前端完成；
@@ -385,7 +386,10 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
               setStatusFilter(filters.status ?? null)
             }}
             onRow={(record) => ({
-              onClick: () => openDetail(record.id),
+              onDoubleClick: (event) => {
+                if (isEntryActionTarget(event.target)) return
+                openDetail(record.id)
+              },
               title: t('announcement.rowClickHint'),
               style: { cursor: 'pointer' },
             })}

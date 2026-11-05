@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 领导端：奖学金及补助管理（分页查询 + 新增 + 查看详情 + 编辑 + 删除）。
  * 接口：
@@ -8,7 +9,7 @@
  * - DELETE /api/rewardings/{id}  删除（权限 rewarding.delete）
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
  * 交互：工具栏支持关键词搜索、学号精确筛选、金额区间与创建时间区间筛选；
- * 点击表格任意一行或「详情」按钮查看详情，详情弹窗内可切换到编辑模式，
+ * 双击表格任意一行或「详情」按钮查看详情，详情弹窗内可切换到编辑模式，
  * 编辑保存后弹窗回到详情态并刷新列表（代码要求 13、14）。
  * 表单弹窗为可复用组件 RewardingFormModal（新增/编辑/详情三模式共用）。
  */
@@ -384,7 +385,8 @@ export default function RewardingManageView() {
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
               onRow={(record: RewardingDto) => ({
-                onClick: (e: React.MouseEvent) => {
+                onDoubleClick: (e: React.MouseEvent) => {
+                  if (isEntryActionTarget(e.target)) return
                   // 点击按钮/气泡确认框时不触发行点击
                   const target = e.target as HTMLElement
                   if (target.closest('button') || target.closest('.ant-popover')) return

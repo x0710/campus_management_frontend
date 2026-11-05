@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 学生端：成绩查询（仅本人成绩）。
  *
@@ -9,7 +10,7 @@
  * 因此学生只能看到本人成绩（后端 /api/examinations 需 examination.select 权限）。
  *
  * 交互：学期筛选（选项来自本人成绩数据）、学分/均分统计、成绩明细表格
- * （每页 20 行，支持直接输入页码跳转并显示总页数）、点击行经
+ * （每页 20 行，支持直接输入页码跳转并显示总页数）、双击行经
  * GET /api/examinations/{id} 查看该条成绩完整详情（代码要求 14）。
  *
  * 绩点：后端未提供绩点字段（也无换算规则接口），因此不做任何前端换算，
@@ -324,7 +325,10 @@ export default function GradesView() {
                 locale={{ emptyText: t('common.noData') }}
                 scroll={{ x: 810 }}
                 onRow={(record: CourseScoreInfo) => ({
-                  onClick: () => void openDetail(record.id),
+                  onDoubleClick: (event) => {
+                    if (isEntryActionTarget(event.target)) return
+                    void openDetail(record.id)
+                  },
                   title: t('grades.rowClickHint'),
                   style: { cursor: 'pointer' },
                 })}

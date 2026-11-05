@@ -1,3 +1,4 @@
+import { isVisibleUserRole } from '../../config/rbac'
 import { usePositionLabel } from '../../composables/usePositionLabel'
 /** 学生端个人信息：汇总用户基本资料、角色、组织任职。所有数据均来自会话级缓存，避免重复请求。 */
 
@@ -50,6 +51,7 @@ export default function StudentProfileView() {
 
   const [user, setUser] = useState<UserDetail | null>(null)
   const [roles, setRoles] = useState<RoleItem[]>([])
+  const visibleRoles = roles.filter(isVisibleUserRole)
   const [orgs, setOrgs] = useState<OrgItem[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -216,11 +218,11 @@ export default function StudentProfileView() {
                 </Space>
               }
             >
-              {roles.length === 0 ? (
+              {visibleRoles.length === 0 ? (
                 <Text type="secondary">{t('profile.noData')}</Text>
               ) : (
                 <Space size={[8, 8]} wrap>
-                  {roles.map((role) =>
+                  {visibleRoles.map((role) =>
                     role.loadError ? (
                       <Tag key={role.id} color="error">
                         ID:{role.id} · {role.loadError}

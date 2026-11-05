@@ -1,3 +1,4 @@
+import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 党建活动加分审核（党委支部端 / 党委学院端共用页面）。
  *
@@ -8,8 +9,8 @@
  *   GET /api/users                         批量解析申请人真实姓名（useUserNames）
  *   PUT /api/party-scores/approvals/{id}/approve|reject|transfer  在审批详情页处理
  *
- * 点击行或操作列统一跳转到审批详情页（/portal/:portalKey/party-score-approvals/:stepId）：
- *   - 行点击：打开详情页查看审批内容；
+ * 双击行或操作列统一跳转到审批详情页（/portal/:portalKey/party-score-approvals/:stepId）：
+ *   - 行双击：打开详情页查看审批内容；
  *   - 操作列「通过 / 驳回 / 转交」：打开详情页并自动选中对应操作，
  *     让审批内容与待填写表单在同一页面同屏展示；
  *   - 审批通过前必须填写「核定分数」，详情页已按后端最新契约设为必填并提交字符串分数。
@@ -448,7 +449,10 @@ export default function PartyScoreApprovalView() {
                 row.step.status === 'pending' ? 'party-score-approval-row-pending' : ''
               }
               onRow={(row) => ({
-                onDoubleClick: () => openDetail(row),
+                onDoubleClick: (event) => {
+                  if (isEntryActionTarget(event.target)) return
+                  openDetail(row)
+                },
                 title: t('partyScoreApproval.rowDoubleClickHint'),
                 style: { cursor: 'pointer' },
               })}
