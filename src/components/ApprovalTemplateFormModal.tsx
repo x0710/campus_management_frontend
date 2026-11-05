@@ -1,3 +1,5 @@
+/** 审批模板表单弹窗（新增 / 编辑 / 查看，含审批步骤管理入口）。 */
+
 import { usePositionLabel } from '../composables/usePositionLabel'
 /**
  * 审批模板表单弹窗（可复用组件）：一个弹窗承载「新增 / 编辑 / 查看详情」三种模式。
@@ -104,6 +106,10 @@ interface ApprovalTemplateFormModalProps {
   onStepsChanged?: () => void
 }
 
+/** ApprovalTemplateFormModal 组件。
+ * @param { open, mode, templateId, onCancel, onSaved, onEdit, onStepsChanged, } 类型：ApprovalTemplateFormModalProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function ApprovalTemplateFormModal({
   open,
   mode,

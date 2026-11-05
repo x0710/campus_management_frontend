@@ -23,7 +23,12 @@ import type {
   CourseScoreUpdateRequest,
 } from './types/examinations'
 
-/** GET /api/examinations 分页查询成绩（force=true 绕过会话缓存） */
+/**
+ * GET /api/examinations 分页查询成绩（force=true 绕过会话缓存）
+ * @param params 类型：CourseScoreQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<CourseScoreInfo>>
+ */
 export function queryScores(params: CourseScoreQuery = {}, force?: boolean) {
   return cachedGet<PaginatedResponse<CourseScoreInfo>>(
     '/examinations',
@@ -32,7 +37,12 @@ export function queryScores(params: CourseScoreQuery = {}, force?: boolean) {
   )
 }
 
-/** GET /api/examinations/{id} 获取成绩详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/examinations/{id} 获取成绩详情（force=true 绕过会话缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<CourseScoreDetail>
+ */
 export function getScore(id: number, force?: boolean) {
   return cachedGet<CourseScoreDetail>(`/examinations/${id}`, undefined, { force })
 }
@@ -48,7 +58,12 @@ export async function createScore(body: CourseScoreCreateRequest): Promise<numbe
   return res.data
 }
 
-/** PATCH /api/examinations/{id} 部分更新成绩，成功后失效成绩列表与详情缓存 */
+/**
+ * PATCH /api/examinations/{id} 部分更新成绩，成功后失效成绩列表与详情缓存
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：CourseScoreUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateScore(id: number, body: CourseScoreUpdateRequest): Promise<void> {
   await http.patch(`/examinations/${id}`, body)
   invalidate('GET /examinations')
@@ -67,7 +82,12 @@ export async function deleteScore(id: number): Promise<void> {
 /** 单次拉取成绩的分页大小（后端 page_size 上限 100） */
 const SCORE_FETCH_PAGE_SIZE = 100
 
-/** 拉取指定学生的全部成绩（分页循环取满，force=true 绕过缓存） */
+/**
+ * 拉取指定学生的全部成绩（分页循环取满，force=true 绕过缓存）
+ * @param uid 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<CourseScoreInfo[]>
+ */
 export async function listAllScoresForUser(
   uid: number,
   force?: boolean,

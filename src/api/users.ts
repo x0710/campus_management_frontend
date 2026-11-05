@@ -13,6 +13,9 @@ import type {
 /**
  * GET /api/users 分页查询（权限 user.read，会话内缓存）。
  * force=true 可绕过缓存（手动刷新按钮）；创建/更新/删除会自动失效列表缓存。
+ * @param params 类型：UserQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<UserInfo>>
  */
 export async function queryUsers(
   params: UserQuery = {},
@@ -40,19 +43,29 @@ export function getUser(id: number, force?: boolean): Promise<UserDetail> {
  * 与 /users/{id} 不同，该接口仅需登录认证、不要求 user.read 权限，
  * 因此顶栏等全局位置可用它把账户名换成真实姓名；走会话缓存，
  * 退出登录时由 invalidate() 统一清空，避免下一个用户读到上一位用户的资料（代码要求 17）。
+ * @returns 类型：Promise<UserDetail>
  */
 export function getMyProfile(): Promise<UserDetail> {
   return cachedGet<UserDetail>('/users/me')
 }
 
-/** POST /api/users 批量创建用户 */
+/**
+ * POST /api/users 批量创建用户
+ * @param body 类型：UserCreateRequest[]；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createUsers(body: UserCreateRequest[]): Promise<number> {
   const res = await http.post<number>('/users', body)
   invalidate('GET /users')
   return res.data
 }
 
-/** PATCH /api/users/{id} 更新用户资料 */
+/**
+ * PATCH /api/users/{id} 更新用户资料
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：UserUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateUser(id: number, body: UserUpdateRequest): Promise<void> {
   await http.patch(`/users/${id}`, body)
   invalidate('GET /users')
@@ -61,7 +74,11 @@ export async function updateUser(id: number, body: UserUpdateRequest): Promise<v
   invalidate('GET /users/me')
 }
 
-/** DELETE /api/users/{id} 删除用户（不能删除自己） */
+/**
+ * DELETE /api/users/{id} 删除用户（不能删除自己）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteUser(id: number): Promise<void> {
   await http.delete(`/users/${id}`)
   invalidate(`GET /users/${id}`)

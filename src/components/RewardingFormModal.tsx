@@ -59,6 +59,10 @@ interface RewardingFormModalProps {
   onEdit?: () => void
 }
 
+/** RewardingFormModal 组件。
+ * @param { open, mode, rewardingId, onCancel, onSaved, onEdit, } 类型：RewardingFormModalProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function RewardingFormModal({
   open,
   mode,

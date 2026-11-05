@@ -1,4 +1,10 @@
-/** 党委门户共用管理组件时的展示用语；不改接口字段或返回的身份名称。 */
+/**
+ * 党委门户共用管理组件时的展示用语；不改接口字段或返回的身份名称。
+ * @param key 类型：string；默认值：无；是否必填：必填
+ * @param text 类型：string；默认值：无；是否必填：必填
+ * @param locale 类型：'zh' | 'en'；默认值：无；是否必填：必填
+ * @returns 类型：string
+ */
 export function partyTerminology(key: string, text: string, locale: 'zh' | 'en'): string {
   const overrides: Record<string, [string, string]> = {
     'portal.school_m5': ['身份管理', 'Identity Management'],

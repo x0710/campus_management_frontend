@@ -1,3 +1,5 @@
+/** 成员详情 - 基本信息面板。 */
+
 import OrganizationName from '../../../components/OrganizationName'
 import { isVisibleUserRole } from '../../../config/rbac'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
@@ -61,8 +63,10 @@ const { Text } = Typography
 
 /**
  * 基本信息面板：用户资料 + 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载）。
- * 党委支部端 / 学院端来源不展示「系统角色」「组织任职」两张卡片（showRoleOrgCards=false），
+ * 支部端 / 学院端来源不展示「系统角色」「组织任职」两张卡片（showRoleOrgCards=false），
  * 此时跳过角色请求，组织任职仍加载以供「党员信息」卡片使用。
+ * @param props 类型：{ user: UserDetail | null loading: boolean genderLabel: string locale: 'zh' | 'en' t: TranslateFn 是否展示编辑入口（管理端 / 党委学校端等来源为 true） canEdit: boolean 是否展示「党员信息」卡片（支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） showPar；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function BasicInfoPanel({
   user,
@@ -83,9 +87,9 @@ export default function BasicInfoPanel({
   t: TranslateFn
   /** 是否展示编辑入口（管理端 / 党委学校端等来源为 true） */
   canEdit: boolean
-  /** 是否展示「党员信息」卡片（党委支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） */
+  /** 是否展示「党员信息」卡片（支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） */
   showPartyInfo: boolean
-  /** 是否展示「系统角色」「组织任职」两张卡片（党委支部端 / 学院端为 false） */
+  /** 是否展示「系统角色」「组织任职」两张卡片（支部端 / 学院端为 false） */
   showRoleOrgCards: boolean
   /** 角色 / 组织任职重载令牌：保存后自增，强制绕过缓存重新请求最新关联数据（代码要求 25） */
   reloadSeq: number
@@ -233,7 +237,7 @@ export default function BasicInfoPanel({
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />
   if (!user) return <Alert type="info" showIcon title={t('memberDetail.loadUserFailed')} />
 
-  // 党员信息（党委支部端 / 学院端 / 学校端）：展示口径与党员端「我的」页一致。
+  // 党员信息（支部端 / 学院端 / 学校端）：展示口径与党员端「我的」页一致。
   // 所属支部取第一项任职组织；政治面貌取任职职位名中的党员身份（书记等其他职位忽略）；
   // 党员编号 / 入党时间取 GET /api/party/profiles。
   const positionNameOf = (uo: OrgItem): string =>
@@ -322,7 +326,7 @@ export default function BasicInfoPanel({
         </Card>
       </div>
 
-      {/* 党员信息（党委支部端 / 学院端 / 学校端）：与党员端「我的」页展示一致的党员端扩展信息 */}
+      {/* 党员信息（支部端 / 学院端 / 学校端）：与党员端「我的」页展示一致的党员端扩展信息 */}
       {showPartyInfo && (
         <Card
           size="small"
@@ -383,7 +387,7 @@ export default function BasicInfoPanel({
         </Card>
       )}
 
-      {/* 系统角色 / 组织任职：党委支部端 / 学院端不展示（见 MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES） */}
+      {/* 系统角色 / 组织任职：支部端 / 学院端不展示（见 MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES） */}
       {showRoleOrgCards && (
         <>
           {/* 系统角色（编辑入口置于卡片右上角） */}
@@ -533,7 +537,7 @@ export default function BasicInfoPanel({
       )}
       </Space>
 
-      {/* 党员档案编辑：仅党委支部端 / 学院端 / 学校端的党员信息卡片展示入口 */}
+      {/* 党员档案编辑：仅支部端 / 学院端 / 学校端的党员信息卡片展示入口 */}
       <Modal
         open={partyEditOpen}
         title={t('partyProfile.editTitle')}

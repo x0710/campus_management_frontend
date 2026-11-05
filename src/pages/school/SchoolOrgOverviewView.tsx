@@ -1,13 +1,16 @@
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
- * 党委学校端：组织概览（左侧组织树 + 右侧下级组织统计列表）。
+ * 党委学校端：组织概览区域（左侧组织树 + 右侧下级组织统计列表）。
+ *
+ * 该区域内嵌在「总览」（school_m1）页面下方，不再作为独立菜单模块；
+ * 原各二级党委排名条形图已由此区域替代。
  *
  * 左侧组织树与「组织成员管理」（school_m2）一致：按「学院党委」容器（ID=2）裁剪。
- * 进入页面时不默认选中、也不默认展开任何组织（仅展示折叠的根节点），须由用户先选择组织，
- * 再查询该组织的**直接下级组织**统计；未选择时右侧展示选择提示且不发起统计请求。
+ * 进入「总览」时默认选中并展开「学院党委」根组织，右侧直接查询其**直接下级组织**
+ * （各二级党委）的统计与平均分；之后可继续在左侧树中选择其它组织切换查询。
+ * 右侧标题旁展示当前组织的平均分（含下级组织），位置与支部端「支部管理」一致。
  * 双击表格行 / 「查看详细」会跳转到组织成员管理并选中该组织，以便查看该组织的成员
  * （成员详细页沿用组织成员管理的跳转链路）。
- * 从「总览」点击某党委的成绩排名也会跳到本页并选中该党委（展开其节点并滚动定位）。
  *
  * 组织维护：右侧表头提供「新建下级 / 编辑 / 删除」，与组织成员管理的组织 CRUD 一致，
  * 操作对象为左侧当前选中的组织；「学院党委」根容器禁止删除。新建/编辑/删除成功后
@@ -26,9 +29,9 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
  *   解析为职位编码后，把每个编码作为同一批量人数接口的一条条件（position + recursive=true），
  *   与党员人数合并成一次请求。
  *
- * 请求复用：批量人数接口本身不走会话缓存（人数需实时），本页按
- * 「下级组织 ID:刷新代数」在页面内缓存统计 Promise，切换组织再切回、或组织/职位
- * 数据晚到导致重跑时都不会重复请求；点「刷新」会递增代数并重新统计。
+ * 请求复用：批量人数接口本身不走会话缓存（人数需实时），本页在模块级按
+ * 「下级组织 ID」缓存统计 Promise，切换组织再切回、切到别的菜单再回来、或组织/职位
+ * 数据晚到导致重跑时都不会重复请求；点「刷新」会清空缓存并重新统计。
  */
 import {
   DeleteOutlined,
@@ -64,7 +67,8 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
+import { subscribeCacheInvalidation } from '../../api/cache'
 import { extractErrorReason } from '../../api/common'
 import {
   createOrganization,
@@ -86,10 +90,11 @@ import {
   ORG_OVERVIEW_STATS_CONCURRENCY,
   SCHOOL_COLLEGE_PARENT_ORG_ID,
   SCHOOL_ORG_ADMIN_MODULE_KEY,
-  SCHOOL_ORG_OVERVIEW_MODULE_KEY,
+  SCHOOL_ORG_OVERVIEW_UI_KEY,
 } from '../../config/organization'
 import { PARTY_PROBATIONARY_STATUS_NAME } from '../../config/partyProfile'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useUiStateStore } from '../../store/uiState'
 import { formatPartyScoreTotalDecimal } from '../../utils/partyScore'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
@@ -204,24 +209,31 @@ async function loadChildStats(
   }
 }
 
-/** 党委学校端：组织概览（组织树 + 下级组织统计表） */
+/**
+ * 下级组织统计的会话内缓存：key = 下级组织 ID → 统计 Promise。
+ * 批量人数接口不走向会话缓存，这里在模块内复用统计请求：
+ * 组织概览内嵌在总览页，切换菜单再回来时直接复用已有统计，不重复发起请求；
+ * 手动刷新（force）或组织/成员数据变化（invalidate 触发）、退出登录时清空。
+ */
+const childStatsCache = new Map<string, Promise<OrgChildStats>>()
+
+subscribeCacheInvalidation(() => {
+  childStatsCache.clear()
+})
+
+/**
+ * 党委学校端：组织概览（组织树 + 下级组织统计表）
+ * @returns 类型：Element
+ */
 export default function SchoolOrgOverviewView() {
   const t = useT()
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const { portalKey } = useParams<{ portalKey: string }>()
-  const location = useLocation()
   const reportError = useErrorFeedback()
 
-  /** 会话状态 key：与门户模块 key 一致，跨路由返回仍保留选中组织与树展开态 */
-  const uiKey = SCHOOL_ORG_OVERVIEW_MODULE_KEY
-
-  /**
-   * 从「总览」点击某党委排名跳转时透传的目标组织 ID。
-   * 仅用于挂载后把左侧组织树滚动到该节点（与组织成员管理的搜索定位一致）。
-   */
-  const focusOrgId =
-    (location.state as { focusOrgId?: number } | null)?.focusOrgId ?? null
+  /** 会话状态 key：跨路由返回仍保留选中组织与树展开态 */
+  const uiKey = SCHOOL_ORG_OVERVIEW_UI_KEY
 
   const [orgs, setOrgs] = useState<OrganizationInfo[]>([])
   const [orgsLoading, setOrgsLoading] = useState(true)
@@ -261,12 +273,9 @@ export default function SchoolOrgOverviewView() {
   /** 统计完成的选择标识（`组织ID:刷新代数`）；与当前标识不一致即表示加载中 */
   const [statsKey, setStatsKey] = useState('')
 
-  /**
-   * 页面内统计缓存：key = `下级组织ID:刷新代数` → 统计 Promise。
-   * 批量人数接口不走向会话缓存，这里在页面内复用同一代数的统计请求：
-   * 切换组织再切回、或组织/职位数据晚到导致 effect 重跑时，不会对同一组织重复发请求。
-   */
-  const statsCacheRef = useRef<Map<string, Promise<OrgChildStats>>>(new Map())
+  /** 当前选中组织自身的平均分（含下级组织；null 表示未取到或无数据） */
+  const [orgAverageScore, setOrgAverageScore] = useState<string | null>(null)
+  const [orgAverageLoading, setOrgAverageLoading] = useState(false)
 
   /** 加载全部组织（force=true 绕过会话缓存，代码要求 5） */
   const loadOrgs = useCallback(
@@ -324,10 +333,10 @@ export default function SchoolOrgOverviewView() {
     [orgsInTree, orgSearch],
   )
 
-  /** 当前选中的组织；null 表示尚未选择（进入页面不默认填充业务数据，需用户先选择） */
+  /** 当前选中的组织；进入「总览」时默认选中「学院党委」根组织，用户可继续切换 */
   const activeOrgId = selectedId
 
-  // 默认不展开任何节点（仅展示折叠的「学院党委」根节点）；之后沿用用户手动调整过的展开态（跨路由保留）
+  // 默认展开「学院党委」根节点（展示各二级党委）；之后沿用用户手动调整过的展开态（跨路由保留）
   const expandedKeys = useMemo<React.Key[]>(
     () => storedExpandedKeys ?? [],
     [storedExpandedKeys],
@@ -339,26 +348,44 @@ export default function SchoolOrgOverviewView() {
   )
 
   /**
-   * 每次进入本页（「总览」排名定位跳转除外）清空上一次的选中组织与树展开态：
-   * 组织概览须先由用户选择组织，再查询该组织的下级组织信息，避免进入页面就展开全部组织并自动查询。
+   * 当前选中组织的平均分（含下级组织），展示在右侧标题旁。
+   * 与支部端「支部管理」的同一位置（组织名右侧）保持一致；手动刷新时随刷新代数一起重新请求。
    */
   useEffect(() => {
-    if (focusOrgId !== null) return
-    setSelectedId(uiKey, null)
-    setOrgTreeExpanded(uiKey, [])
-  }, [focusOrgId, setOrgTreeExpanded, setSelectedId, uiKey])
+    if (activeOrgId === null) {
+      setOrgAverageScore(null)
+      return
+    }
+    let cancelled = false
+    setOrgAverageLoading(true)
+    void (async () => {
+      try {
+        const res = await getPartyScoreOrganizationAverage({
+          organization_id: activeOrgId,
+          recursive: true,
+        })
+        if (!cancelled) setOrgAverageScore(res.average_score)
+      } catch {
+        // 平均分取不到时不阻塞组织信息与下级统计的展示
+        if (!cancelled) setOrgAverageScore(null)
+      } finally {
+        if (!cancelled) setOrgAverageLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeOrgId, refreshTick])
 
-  /** 从「总览」排名跳转过来时，把左侧组织树滚动到选中的党委节点（与组织成员管理的搜索定位一致） */
+  /**
+   * 进入「总览」时默认选中并展开「学院党委」根组织：
+   * 右侧直接展示其下级组织（各二级党委）的详细统计；用户仍可在左侧树中选择其它组织。
+   * 同时重置展开态，避免沿用上次浏览过的深层组织展开记录。
+   */
   useEffect(() => {
-    if (treeCollapsed || focusOrgId === null || focusOrgId !== activeOrgId) return
-    // 等组织树完成展开动画并渲染出选中节点后再滚动，避免定位到尚未挂载的节点
-    const timer = window.setTimeout(() => {
-      document
-        .querySelector('.org-tree-card .ant-tree-treenode-selected')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 150)
-    return () => window.clearTimeout(timer)
-  }, [treeCollapsed, focusOrgId, activeOrgId, treeData])
+    setSelectedId(uiKey, SCHOOL_COLLEGE_PARENT_ORG_ID)
+    setOrgTreeExpanded(uiKey, [SCHOOL_COLLEGE_PARENT_ORG_ID])
+  }, [setOrgTreeExpanded, setSelectedId, uiKey])
 
   /** 右侧列表数据：当前选中组织的直接下级组织（按 ID 升序；未选择组织时为空，不查询） */
   const childOrgs = useMemo(
@@ -471,25 +498,25 @@ export default function SchoolOrgOverviewView() {
     const childIds = childrenKey.split(',').map(Number)
     const force = forceNextLoadRef.current
     forceNextLoadRef.current = false
-    // 手动刷新：丢弃页面内统计缓存（刷新代数同时变化，正常情况下也会重新请求）
-    if (force) statsCacheRef.current.clear()
+    // 手动刷新：丢弃模块内统计缓存（刷新代数同时变化，正常情况下也会重新请求）
+    if (force) childStatsCache.clear()
     let cancelled = false
 
     /**
-     * 取某个下级组织的统计：命中页面内缓存直接复用，未命中才请求并写入。
+     * 取某个下级组织的统计：命中模块内缓存直接复用，未命中才请求并写入。
      * 失败不缓存，下一次切换组织 / 重跑 effect 时可重试。
      * @param childId 下级组织 ID（必填）
      * @returns Promise<OrgChildStats> 该组织（含下级组织）的统计项
      */
     function getChildStats(childId: number): Promise<OrgChildStats> {
-      const cacheKey = `${childId}:${refreshTick}`
-      const cached = statsCacheRef.current.get(cacheKey)
+      const cacheKey = String(childId)
+      const cached = childStatsCache.get(cacheKey)
       if (cached) return cached
       const pending = loadChildStats(childId, reserveCodes, force)
-      statsCacheRef.current.set(cacheKey, pending)
+      childStatsCache.set(cacheKey, pending)
       pending.catch(() => {
-        if (statsCacheRef.current.get(cacheKey) === pending) {
-          statsCacheRef.current.delete(cacheKey)
+        if (childStatsCache.get(cacheKey) === pending) {
+          childStatsCache.delete(cacheKey)
         }
       })
       return pending
@@ -779,6 +806,16 @@ export default function SchoolOrgOverviewView() {
                 ? `${activeOrg.name}（${activeOrg.code}）`
                 : t('schoolOrgOverview.selectOrgTitle')}
             </h3>
+            {/* 当前选中组织的平均分，位置与支部端「支部管理」一致（组织名右侧） */}
+            {activeOrg && (
+              <span className="org-average-score">
+                {t('orgExplorer.orgAverageScore')}
+                <strong>
+                  {orgAverageLoading ? '—' : formatPartyScoreTotalDecimal(orgAverageScore)}
+                </strong>
+                <em>{t('party.scoreUnit')}</em>
+              </span>
+            )}
           </div>
           <div className="approval-toolbar">
             {/* 说明统计口径：人数与平均分均含下级组织（代码要求 10：悬停提示） */}
@@ -861,7 +898,7 @@ export default function SchoolOrgOverviewView() {
                 total: rows.length,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_TABLE_PAGE_SIZE),
               }}
             />
           )}

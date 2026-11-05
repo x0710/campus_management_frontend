@@ -1,6 +1,6 @@
 /**
  * 党建活动加分审核相关常量（代码要求 7：常量统一收敛到 config/，便于复用）。
- * 供党委支部端 / 党委学院端 / 党委学校端的审核管理页使用。
+ * 供支部端 / 党委学院端 / 党委学校端的审核管理页使用。
  */
 import type { ApprovalStepStatus } from '../api/types/approvals'
 

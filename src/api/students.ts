@@ -9,7 +9,12 @@ import { cachedGet } from './cache'
 import type { PaginatedResponse } from './types/common'
 import type { StudentDetail, StudentInfo, StudentQuery } from './types/students'
 
-/** GET /api/students 分页查询学生（force=true 绕过会话缓存） */
+/**
+ * GET /api/students 分页查询学生（force=true 绕过会话缓存）
+ * @param params 类型：StudentQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<StudentInfo>>
+ */
 export function queryStudents(
   params: StudentQuery = {},
   force?: boolean,
@@ -21,7 +26,12 @@ export function queryStudents(
   )
 }
 
-/** GET /api/students/{no} 按学号查询学生详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/students/{no} 按学号查询学生详情（force=true 绕过会话缓存）
+ * @param studentNo 类型：string；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<StudentDetail>
+ */
 export function getStudent(studentNo: string, force?: boolean): Promise<StudentDetail> {
   return cachedGet<StudentDetail>(
     `/students/${encodeURIComponent(studentNo)}`,

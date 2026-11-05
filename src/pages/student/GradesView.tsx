@@ -70,6 +70,9 @@ function toStatus(record: CourseScoreInfo): GradeStatus {
   return record.exam_type === 'makeup' || record.exam_type === 'retake' ? 'makeup' : 'pass'
 }
 
+/** GradesView 组件。
+ * @returns 类型：Element
+ */
 export default function GradesView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

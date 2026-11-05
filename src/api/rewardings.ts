@@ -22,7 +22,12 @@ import type {
   RewardingUpdateRequest,
 } from './types/rewardings'
 
-/** GET /api/rewardings 分页查询奖学金记录（force=true 绕过会话缓存） */
+/**
+ * GET /api/rewardings 分页查询奖学金记录（force=true 绕过会话缓存）
+ * @param params 类型：RewardingQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<RewardingDto>>
+ */
 export function queryRewardings(params: RewardingQuery = {}, force?: boolean) {
   return cachedGet<PaginatedResponse<RewardingDto>>(
     '/rewardings',
@@ -31,19 +36,33 @@ export function queryRewardings(params: RewardingQuery = {}, force?: boolean) {
   )
 }
 
-/** GET /api/rewardings/{id} 获取奖学金记录详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/rewardings/{id} 获取奖学金记录详情（force=true 绕过会话缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<RewardingDto>
+ */
 export function getRewarding(id: number, force?: boolean) {
   return cachedGet<RewardingDto>(`/rewardings/${id}`, undefined, { force })
 }
 
-/** POST /api/rewardings 创建奖学金记录，返回新记录 ID */
+/**
+ * POST /api/rewardings 创建奖学金记录，返回新记录 ID
+ * @param body 类型：RewardingCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createRewarding(body: RewardingCreateRequest): Promise<number> {
   const res = await http.post<number>('/rewardings', body)
   invalidate('GET /rewardings')
   return res.data
 }
 
-/** PATCH /api/rewardings/{id} 部分更新奖学金记录 */
+/**
+ * PATCH /api/rewardings/{id} 部分更新奖学金记录
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：RewardingUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateRewarding(
   id: number,
   body: RewardingUpdateRequest,
@@ -52,7 +71,11 @@ export async function updateRewarding(
   invalidate('GET /rewardings')
 }
 
-/** DELETE /api/rewardings/{id} 删除奖学金记录 */
+/**
+ * DELETE /api/rewardings/{id} 删除奖学金记录
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteRewarding(id: number): Promise<void> {
   await http.delete(`/rewardings/${id}`)
   invalidate('GET /rewardings')

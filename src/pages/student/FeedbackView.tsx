@@ -41,6 +41,7 @@ import {
   getFeedbackCategoryLabel,
 } from '../../config/feedback'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
@@ -50,6 +51,38 @@ interface FeedbackModalState {
   feedbackId?: number
 }
 
+/**
+ * 反馈搜索框：把输入草稿状态收敛在最小作用域内，
+ * 仅在回车或清空时提交关键词，避免每输入一个字符就重渲染整页（代码要求 26）。
+ */
+function FeedbackSearchBox({
+  placeholder,
+  onSubmit,
+}: {
+  placeholder: string
+  onSubmit: (value: string) => void
+}) {
+  const [value, setValue] = useState('')
+  return (
+    <Input.Search
+      allowClear
+      className="admin-search"
+      style={{ width: 240 }}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => {
+        const next = e.target.value
+        setValue(next)
+        if (!next) onSubmit('')
+      }}
+      onSearch={(v) => onSubmit(v.trim())}
+    />
+  )
+}
+
+/** FeedbackView 组件。
+ * @returns 类型：Element
+ */
 export default function FeedbackView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -63,7 +96,6 @@ export default function FeedbackView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const [keyword, setKeyword] = useState('')
   const [appliedKeyword, setAppliedKeyword] = useState('')
   const [category, setCategory] = useState<FeedbackCategory | undefined>()
   const [modalState, setModalState] = useState<FeedbackModalState>({
@@ -223,16 +255,11 @@ export default function FeedbackView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('feedback.title')}</h3>
           <div className="student-toolbar">
-            <Input.Search
-              allowClear
-              className="admin-search"
-              style={{ width: 240 }}
+            <FeedbackSearchBox
               placeholder={t('feedback.searchPlaceholder')}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onSearch={() => {
+              onSubmit={(value) => {
                 setPage(1)
-                setAppliedKeyword(keyword.trim())
+                setAppliedKeyword(value)
               }}
             />
             <Tooltip title={t('feedback.filterCategoryHint')}>
@@ -281,14 +308,18 @@ export default function FeedbackView() {
               dataSource={rows}
               locale={{ emptyText: t('common.noData') }}
               scroll={{ x: 920 }}
+              // 整行双击进入详情（代码要求 14）
+              onRow={(row) => ({
+                onDoubleClick: () => openModal('view', row.id),
+                style: { cursor: 'pointer' },
+              })}
               pagination={{
                 current: page,
                 pageSize: FEEDBACK_PAGE_SIZE,
                 total,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) =>
-                  `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, FEEDBACK_PAGE_SIZE),
                 onChange: (p: number) => setPage(p),
               }}
             />

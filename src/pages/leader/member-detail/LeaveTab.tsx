@@ -1,3 +1,5 @@
+/** 成员详情 - 请假页签：请假审批记录查询与详情。 */
+
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { ReloadOutlined } from '@ant-design/icons'
@@ -13,6 +15,7 @@ import type { LeaveDetail } from '../../../api/types/leaves'
 import { MEMBER_DETAIL_PAGE_SIZE } from '../../../config/leaderOrg'
 import { LEAVE_STATUS_COLOR, LEAVE_TYPE_COLOR } from '../../../config/leave'
 import { type TranslateFn } from '../../../i18n'
+import { formatPaginationTotal } from '../../../utils/pagination'
 import { useSettingsStore } from '../../../store/settings'
 import { formatDateTime } from '../../../utils/datetime'
 import ErrorState from '../../../components/ErrorState'
@@ -23,7 +26,11 @@ interface LeaveRow {
   status: ApprovalStepStatus
 }
 
-/** 请假信息 Tab：审批实例 → 请假详情，双击行查看请假详情 */
+/**
+ * 请假信息 Tab：审批实例 → 请假详情，双击行查看请假详情
+ * @param { uid, t } 类型：{ uid: number; t: TranslateFn }；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
   const locale = useSettingsStore((s) => s.locale)
   const [rows, setRows] = useState<LeaveRow[]>([])
@@ -158,7 +165,7 @@ export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
             total: rows.length,
             showSizeChanger: false,
             showQuickJumper: true,
-            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            showTotal: (n: number) => formatPaginationTotal(t, n, MEMBER_DETAIL_PAGE_SIZE),
             onChange: (p: number) => setPage(p),
           }}
         />

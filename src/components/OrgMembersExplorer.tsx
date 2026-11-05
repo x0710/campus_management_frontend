@@ -1,3 +1,5 @@
+/** 组织成员浏览器：组织树 + 成员表，支持搜索、翻页与进入成员详情。 */
+
 import { isEntryActionTarget } from '../utils/entryInteraction'
 import { useRequestSequence } from '../composables/useRequestSequence'
 import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
@@ -10,7 +12,7 @@ import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
  * - 领导端传入全部组织（listAllOrganizations）；
  * - 老师端传入本人所在组织（listUserOrganizations），接口与数据范围都不变；
  * - 党委学院端「学院支部管理」传入本学院子树并保留组织树；
- * - 党委支部端「支部管理」传 showOrgTree=false（支部为最底层组织，无需树），仅展示成员表。
+ * - 支部端「支部管理」传 showOrgTree=false（支部为最底层组织，无需树），仅展示成员表。
  *
  * 成员 ID 搜索（各门户通用，逻辑见 composables/useMemberSearch）：输入用户 ID 后经
  * GET /api/organization-members?uids= 定位其所属组织 → 展开组织树到该组织并选中
@@ -58,6 +60,7 @@ import { usePositionLabel } from '../composables/usePositionLabel'
 import { useUserNames } from '../composables/useUserNames'
 import { LEADER_ORG_MEMBER_PAGE_SIZE } from '../config/leaderOrg'
 import { useT } from '../i18n'
+import { formatPaginationTotal } from '../utils/pagination'
 import { useAuthStore } from '../store/auth'
 import { useUiStateStore } from '../store/uiState'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../utils/partyScore'
@@ -124,6 +127,10 @@ interface OrgMembersExplorerProps {
   focusOrgId?: number | null
 }
 
+/** OrgMembersExplorer 组件。
+ * @param { orgs, orgsLoading, orgsError, onReloadOrgs, fromModuleKey, memberPageSize = LEADER_ORG_MEMBER_PAGE_SIZE, autoSelectFirst = false, autoSelectFirstWithMembers = false, showOrgTree = true, partyScoreColumns = false, focusOrgId = null, } 类型：OrgMembersExplorerProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function OrgMembersExplorer({
   orgs,
   orgsLoading,
@@ -890,7 +897,7 @@ export default function OrgMembersExplorer({
                 total: displayTotal,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, memberPageSize),
               }}
             />
           )}

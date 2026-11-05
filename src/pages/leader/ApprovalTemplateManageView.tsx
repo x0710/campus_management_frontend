@@ -39,6 +39,9 @@ import { formatDateTime } from '../../utils/datetime'
 /** 启用状态筛选值：'all' 表示不限状态 */
 type EnabledFilter = 'all' | 'on' | 'off'
 
+/** ApprovalTemplateManageView 组件。
+ * @returns 类型：Element
+ */
 export default function ApprovalTemplateManageView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

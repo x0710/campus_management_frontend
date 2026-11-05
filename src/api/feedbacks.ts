@@ -18,7 +18,12 @@ import type {
   FeedbackUpdateRequest,
 } from './types/feedbacks'
 
-/** GET /api/feedbacks 分页查询反馈（force=true 绕过会话缓存） */
+/**
+ * GET /api/feedbacks 分页查询反馈（force=true 绕过会话缓存）
+ * @param params 类型：FeedbackQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<FeedbackDto>>
+ */
 export function queryFeedbacks(params: FeedbackQuery = {}, force?: boolean) {
   return cachedGet<PaginatedResponse<FeedbackDto>>(
     '/feedbacks',
@@ -27,19 +32,33 @@ export function queryFeedbacks(params: FeedbackQuery = {}, force?: boolean) {
   )
 }
 
-/** GET /api/feedbacks/{id} 获取反馈详情（force=true 绕过会话缓存） */
+/**
+ * GET /api/feedbacks/{id} 获取反馈详情（force=true 绕过会话缓存）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<FeedbackDto>
+ */
 export function getFeedback(id: number, force?: boolean) {
   return cachedGet<FeedbackDto>(`/feedbacks/${id}`, undefined, { force })
 }
 
-/** POST /api/feedbacks 创建反馈，返回新反馈 ID */
+/**
+ * POST /api/feedbacks 创建反馈，返回新反馈 ID
+ * @param body 类型：FeedbackCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createFeedback(body: FeedbackCreateRequest): Promise<number> {
   const res = await http.post<number>('/feedbacks', body)
   invalidate('GET /feedbacks')
   return res.data
 }
 
-/** PATCH /api/feedbacks/{id} 部分更新反馈 */
+/**
+ * PATCH /api/feedbacks/{id} 部分更新反馈
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param body 类型：FeedbackUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateFeedback(
   id: number,
   body: FeedbackUpdateRequest,
@@ -48,7 +67,11 @@ export async function updateFeedback(
   invalidate('GET /feedbacks')
 }
 
-/** DELETE /api/feedbacks/{id} 删除反馈 */
+/**
+ * DELETE /api/feedbacks/{id} 删除反馈
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteFeedback(id: number): Promise<void> {
   await http.delete(`/feedbacks/${id}`)
   invalidate('GET /feedbacks')

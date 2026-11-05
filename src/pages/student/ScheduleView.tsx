@@ -1,3 +1,5 @@
+/** 学生端 - 我的课表页（当前为模拟数据预览）。 */
+
 import { Alert, Select, Space } from 'antd'
 import { useMemo, useState } from 'react'
 import { useT } from '../../i18n'
@@ -78,6 +80,9 @@ const MOCK_EVENTS: MockCourseEvent[] = [
 const DAY_COUNT = 7
 const SLOT_COUNT = 11
 
+/** ScheduleView 组件。
+ * @returns 类型：Element
+ */
 export default function ScheduleView() {
   const t = useT()
   const [term, setTerm] = useState('term_1')

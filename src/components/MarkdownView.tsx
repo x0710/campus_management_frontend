@@ -18,6 +18,8 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
  * 可复用的 Markdown 只读渲染组件：
  * marked 解析 GFM 语法（标题/粗体/斜体/删除线/代码/列表/任务列表/引用/表格/分割线），
  * DOMPurify 消毒后输出，避免 XSS。样式见 index.css 的 .markdown-body，自动适配明暗主题。
+ * @param { content, className = '', } 类型：{ content: string className?: string }；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function MarkdownView({
   content,

@@ -1,3 +1,5 @@
+/** 领导端 - 审批模板详情页：模板信息与审批步骤增改删。 */
+
 import { usePositionLabel } from '../../composables/usePositionLabel'
 /**
  * 领导端：审批指标（审批模板）详情页。
@@ -82,6 +84,9 @@ interface TemplateInfoFormValues {
   description?: string
 }
 
+/** ApprovalTemplateDetailPage 组件。
+ * @returns 类型：Element
+ */
 export default function ApprovalTemplateDetailPage() {
   const t = useT()
   const positionLabel = usePositionLabel()

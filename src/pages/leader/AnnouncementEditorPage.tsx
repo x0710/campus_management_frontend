@@ -61,6 +61,9 @@ function toDayjs(value: string | null | undefined): Dayjs | null {
   return d.isValid() ? d : null
 }
 
+/** AnnouncementEditorPage 组件。
+ * @returns 类型：Element
+ */
 export default function AnnouncementEditorPage() {
   const t = useT()
   const { message } = AntdApp.useApp()

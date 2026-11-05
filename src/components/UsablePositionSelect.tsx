@@ -1,3 +1,5 @@
+/** 可用职务下拉选择组件（可按组织过滤）。 */
+
 import { usePositionFormatter } from '../composables/usePositionLabel'
 import { Button, Select, Spin } from 'antd'
 import type { SelectProps } from 'antd'
@@ -8,7 +10,11 @@ import { useT } from '../i18n'
 
 type Props = Omit<SelectProps<string>, 'options'> & { organizationId?: number | null }
 
-/** 切换组织时重建选择器，避免短暂展示上一个组织的职位。 */
+/**
+ * 切换组织时重建选择器，避免短暂展示上一个组织的职位。
+ * @param props 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function UsablePositionSelect(props: Props) {
   return <OrganizationPositionSelect key={props.organizationId ?? 'none'} {...props} />
 }

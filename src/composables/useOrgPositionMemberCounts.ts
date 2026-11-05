@@ -1,5 +1,5 @@
 /**
- * 组织成员按职位统计（党委支部端 / 党委学院端 / 学校端工作台共用）。
+ * 组织成员按职位统计（支部端 / 党委学院端 / 学校端工作台共用）。
  *
  * 使用 POST /api/organizations/member-counts 批量统计（取代旧的
  * GET /api/organizations/{id}/members?position=... 取分页 total 再逐组织累加的做法）：

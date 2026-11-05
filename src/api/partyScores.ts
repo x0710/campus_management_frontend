@@ -95,7 +95,11 @@ export function getPartyScore(id: number, force?: boolean) {
   return cachedGet<PartyScoreDetail>(`/party-scores/${id}`, undefined, { force })
 }
 
-/** 直接扣分，无审批实例；成功后刷新记录与各处积分统计缓存。 */
+/**
+ * 直接扣分，无审批实例；成功后刷新记录与各处积分统计缓存。
+ * @param data 类型：PartyScoreDeductRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<PartyScoreDeductResponse>
+ */
 export async function deductPartyScore(data: PartyScoreDeductRequest) {
   const res = await http.post<PartyScoreDeductResponse>('/party-scores/deductions', data)
   invalidate('GET /party-scores')

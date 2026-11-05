@@ -32,6 +32,8 @@ interface Props {
  * 可复用的用户资料编辑弹窗：
  * 打开时拉取用户最新信息并回填表单，提交 PATCH /api/users/{id}。
  * 仅编辑资料字段（姓名/性别/邮箱/电话/生日/头像），角色与组织任职不在此处理。
+ * @param { open, uid, onClose, onSaved } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function UserProfileEditModal({ open, uid, onClose, onSaved }: Props) {
   const t = useT()

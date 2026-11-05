@@ -1,3 +1,5 @@
+/** 成员详情 - 档案信息页签：档案字段维护。 */
+
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
@@ -55,6 +57,8 @@ interface ProfileFormValues {
  * 详细信息面板：读取 /api/profile-details 中该用户的档案详情。
  * 非只读来源（管理端 / 党委学校端）支持新增（无档案时）、编辑与删除档案；
  * readOnly=true（如老师端班级管理进入）时隐藏以上入口，仅作查询。
+ * @param { uid, locale, t, readOnly, } 类型：{ uid: number locale: 'zh' | 'en' t: TranslateFn readOnly: boolean }；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function ProfileDetailTab({
   uid,

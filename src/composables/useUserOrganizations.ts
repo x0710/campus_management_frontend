@@ -13,6 +13,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { listUserOrganizationsBatch } from '../api/organizations'
 import type { UserOrganization } from '../api/types/organizations'
 
+/**
+ * useUserOrganizations 的参数与返回值说明。
+ * @param ids 类型：number[]；默认值：无；是否必填：必填
+ * @returns 类型：Map<number, UserOrganization[]>
+ */
 export function useUserOrganizations(
   ids: number[],
 ): Map<number, UserOrganization[]> {

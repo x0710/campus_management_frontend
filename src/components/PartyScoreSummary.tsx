@@ -1,3 +1,5 @@
+/** 党员积分汇总（总分与等级）展示组件。 */
+
 import { Skeleton } from 'antd'
 import { useMemo } from 'react'
 import ErrorState from './ErrorState'
@@ -27,6 +29,9 @@ function formatScoreValue(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
+/** PartyScoreSummary 组件。
+ * @returns 类型：Element
+ */
 export default function PartyScoreSummary() {
   const t = useT()
   const { records, loading, error, refresh } = useMyPartyScores()

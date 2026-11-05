@@ -23,6 +23,9 @@ import { formatPartyScore, isNegativePartyScore } from '../utils/partyScore'
 import ErrorState from './ErrorState'
 import PartyScoreDetailModal from './PartyScoreDetailModal'
 
+/** PartyScoreRecords 组件。
+ * @returns 类型：Element
+ */
 export default function PartyScoreRecords() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

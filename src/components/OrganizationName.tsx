@@ -1,3 +1,5 @@
+/** 按组织 ID 展示组织名称的组件。 */
+
 import { useEffect, useState } from 'react'
 import { Popover, Spin, Tree } from 'antd'
 import { getOrganization, getOrganizationTree } from '../api/organizations'

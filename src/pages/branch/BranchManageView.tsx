@@ -1,5 +1,5 @@
 /**
- * 党委支部端 / 党委学院端：支部管理（所属支部及其下级组织的成员信息）。
+ * 支部端 / 党委学院端：支部管理（所属支部及其下级组织的成员信息）。
  * 两端共用本组件，仅侧栏高亮与详情页返回来源（fromModuleKey）不同。
  *
  * 组织定位（规则已抽到 composables/usePortalOrg.ts，与支部/学院工作台共用）：
@@ -76,7 +76,11 @@ interface BranchManageViewProps {
   ancestorDepths: readonly number[]
 }
 
-/** 党委支部端 / 党委学院端：支部管理（目标组织及其下级组织成员查看） */
+/**
+ * 支部端 / 党委学院端：支部管理（目标组织及其下级组织成员查看）
+ * @param { fromModuleKey, ancestorDepths, } 类型：BranchManageViewProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function BranchManageView({
   fromModuleKey,
   ancestorDepths,

@@ -1,7 +1,7 @@
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 请假审批待办（GET /api/approvals + PUT /api/approvals）。
- * 教师端「请假审批」与党委支部端 / 学院端 / 学校端的「审批管理」共用本组件。
+ * 教师端「请假审批」与支部端 / 学院端 / 学校端的「审批管理」共用本组件。
  *
  * 审批入口有两处：
  *   1. 列表「操作」列：同意 / 驳回（填写意见后提交）；
@@ -36,9 +36,8 @@ import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
-
-/** 请假审批表每页条数（代码要求 12：表格每页最多 100 行） */
-const PAGE_SIZE = 100
+import { DEFAULT_TABLE_PAGE_SIZE } from '../../config/table'
+import { formatPaginationTotal } from '../../utils/pagination'
 
 const STATUS_COLOR: Record<ApprovalStepStatus, string> = {
   waiting: 'default',
@@ -53,7 +52,10 @@ function isActionable(status: ApprovalStepStatus): boolean {
   return status === 'waiting' || status === 'pending'
 }
 
-/** 教师端：请假审批待办（GET /api/approvals + PUT /api/approvals） */
+/**
+ * 教师端：请假审批待办（GET /api/approvals + PUT /api/approvals）
+ * @returns 类型：Element
+ */
 export default function LeaveApprovalView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -84,7 +86,7 @@ export default function LeaveApprovalView() {
         getCurrentUser(),
         queryApprovals({
           page,
-          page_size: PAGE_SIZE,
+          page_size: DEFAULT_TABLE_PAGE_SIZE,
           ...(status === 'all' ? {} : { status }),
         }),
       ])
@@ -224,7 +226,7 @@ export default function LeaveApprovalView() {
   )
 
   // 裸数组无 total：满页时假定可能还有下一页
-  const total = (page - 1) * PAGE_SIZE + rows.length + (rows.length === PAGE_SIZE ? 1 : 0)
+  const total = (page - 1) * DEFAULT_TABLE_PAGE_SIZE + rows.length + (rows.length === DEFAULT_TABLE_PAGE_SIZE ? 1 : 0)
 
   return (
     <div className="data-page-view">
@@ -271,9 +273,10 @@ export default function LeaveApprovalView() {
               })}
               pagination={{
                 current: page,
-                pageSize: PAGE_SIZE,
+                pageSize: DEFAULT_TABLE_PAGE_SIZE,
                 total,
                 showSizeChanger: false,
+                showTotal: (n: number) => formatPaginationTotal(t, n, DEFAULT_TABLE_PAGE_SIZE),
                 onChange: (nextPage: number) => setPage(nextPage),
               }}
             />

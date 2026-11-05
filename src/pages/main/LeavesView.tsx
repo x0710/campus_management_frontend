@@ -1,12 +1,16 @@
+/** 请假列表页（当前未注册路由，保留供复用）。 */
+
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { LeaveInfo, LeaveType } from '../../api/types/leaves'
 import { queryLeaves } from '../../api/leaves'
 import ErrorState from '../../components/ErrorState'
+import LeaveDetailModal from '../../components/LeaveDetailModal'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
@@ -17,11 +21,16 @@ const LEAVE_COLOR: Record<LeaveType, string> = {
   other: 'default',
 }
 
+/** LeavesView 组件。
+ * @returns 类型：Element
+ */
 export default function LeavesView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
     usePaginated<LeaveInfo>(queryLeaves)
+  /** 双击行进入的请假详情 ID（代码要求 14） */
+  const [detailId, setDetailId] = useState<number | null>(null)
 
   const columns = useMemo<ColumnsType<LeaveInfo>>(
     () => [
@@ -87,13 +96,18 @@ export default function LeavesView() {
             columns={columns}
             dataSource={data}
             scroll={{ x: 760 }}
+            // 整行双击进入请假详情（代码要求 14）
+            onRow={(row) => ({
+              onDoubleClick: () => setDetailId(row.id),
+              style: { cursor: 'pointer' },
+            })}
             pagination={{
               current: page,
               pageSize,
               total,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+              showTotal: (n: number) => formatPaginationTotal(t, n, pageSize),
               onChange: (nextPage: number, nextSize: number) => {
                 if (nextSize !== pageSize) setPageSize(nextSize)
                 else setPage(nextPage)
@@ -103,6 +117,11 @@ export default function LeavesView() {
         )}
       </div>
       </section>
+      <LeaveDetailModal
+        open={detailId !== null}
+        leaveId={detailId}
+        onClose={() => setDetailId(null)}
+      />
     </div>
   )
 }

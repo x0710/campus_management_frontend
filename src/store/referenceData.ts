@@ -1,3 +1,5 @@
+/** 参考数据共享资源：我的角色、职务名称等，随缓存失效自动刷新。 */
+
 import { getMyRoles, getMyPortalPositions } from '../api/auth'
 import { subscribeCacheInvalidation } from '../api/cache'
 import { listAllPositions } from '../api/positions'

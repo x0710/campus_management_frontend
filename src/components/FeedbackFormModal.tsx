@@ -62,6 +62,10 @@ interface FeedbackFormModalProps {
   onEdit?: () => void
 }
 
+/** FeedbackFormModal 组件。
+ * @param { open, mode, feedbackId, onCancel, onSaved, onEdit, } 类型：FeedbackFormModalProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function FeedbackFormModal({
   open,
   mode,

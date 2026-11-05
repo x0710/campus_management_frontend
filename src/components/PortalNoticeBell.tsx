@@ -22,6 +22,9 @@ import { formatDateTime } from '../utils/datetime'
 /** 顶栏通知弹层单页条数（代码要求 12：单页最多 100 行） */
 const NOTICE_POPOVER_PAGE_SIZE = 20
 
+/** PortalNoticeBell 组件。
+ * @returns 类型：Element
+ */
 export default function PortalNoticeBell() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

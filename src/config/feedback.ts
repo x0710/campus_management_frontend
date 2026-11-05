@@ -31,7 +31,12 @@ export const FEEDBACK_TITLE_MAX_LENGTH = 120
 export const FEEDBACK_CONTENT_MAX_LENGTH = 2000
 export const FEEDBACK_CONTACT_MAX_LENGTH = 255
 
-/** 反馈分类展示文案（统一走 feedback.category_*，避免同一枚举在多处重复翻译） */
+/**
+ * 反馈分类展示文案（统一走 feedback.category_*，避免同一枚举在多处重复翻译）
+ * @param category 类型：FeedbackCategory；默认值：无；是否必填：必填
+ * @param t 类型：TranslateFn；默认值：无；是否必填：必填
+ * @returns 类型：string
+ */
 export function getFeedbackCategoryLabel(
   category: FeedbackCategory,
   t: TranslateFn,

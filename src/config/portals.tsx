@@ -16,7 +16,6 @@ import {
   BookOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
-  ClusterOutlined,
   CrownOutlined,
   DollarOutlined,
   FileDoneOutlined,
@@ -45,7 +44,7 @@ import type { ReactNode } from 'react'
 
 /**
  * 工作端标识（与后端角色 student/teacher/admin 对齐，leader 为产品层门户）。
- * party 为党员端门户、branch 为党委支部端门户、academy 为党委学院端门户、school 为党委学校端门户：
+ * party 为党员端门户、branch 为支部端门户、academy 为党委学院端门户、school 为党委学校端门户：
  * 后端暂无对应角色与接口，前端全部使用虚拟数据。
  */
 export type PortalKey =
@@ -108,7 +107,7 @@ export const PORTALS: PortalDef[] = [
     ],
   },
   {
-    // 党委支部端门户：工作台（党员总数、平均分、待审核申报接真实接口，等级分布由前端计算）、
+    // 支部端门户：工作台（党员总数、平均分、待审核申报接真实接口，等级分布由前端计算）、
     // 我的使用虚拟数据预览；审核管理接入党建活动加分审批接口
     // （审批步骤由 GET /api/party-scores + /api/approvals 前端合成，
     //   审核动作走 PUT /api/party-scores/approvals/{id}/approve|reject|transfer），
@@ -144,8 +143,8 @@ export const PORTALS: PortalDef[] = [
     ],
   },
   {
-    // 党委学校端门户：菜单顺序为 总览 → 组织概览 → 组织成员管理 → 岗位管理 → 系统权限管理；
-    // 总览（党员总数、平均分、各二级党委排名均接真实接口，点击排名可跳到组织概览定位该党委）；
+    // 党委学校端门户：菜单顺序为 总览 → 组织成员管理 → 岗位管理 → 系统权限管理；
+    // 总览包含全校驾驶舱统计与组织概览（组织树 + 下级组织统计），均接真实接口；
     // 组织成员管理复用管理端「组织架构」页面，系统权限管理复用管理端「角色权限」页面，
     // 岗位管理复用管理端「岗位管理」页面，均接真实接口
     key: 'school',
@@ -154,8 +153,6 @@ export const PORTALS: PortalDef[] = [
     accent: '#08979c',
     modules: [
       { key: 'school_m1', status: 'ready', icon: <LineChartOutlined /> },
-      // 组织概览：左侧组织树 + 右侧下级组织统计（党员 / 预备党员人数、先锋指数平均分）
-      { key: 'school_m6', status: 'ready', icon: <ClusterOutlined /> },
       { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
       { key: 'school_m5', status: 'ready', icon: <IdcardOutlined /> },
       { key: 'school_m3', status: 'ready', icon: <SafetyCertificateOutlined /> },
@@ -238,6 +235,11 @@ export const PORTALS: PortalDef[] = [
   },
 ]
 
+/**
+ * getPortal 的参数与返回值说明。
+ * @param key 类型：string | undefined；默认值：无；是否必填：必填
+ * @returns 类型：PortalDef | undefined
+ */
 export function getPortal(key: string | undefined): PortalDef | undefined {
   return PORTALS.find((p) => p.key === key)
 }
@@ -312,6 +314,11 @@ export function getPortalKeysByRoleCodes(roleCodes: string[]): PortalKey[] {
 export interface PortalRole {
   code: string
   name: string
+}
+
+/** 超级管理员按系统角色编码精确识别，避免名称变更影响门户访问。 */
+export function isSuperAdminRole(role: PortalRole): boolean {
+  return role.code.trim().toLowerCase() === 'super_admin'
 }
 
 /** 默认门户：所有人登录后默认进入党员端（支部书记 / 党委委员 / 校级党委按任职职位另行分流） */

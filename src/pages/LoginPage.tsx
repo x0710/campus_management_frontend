@@ -22,6 +22,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router'
 import ErrorState from '../components/ErrorState'
 import { login } from '../api/auth'
 import { extractErrorReason } from '../api/common'
+import { REMEMBERED_USERNAME_KEY } from '../config/auth'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
@@ -33,8 +34,9 @@ interface LoginFormValues {
   remember: boolean
 }
 
-const REMEMBER_KEY = 'campus-remembered-user'
-
+/** LoginPage 组件。
+ * @returns 类型：Element
+ */
 export default function LoginPage() {
   const t = useT()
   const { notification } = AntdApp.useApp()
@@ -71,9 +73,9 @@ export default function LoginPage() {
       const res = await login({ username: values.username.trim(), password: values.password })
       setAuth({ token: res.token, username: res.user, lastLoginAt: res.last_login_at })
       if (values.remember) {
-        localStorage.setItem(REMEMBER_KEY, res.user)
+        localStorage.setItem(REMEMBERED_USERNAME_KEY, res.user)
       } else {
-        localStorage.removeItem(REMEMBER_KEY)
+        localStorage.removeItem(REMEMBERED_USERNAME_KEY)
       }
       // 登录成功：顶部弹窗欢迎；有上次登录时间则附带「上次登录 + 已过去」，首次登录走欢迎语
       if (res.last_login_at) {
@@ -115,7 +117,7 @@ export default function LoginPage() {
     }
   }
 
-  const rememberedUser = localStorage.getItem(REMEMBER_KEY)
+  const rememberedUser = localStorage.getItem(REMEMBERED_USERNAME_KEY)
 
   return (
     <div className="login-page">

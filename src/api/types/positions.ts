@@ -46,8 +46,7 @@ export interface PositionCreateRequest {
 
 /**
  * 职位更新请求体（code 为主键不可改）。
- * 注意：后端将 description: None 视为「保留原值」，因此清空描述无法通过本接口实现，
- * 空值时应省略该字段（见 updatePosition 调用方）。
+ * description 省略（None）表示保留原值；传入空字符串表示清空描述。
  */
 export interface PositionUpdateRequest {
   usage_scope?: PositionUsageScope | null

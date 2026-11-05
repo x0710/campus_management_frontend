@@ -1,7 +1,14 @@
+/** 日期时间格式化工具（按语言与本地时区展示）。 */
+
 import type { Dayjs } from 'dayjs'
 import type { Locale } from '../store/settings'
 
-/** 按当前语言格式化日期时间；后端返回 RFC3339（UTC），toLocaleString 自动转本地时区 */
+/**
+ * 按当前语言格式化日期时间；后端返回 RFC3339（UTC），toLocaleString 自动转本地时区
+ * @param value 类型：string | null；默认值：无；是否必填：必填
+ * @param locale 类型：Locale；默认值：无；是否必填：必填
+ * @returns 类型：string
+ */
 export function formatDateTime(value: string | null, locale: Locale): string {
   if (!value) return '—'
   const date = new Date(value)
@@ -20,6 +27,8 @@ export function formatDateTime(value: string | null, locale: Locale): string {
  * 仅格式化日期（如生日、出生日期）：输出 YYYY-MM-DD，不带时分。
  * 优先从 ISO 字符串中截取日期段，避免 new Date('2007-04-09T00:00:00Z') 在部分时区被移到前一天；
  * 非标准格式时才回退到本地时间解析。
+ * @param value 类型：string | null；默认值：无；是否必填：必填
+ * @returns 类型：string
  */
 export function formatDateOnly(value: string | null): string {
   if (!value) return '—'
@@ -32,13 +41,23 @@ export function formatDateOnly(value: string | null): string {
   ).padStart(2, '0')}`
 }
 
-/** 月份标签：zh → 2026年9月；en → September 2026（用于日历看板标题） */
+/**
+ * 月份标签：zh → 2026年9月；en → September 2026（用于日历看板标题）
+ * @param value 类型：Dayjs；默认值：无；是否必填：必填
+ * @param locale 类型：Locale；默认值：无；是否必填：必填
+ * @returns 类型：string
+ */
 export function formatMonthLabel(value: Dayjs, locale: Locale): string {
   if (locale === 'zh') return `${value.year()}年${value.month() + 1}月`
   return value.format('MMMM YYYY')
 }
 
-/** 日期标签：2026/9/11（用于「当日事件」标题，与月份标签风格一致） */
+/**
+ * 日期标签：2026/9/11（用于「当日事件」标题，与月份标签风格一致）
+ * @param value 类型：Dayjs；默认值：无；是否必填：必填
+ * @param locale 类型：Locale；默认值：无；是否必填：必填
+ * @returns 类型：string
+ */
 export function formatDayLabel(value: Dayjs, locale: Locale): string {
   if (locale === 'zh') return `${value.year()}/${value.month() + 1}/${value.date()}`
   return value.format('YYYY/M/D')

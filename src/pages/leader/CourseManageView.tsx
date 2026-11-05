@@ -25,6 +25,7 @@ import ErrorState from '../../components/ErrorState'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { COURSE_PAGE_SIZE, COURSE_TYPE_COLOR, COURSE_TYPE_OPTIONS } from '../../config/course'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 
 /** 课程类型筛选值：'all' 表示不限类型 */
 type TypeFilter = CourseType | 'all'
@@ -35,6 +36,9 @@ interface ModalState {
   courseId?: number
 }
 
+/** CourseManageView 组件。
+ * @returns 类型：Element
+ */
 export default function CourseManageView() {
   const t = useT()
   const { message } = AntdApp.useApp()
@@ -251,7 +255,7 @@ export default function CourseManageView() {
                 total,
                 showSizeChanger: false,
                 showQuickJumper: true,
-                showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+                showTotal: (n: number) => formatPaginationTotal(t, n, COURSE_PAGE_SIZE),
                 onChange: (p: number) => setPage(p),
               }}
             />

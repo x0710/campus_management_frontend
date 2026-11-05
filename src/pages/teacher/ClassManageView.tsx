@@ -21,6 +21,9 @@ import type { OrgNode } from '../../components/OrgMembersExplorer'
 import OrgMembersExplorer from '../../components/OrgMembersExplorer'
 import { useT } from '../../i18n'
 
+/** ClassManageView 组件。
+ * @returns 类型：Element
+ */
 export default function ClassManageView() {
   const t = useT()
 

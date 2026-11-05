@@ -28,7 +28,12 @@ export const ORG_MEMBER_FETCH_PAGE_SIZE = 100
 /** 优秀成绩分数线（仅用于成绩文本着色，及格与否以后端 is_pass 为准） */
 export const SCORE_EXCELLENT = 90
 
-/** 成绩文本配色：不及格红、优秀绿、其余沿用主题默认色 */
+/**
+ * 成绩文本配色：不及格红、优秀绿、其余沿用主题默认色
+ * @param score 类型：string；默认值：无；是否必填：必填
+ * @param isPass 类型：boolean；默认值：无；是否必填：必填
+ * @returns 类型：string | undefined
+ */
 export function scoreColor(score: string, isPass: boolean): string | undefined {
   if (!isPass) return '#cf1322'
   const value = Number(score)

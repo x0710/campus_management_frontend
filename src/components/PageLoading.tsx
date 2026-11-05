@@ -1,6 +1,11 @@
+/** 懒加载路由 / 页面的居中加载占位组件。 */
+
 import { Spin } from 'antd'
 
-/** 懒加载路由的加载占位：居中 spinner，仅替换内容区，不影响顶栏/侧栏。 */
+/**
+ * 懒加载路由的加载占位：居中 spinner，仅替换内容区，不影响顶栏/侧栏。
+ * @returns 类型：Element
+ */
 export default function PageLoading() {
   return (
     <div

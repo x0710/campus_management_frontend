@@ -42,7 +42,10 @@ function normalizeStatus(raw: unknown): KnownAnnouncementStatus | 'unknown' {
   return 'unknown'
 }
 
-/** 公告详情页：从列表双击整行跳转过来，单独请求全文 */
+/**
+ * 公告详情页：从列表双击整行跳转过来，单独请求全文
+ * @returns 类型：Element
+ */
 export default function AnnouncementDetailPage() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

@@ -53,6 +53,9 @@ type FormModal =
   | { mode: 'edit'; event: CalendarEventDetail }
   | null
 
+/** CalendarManageView 组件。
+ * @returns 类型：Element
+ */
 export default function CalendarManageView() {
   const t = useT()
   const { message } = AntdApp.useApp()

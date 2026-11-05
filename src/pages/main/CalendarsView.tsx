@@ -1,27 +1,29 @@
+/** 校历列表页（当前未注册路由，保留供复用）。 */
+
 import { ReloadOutlined } from '@ant-design/icons'
-import { Button, Table, Tag } from 'antd'
+import { Button, Descriptions, Modal, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { CalendarEventInfo, EventType } from '../../api/types/calendars'
 import { queryEvents } from '../../api/calendars'
+import { CALENDAR_EVENT_COLOR } from '../../config/calendar'
 import ErrorState from '../../components/ErrorState'
 import { usePaginated } from '../../hooks/usePaginated'
 import { useT } from '../../i18n'
+import { formatPaginationTotal } from '../../utils/pagination'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
 
-const EVENT_COLOR: Record<EventType, string> = {
-  holiday: 'blue',
-  exam: 'red',
-  activity: 'green',
-  other: 'default',
-}
-
+/** CalendarsView 组件。
+ * @returns 类型：Element
+ */
 export default function CalendarsView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
     usePaginated<CalendarEventInfo>(queryEvents)
+  /** 双击行进入的事件详情（代码要求 14） */
+  const [selected, setSelected] = useState<CalendarEventInfo | null>(null)
 
   const columns = useMemo<ColumnsType<CalendarEventInfo>>(
     () => [
@@ -37,7 +39,7 @@ export default function CalendarsView() {
         key: 'event_type',
         width: 120,
         render: (type: EventType) => (
-          <Tag color={EVENT_COLOR[type]}>{t(`calendar.type_${type}`)}</Tag>
+          <Tag color={CALENDAR_EVENT_COLOR[type]}>{t(`calendar.type_${type}`)}</Tag>
         ),
       },
       {
@@ -81,13 +83,18 @@ export default function CalendarsView() {
             columns={columns}
             dataSource={data}
             scroll={{ x: 720 }}
+            // 整行双击进入事件详情（代码要求 14）
+            onRow={(row) => ({
+              onDoubleClick: () => setSelected(row),
+              style: { cursor: 'pointer' },
+            })}
             pagination={{
               current: page,
               pageSize,
               total,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+              showTotal: (n: number) => formatPaginationTotal(t, n, pageSize),
               onChange: (nextPage: number, nextSize: number) => {
                 if (nextSize !== pageSize) setPageSize(nextSize)
                 else setPage(nextPage)
@@ -97,6 +104,31 @@ export default function CalendarsView() {
         )}
       </div>
       </section>
+      <Modal
+        open={selected !== null}
+        title={t('calendar.detailTitle')}
+        footer={null}
+        onCancel={() => setSelected(null)}
+        width={560}
+      >
+        {selected ? (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label={t('calendar.colTitle')}>
+              {selected.title}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('calendar.colType')}>
+              <Tag color={CALENDAR_EVENT_COLOR[selected.event_type]}>
+                {t(`calendar.type_${selected.event_type}`)}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label={t('calendar.fieldRange')}>
+              {formatDateTime(selected.start_date, locale)}
+              {' ~ '}
+              {formatDateTime(selected.end_date, locale)}
+            </Descriptions.Item>
+          </Descriptions>
+        ) : null}
+      </Modal>
     </div>
   )
 }

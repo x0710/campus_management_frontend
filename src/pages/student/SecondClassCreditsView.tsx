@@ -1,3 +1,5 @@
+/** 学生端 - 第二课堂学分页（当前为模拟数据预览）。 */
+
 import { Alert, Card, Col, Progress, Row, Space, Statistic, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useMemo } from 'react'
@@ -58,6 +60,9 @@ const MOCK_DETAILS: MockCreditDetail[] = [
 
 const TOTAL_REQUIRED = 12
 
+/** SecondClassCreditsView 组件。
+ * @returns 类型：Element
+ */
 export default function SecondClassCreditsView() {
   const t = useT()
 

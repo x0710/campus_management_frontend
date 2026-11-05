@@ -24,6 +24,8 @@ const MY_APPROVAL_STEP_MAX_PAGES = 5
 /**
  * GET /api/approvals 审批步骤列表。
  * 注意：接口返回裸数组（无分页 total），page/page_size 由后端 LIMIT/OFFSET 生效。
+ * @param params 类型：ApprovalTodoQuery；默认值：{}；是否必填：可选
+ * @returns 类型：Promise<ApprovalInstanceStep[]>
  */
 export function queryApprovals(params: ApprovalTodoQuery = {}) {
   return http
@@ -96,7 +98,11 @@ export function getApprovalRecords(instanceId: number, force?: boolean) {
   return cachedGet<ApprovalRecordItem[]>(`/approvals/${instanceId}/records`, undefined, { force })
 }
 
-/** PUT /api/approvals 提交审批结果（同意 / 驳回 / 转交），成功返回 200 无 body */
+/**
+ * PUT /api/approvals 提交审批结果（同意 / 驳回 / 转交），成功返回 200 无 body
+ * @param data 类型：ApprovalStepResult；默认值：无；是否必填：必填
+ * @returns 类型：Promise<any>
+ */
 export function submitApproval(data: ApprovalStepResult) {
   return http
     .put('/approvals', data)

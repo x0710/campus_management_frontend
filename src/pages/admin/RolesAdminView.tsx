@@ -1,3 +1,5 @@
+/** 管理员端 - 角色管理：角色增删改与权限分配入口。 */
+
 import {
   DeleteOutlined,
   EditOutlined,
@@ -40,9 +42,8 @@ import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { formatDateTime } from '../../utils/datetime'
 import { useT } from '../../i18n'
 import { PROTECTED_ROLE_CODES } from '../../config/rbac'
-
-/** 角色/权限关联表每页条数（代码要求 12：表格每页最多 100 行） */
-const PAGE_SIZE = 100
+import { formatPaginationTotal } from '../../utils/pagination'
+import { DEFAULT_TABLE_PAGE_SIZE } from '../../config/table'
 
 type RoleFormValues = {
   code: string
@@ -60,6 +61,7 @@ type PermFormValues = {
  * - 角色 CRUD（POST/PATCH/DELETE /rbac/roles）
  * - 权限 CRUD（POST/PATCH/DELETE /rbac/permissions）
  * - 角色-权限覆盖式分配（PUT /rbac/roles/{id}/permissions）
+ * @returns 类型：Element
  */
 export default function RolesAdminView() {
   const t = useT()
@@ -118,7 +120,7 @@ export default function RolesAdminView() {
       const res = await queryRoles(
         {
           page: rolePage,
-          page_size: PAGE_SIZE,
+          page_size: DEFAULT_TABLE_PAGE_SIZE,
           ...(roleKeyword.trim() ? { keyword: roleKeyword.trim() } : {}),
         },
         roleReload.force,
@@ -146,7 +148,7 @@ export default function RolesAdminView() {
       const res = await queryPermissions(
         {
           page: permPage,
-          page_size: PAGE_SIZE,
+          page_size: DEFAULT_TABLE_PAGE_SIZE,
           ...(permKeyword.trim() ? { keyword: permKeyword.trim() } : {}),
         },
         permReload.force,
@@ -459,12 +461,12 @@ export default function RolesAdminView() {
                           locale={{ emptyText: t('common.noData') }}
                           pagination={{
                             current: rolePage,
-                            pageSize: PAGE_SIZE,
+                            pageSize: DEFAULT_TABLE_PAGE_SIZE,
                             total: roleTotal,
                             showSizeChanger: false,
                             showQuickJumper: true,
                             showTotal: (n: number) =>
-                              `${t('common.total')} ${n} ${t('common.items')}`,
+                              formatPaginationTotal(t, n, DEFAULT_TABLE_PAGE_SIZE),
                             onChange: (p: number) => setRolePage(p),
                           }}
                         />
@@ -517,12 +519,12 @@ export default function RolesAdminView() {
                           locale={{ emptyText: t('common.noData') }}
                           pagination={{
                             current: permPage,
-                            pageSize: PAGE_SIZE,
+                            pageSize: DEFAULT_TABLE_PAGE_SIZE,
                             total: permTotal,
                             showSizeChanger: false,
                             showQuickJumper: true,
                             showTotal: (n: number) =>
-                              `${t('common.total')} ${n} ${t('common.items')}`,
+                              formatPaginationTotal(t, n, DEFAULT_TABLE_PAGE_SIZE),
                             onChange: (p: number) => setPermPage(p),
                           }}
                         />

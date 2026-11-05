@@ -20,6 +20,10 @@ interface MemberSearchModeToggleProps {
   onToggle: () => void
 }
 
+/** MemberSearchModeToggle 组件。
+ * @param { matchOnly, visible, onToggle, } 类型：MemberSearchModeToggleProps；默认值：无；是否必填：必填
+ * @returns 类型：Element | null
+ */
 export default function MemberSearchModeToggle({
   matchOnly,
   visible,

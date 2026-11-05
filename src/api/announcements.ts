@@ -19,6 +19,9 @@ import type {
  * 这里做一次归一化：裸数组时先按 created_at 倒序（最新发布在前）整体排序，
  * 再按分页参数切片，兼容两种形态。
  * force=true 可绕过缓存（手动刷新）。
+ * @param params 类型：AnnouncementQuery；默认值：{}；是否必填：可选
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<PaginatedResponse<AnnouncementListItem>>
  */
 export async function queryAnnouncements(
   params: AnnouncementQuery = {},
@@ -55,6 +58,8 @@ export async function queryAnnouncements(
  * 后端当前返回裸数组（queryAnnouncements 在前端按页切片），也兼容未来的真分页形态；
  * 每一页都走会话缓存，force=true 时整体绕过缓存（手动刷新）。
  * 用于需要在前端做多选筛选的场景。
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<AnnouncementListItem[]>
  */
 export async function listAllAnnouncements(
   force?: boolean,
@@ -69,7 +74,11 @@ export async function listAllAnnouncements(
   return all
 }
 
-/** POST /api/announcements 创建并直接发布公告，返回新公告 ID（权限 announcement.create） */
+/**
+ * POST /api/announcements 创建并直接发布公告，返回新公告 ID（权限 announcement.create）
+ * @param payload 类型：AnnouncementCreateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<number>
+ */
 export async function createAnnouncement(
   payload: AnnouncementCreateRequest,
 ): Promise<number> {
@@ -81,6 +90,9 @@ export async function createAnnouncement(
 /**
  * GET /api/announcements/{id} 获取公告详情（含正文，列表不返回正文，需点击后单独请求；会话内缓存）。
  * force=true 可绕过缓存。
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param force 类型：boolean；默认值：无；是否必填：可选
+ * @returns 类型：Promise<AnnouncementDetail>
  */
 export async function getAnnouncement(
   id: number,
@@ -89,7 +101,12 @@ export async function getAnnouncement(
   return cachedGet<AnnouncementDetail>(`/announcements/${id}`, undefined, { force })
 }
 
-/** PATCH /api/announcements/{id} 更新公告字段（如撤回 status=withdrawn，权限 announcement.update） */
+/**
+ * PATCH /api/announcements/{id} 更新公告字段（如撤回 status=withdrawn，权限 announcement.update）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @param payload 类型：AnnouncementUpdateRequest；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function updateAnnouncement(
   id: number,
   payload: AnnouncementUpdateRequest,
@@ -99,7 +116,11 @@ export async function updateAnnouncement(
   invalidate(`GET /announcements/${id}`)
 }
 
-/** DELETE /api/announcements/{id} 删除公告（权限 announcement.delete） */
+/**
+ * DELETE /api/announcements/{id} 删除公告（权限 announcement.delete）
+ * @param id 类型：number；默认值：无；是否必填：必填
+ * @returns 类型：Promise<void>
+ */
 export async function deleteAnnouncement(id: number): Promise<void> {
   await http.delete(`/announcements/${id}`)
   invalidate('GET /announcements')

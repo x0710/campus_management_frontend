@@ -29,6 +29,7 @@ import { useUserNames } from '../composables/useUserNames'
 import { useUserOrganizations } from '../composables/useUserOrganizations'
 import { MEMBER_TABLE_PAGE_SIZE } from '../config/organization'
 import { useT } from '../i18n'
+import { formatPaginationTotal } from '../utils/pagination'
 import type { UserOrganization } from '../api/types/organizations'
 import { uniquePositionCodes, uniqueWorkplaces } from '../utils/userOrganization'
 
@@ -60,6 +61,10 @@ function pickMemberships(
   return (list ?? []).filter((o) => o.organization_id === orgId)
 }
 
+/** MatchedMembersTable 组件。
+ * @param { rows, hitUid, loading, onOpenMember, pageSize = MEMBER_TABLE_PAGE_SIZE, } 类型：MatchedMembersTableProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function MatchedMembersTable({
   rows,
   hitUid,
@@ -212,7 +217,7 @@ export default function MatchedMembersTable({
         total: rows.length,
         showSizeChanger: false,
         showQuickJumper: true,
-        showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+        showTotal: (n: number) => formatPaginationTotal(t, n, pageSize),
         onChange: (p: number) => setPageState({ key: hitUid, page: p }),
       }}
     />

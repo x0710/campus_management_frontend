@@ -1,6 +1,6 @@
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
- * 党建活动加分审核（党委支部端 / 党委学院端共用页面）。
+ * 党建活动加分审核（支部端 / 党委学院端共用页面）。
  *
  * 数据源：
  *   GET /api/approvals                     按显式 approver_id（当前登录用户）取审批步骤
@@ -86,7 +86,8 @@ async function fetchPartyScoreMap(
 
 /**
  * 党建活动加分审核页。
- * 党委支部端、党委学院端的「审核管理」共用本组件。
+ * 支部端、党委学院端的「审核管理」共用本组件。
+ * @returns 类型：Element
  */
 export default function PartyScoreApprovalView() {
   const t = useT()

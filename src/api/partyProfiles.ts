@@ -63,6 +63,7 @@ export async function updatePartyProfile(
  * DELETE /api/party/profiles/{user_id} 删除指定用户的党员档案。
  * 需要 `party_profile.delete` 权限及目标用户的数据范围。
  * @param userId 用户 ID（必填）
+ * @returns 类型：Promise<void>
  */
 export async function deletePartyProfile(userId: number): Promise<void> {
   await http.delete(`/party/profiles/${userId}`)

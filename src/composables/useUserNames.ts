@@ -15,6 +15,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { queryUsers } from '../api/users'
 
+/**
+ * useUserNames 的参数与返回值说明。
+ * @param ids 类型：number[]；默认值：无；是否必填：必填
+ * @returns 类型：Map<number, string | null>
+ */
 export function useUserNames(ids: number[]): Map<number, string | null> {
   const [names, setNames] = useState<Map<number, string | null>>(new Map())
 

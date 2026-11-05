@@ -65,6 +65,10 @@ interface CourseFormModalProps {
   onEdit?: () => void
 }
 
+/** CourseFormModal 组件。
+ * @param { open, mode, courseId, onCancel, onSaved, onEdit, } 类型：CourseFormModalProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function CourseFormModal({
   open,
   mode,

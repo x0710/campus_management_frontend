@@ -1,3 +1,5 @@
+/** 学生端 - 心理咨询预约页。 */
+
 import {
   Alert,
   Button,
@@ -40,6 +42,9 @@ interface BookingFormValues {
 const TYPE_OPTIONS: CounselType[] = ['academic', 'interpersonal', 'emotion', 'career', 'other']
 const SLOT_OPTIONS: CounselSlot[] = ['morning', 'afternoon', 'evening']
 
+/** CounselingBookingView 组件。
+ * @returns 类型：Element
+ */
 export default function CounselingBookingView() {
   const t = useT()
   const [form] = Form.useForm<BookingFormValues>()

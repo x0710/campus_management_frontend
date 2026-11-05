@@ -25,7 +25,7 @@ import {
   Tooltip,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   assignRoleDataScopes,
   assignRolePermissions,
@@ -47,6 +47,7 @@ import {
   RBAC_PERM_SEARCH_DEBOUNCE_MS,
 } from '../config/rbac'
 import { useT } from '../i18n'
+import { formatPaginationTotal } from '../utils/pagination'
 import ErrorState from './ErrorState'
 
 import { parseRoleDataScopes, serializeRoleDataScopes, type ScopeConfig } from '../utils/roleDataScopes'
@@ -128,6 +129,10 @@ function PermissionSearchInput({ onSearch }: { onSearch: (keyword: string) => vo
   )
 }
 
+/** RolePermissionsPanel 组件。
+ * @param { role, onCancel, onSaved, } 类型：RolePermissionsPanelProps；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function RolePermissionsPanel({
   role,
   onCancel,
@@ -152,6 +157,9 @@ export default function RolePermissionsPanel({
 
   /** 搜索框防抖后提交的关键词 */
   const [keyword, setKeyword] = useState('')
+
+  /** 权限表格当前页码（代码要求 12：支持分页并展示总页数） */
+  const [permPage, setPermPage] = useState(1)
 
   /** 「已分配权限」区域是否收起（默认展开，收起后仅保留标题与数量） */
   const [assignedCollapsed, setAssignedCollapsed] = useState(false)
@@ -197,6 +205,11 @@ export default function RolePermissionsPanel({
       cancelled = true
     }
   }, [role.id, t])
+
+  const handlePermissionSearch = useCallback((value: string) => {
+    setKeyword(value)
+    setPermPage(1)
+  }, [])
 
   const selectedSet = useMemo(() => new Set(selected), [selected])
 
@@ -382,7 +395,7 @@ export default function RolePermissionsPanel({
           ) : (
             <>
               <div className="approval-toolbar" style={{ marginBottom: 12 }}>
-                <PermissionSearchInput onSearch={setKeyword} />
+                <PermissionSearchInput onSearch={handlePermissionSearch} />
                 <span className="rbac-search-count">
                   {t('common.total')} {visiblePerms.length} {t('common.items')}
                 </span>
@@ -434,7 +447,16 @@ export default function RolePermissionsPanel({
                   columns={columns}
                   dataSource={visiblePerms}
                   locale={{ emptyText: t('common.noData') }}
-                  pagination={false}
+                  pagination={{
+                    current: permPage,
+                    pageSize: RBAC_PERMISSION_PAGE_SIZE,
+                    total: visiblePerms.length,
+                    showSizeChanger: false,
+                    showQuickJumper: true,
+                    showTotal: (n: number) =>
+                      formatPaginationTotal(t, n, RBAC_PERMISSION_PAGE_SIZE),
+                    onChange: (p: number) => setPermPage(p),
+                  }}
                   rowSelection={{
                     selectedRowKeys: selected,
                     // 搜索过滤会改变 dataSource，开启后已选但被过滤掉的行不会被 antd 丢弃，

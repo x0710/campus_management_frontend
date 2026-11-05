@@ -82,6 +82,10 @@ interface Props {
   showCount?: boolean
 }
 
+/** RichTextEditor 组件。
+ * @param { value = '', onChange, placeholder, maxLength, showCount = false, } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function RichTextEditor({
   value = '',
   onChange,

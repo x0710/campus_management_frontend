@@ -1,3 +1,5 @@
+/** 成员详情 - 违规页签：违规记录增删改。 */
+
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -34,6 +36,7 @@ import {
   VIOLATION_TITLE_MAX_LENGTH,
 } from '../../../config/violation'
 import { type TranslateFn } from '../../../i18n'
+import { formatPaginationTotal } from '../../../utils/pagination'
 import { useSettingsStore } from '../../../store/settings'
 import { formatDateTime } from '../../../utils/datetime'
 import ErrorState from '../../../components/ErrorState'
@@ -51,6 +54,8 @@ interface ViolationFormValues {
 /**
  * 违规信息 Tab：分页展示成员违规记录，双击行查看详细，支持编辑（PATCH /api/violations/{id}）。
  * readOnly=true（如老师端班级管理进入）时隐藏编辑入口，仅可查看详情（代码要求 14）。
+ * @param { uid, t, readOnly } 类型：{ uid: number; t: TranslateFn; readOnly: boolean }；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: TranslateFn; readOnly: boolean }) {
   const { message } = AntdApp.useApp()
@@ -252,7 +257,7 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
             total,
             showSizeChanger: false,
             showQuickJumper: true,
-            showTotal: (n: number) => `${t('common.total')} ${n} ${t('common.items')}`,
+            showTotal: (n: number) => formatPaginationTotal(t, n, VIOLATION_PAGE_SIZE),
             onChange: (p: number) => setPage(p),
           }}
         />

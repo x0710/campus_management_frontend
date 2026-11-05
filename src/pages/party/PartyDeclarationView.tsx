@@ -73,7 +73,10 @@ interface TemplateRulesState {
   error: string | null
 }
 
-/** 党员端：成绩申报（表单 + 本人申报记录） */
+/**
+ * 党员端：成绩申报（表单 + 本人申报记录）
+ * @returns 类型：Element
+ */
 export default function PartyDeclarationView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

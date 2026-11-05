@@ -9,7 +9,14 @@ import { ApiOutlined, AppstoreAddOutlined, LockOutlined } from '@ant-design/icon
 import { Navigate, useParams } from 'react-router'
 import { lazy, type ComponentType } from 'react'
 import { Tag } from 'antd'
-import { getPortal, type PortalKey, type PortalModule } from '../../config/portals'
+import {
+  DEFAULT_PORTAL_KEY,
+  getPortal,
+  type PortalKey,
+  type PortalModule,
+} from '../../config/portals'
+import PageLoading from '../../components/PageLoading'
+import { usePortalAccess } from '../../hooks/usePortalAccess'
 import {
   ACADEMY_ANCESTOR_DEPTHS,
   ACADEMY_BRANCH_MODULE_KEY,
@@ -49,7 +56,6 @@ const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
 const BranchManageView = lazy(() => import('../branch/BranchManageView'))
 const AcademyWorkbenchView = lazy(() => import('../academy/AcademyWorkbenchView'))
 const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
-const SchoolOrgOverviewView = lazy(() => import('../school/SchoolOrgOverviewView'))
 
 /**
  * （可查看全部公告、删除任意公告，编辑仅限本人发布的公告）。
@@ -68,11 +74,12 @@ const SchoolOrgAdminView = () => (
     rootOrgId={SCHOOL_COLLEGE_PARENT_ORG_ID}
     partyScoreColumns
     showResetPassword
+    showBulkAdd
   />
 )
 
 /**
- * 党委支部端「支部管理」：按组织树深度判定当前用户所属支部后展示其成员
+ * 支部端「支部管理」：按组织树深度判定当前用户所属支部后展示其成员
  * （支部还有下级支部时展示「支部 + 全部下级」组织树）。
  */
 const BranchManageModule = () => (
@@ -101,11 +108,11 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'party:party_m3': PartyImprovementView,
   'party:party_m4': PartyProfileView,
   'branch:branch_m1': BranchWorkbenchView,
-  // 党委支部端「审核管理」：党建活动加分审批（步骤列表前端合成 + PUT 通过/驳回/转交）
+  // 支部端「审核管理」：党建活动加分审批（步骤列表前端合成 + PUT 通过/驳回/转交）
   'branch:branch_m3': PartyScoreApprovalView,
-  // 党委支部端「我的」：与党员端「我的」复用同一页面
+  // 支部端「我的」：与党员端「我的」复用同一页面
   'branch:branch_m4': PartyProfileView,
-  // 党委支部端「支部管理」：判定所属支部后展示其成员（有下级支部则展示组织树）
+  // 支部端「支部管理」：判定所属支部后展示其成员（有下级支部则展示组织树）
   'branch:branch_m5': BranchManageModule,
   'academy:academy_m1': AcademyWorkbenchView,
   // 党委学院端「指标」：审批模板管理就是指标功能，直接复用领导端审批模板管理页面
@@ -125,8 +132,6 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'school:school_m4': PartyProfileView,
   // 党委学校端「岗位管理」：复用管理端「岗位管理」页面（接真实职位接口）
   'school:school_m5': PositionsAdminView,
-  // 党委学校端「组织概览」：左侧组织树 + 右侧下级组织统计（党员 / 预备党员人数、先锋指数平均分）
-  'school:school_m6': SchoolOrgOverviewView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,
@@ -153,15 +158,26 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'admin:admin_m5': PositionsAdminView,
 }
 
+/** PortalModuleRoute 组件。
+ * @returns 类型：Element
+ */
 export default function PortalModuleRoute() {
   const { portalKey, moduleKey } = useParams<{
     portalKey: string
     moduleKey?: string
   }>()
   const portal = getPortal(portalKey)
+  // 模块入口同样做角色校验，与 PortalWorkspace 形成双重兜底
+  const portalAccess = usePortalAccess(portal?.key)
 
   if (!portal) {
     return <Navigate to="/" replace />
+  }
+  if (portalAccess === null) {
+    return <PageLoading />
+  }
+  if (!portalAccess) {
+    return <Navigate to={`/portal/${DEFAULT_PORTAL_KEY}`} replace />
   }
 
   const readyModules = portal.modules.filter((m) => m.status === 'ready')

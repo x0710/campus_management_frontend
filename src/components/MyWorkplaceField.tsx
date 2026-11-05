@@ -1,3 +1,5 @@
+/** 成员工作地点编辑字段（按单条任职记录更新，避免覆盖其他职位）。 */
+
 import { EditOutlined } from '@ant-design/icons'
 import { App, Button, Input, Modal, Space } from 'antd'
 import axios from 'axios'
@@ -12,7 +14,11 @@ interface Props {
   onSaved: (workplace: string | null) => void
 }
 
-/** 仅在本人档案使用，按单条任职记录编辑，避免多职位工作地点被一起覆盖。 */
+/**
+ * 仅在本人档案使用，按单条任职记录编辑，避免多职位工作地点被一起覆盖。
+ * @param { memberId, workplace, onSaved } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function MyWorkplaceField({ memberId, workplace, onSaved }: Props) {
   const t = useT()
   const { message } = App.useApp()

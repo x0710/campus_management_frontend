@@ -1,3 +1,5 @@
+/** 党员端 - 党员档案页。 */
+
 import { isVisibleUserRole } from '../../config/rbac'
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import { usePositionFormatter, usePositionLabel } from '../../composables/usePositionLabel'
@@ -822,6 +824,9 @@ function NotificationsList() {
   )
 }
 
+/** PartyProfileView 组件。
+ * @returns 类型：Element
+ */
 export default function PartyProfileView() {
   const t = useT()
 

@@ -22,7 +22,11 @@ interface Props {
   maxCount?: number
 }
 
-/** 通用附件上传：选择文件后立即上传，上传成功把文件 ID 追加进表单值 */
+/**
+ * 通用附件上传：选择文件后立即上传，上传成功把文件 ID 追加进表单值
+ * @param { value, onChange, maxCount = 10 } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
+ */
 export default function AttachmentUploader({ value, onChange, maxCount = 10 }: Props) {
   const t = useT()
   const { message } = AntdApp.useApp()

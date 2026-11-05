@@ -1,3 +1,5 @@
+/** i18n 上下文、useT 翻译函数与插值 / 党建用语切换。 */
+
 // 多语言翻译函数
 // 支持插值，例如 t('login.welcome', { name: '张三' })
 import { createContext, useCallback, useContext } from 'react'
@@ -18,7 +20,10 @@ function resolve(dict: unknown, path: string): string | undefined {
 
 export type TranslateFn = (key: string, vars?: Record<string, string | number>) => string
 
-/** 多语言钩子：t('login.welcome')，支持 {name} 形式的插值 */
+/**
+ * 多语言钩子：t('login.welcome')，支持 {name} 形式的插值
+ * @returns 类型：TranslateFn
+ */
 export function useT(): TranslateFn {
   const partyPortal = useContext(PartyTerminologyContext)
   const locale = useSettingsStore((s) => s.locale)  // 从状态中获取当前语言
@@ -40,7 +45,12 @@ export function useT(): TranslateFn {
   )
 }
 
-/** 供非组件场景（枚举映射等）使用的命令式翻译 */
+/**
+ * 供非组件场景（枚举映射等）使用的命令式翻译
+ * @param locale 类型：'zh' | 'en'；默认值：无；是否必填：必填
+ * @param key 类型：string；默认值：无；是否必填：必填
+ * @returns 类型：string
+ */
 export function translate(locale: 'zh' | 'en', key: string): string {
   return resolve(messages[locale], key) ?? resolve(messages.zh, key) ?? key
 }

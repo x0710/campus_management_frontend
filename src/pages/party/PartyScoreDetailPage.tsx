@@ -65,6 +65,9 @@ const STATUS_ALERT_TYPE: Record<
   rejected: 'error',
 }
 
+/** PartyScoreDetailPage 组件。
+ * @returns 类型：Element
+ */
 export default function PartyScoreDetailPage() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)

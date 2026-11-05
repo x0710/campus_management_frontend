@@ -28,6 +28,8 @@ interface Props {
 /**
  * 可复用的请假详情弹窗：教师审批列表点击行后展示请假完整信息。
  * 数据通过 getLeave 走会话级缓存；单个详情加载失败时弹窗内显示带状态码的错误并支持重试。
+ * @param { open, leaveId, onClose, footerExtra, } 类型：Props；默认值：无；是否必填：必填
+ * @returns 类型：Element
  */
 export default function LeaveDetailModal({
   open,

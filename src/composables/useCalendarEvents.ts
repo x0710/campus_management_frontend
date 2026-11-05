@@ -43,6 +43,10 @@ function isAuthError(err: unknown): boolean {
   return axios.isAxiosError(err) && err.response?.status === 401
 }
 
+/**
+ * useCalendarEvents 的参数与返回值说明。
+ * @returns 类型：{ value: Dayjs; setValue: (next: Dayjs) => void; typeFilter: CalendarTypeFilter; setTypeFilter: Dispatch<SetStateAction<CalendarTypeFilter>>; ... 6 more ...; dayDetailsError: string | null; }
+ */
 export function useCalendarEvents() {
   const t = useT()
   /** 选中日期：其所在月份即看板当前展示的月份 */

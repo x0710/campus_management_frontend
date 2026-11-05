@@ -1,5 +1,5 @@
 /**
- * 党委支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
+ * 支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
  *
  * 已接入真实接口：
  *   支部总人数（人）  经 composables/usePortalOrg 定位当前用户所属支部 →
@@ -103,6 +103,9 @@ async function buildGradeDistribution(orgId: number): Promise<GradeDistributionI
   }))
 }
 
+/** BranchWorkbenchView 组件。
+ * @returns 类型：Element
+ */
 export default function BranchWorkbenchView() {
   const t = useT()
   const { portalKey } = useParams<{ portalKey: string }>()
