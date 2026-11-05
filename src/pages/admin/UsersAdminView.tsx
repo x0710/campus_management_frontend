@@ -7,7 +7,6 @@ import { useRequestSequence } from '../../composables/useRequestSequence'
 import { useSharedResource } from '../../composables/useSharedResource'
 import { myRolesResource } from '../../store/referenceData'
 import {
-  KeyOutlined,
   MoreOutlined,
   MinusCircleOutlined,
   PlusOutlined,
@@ -548,7 +547,7 @@ export default function UsersAdminView() {
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: isSuperAdmin ? 300 : 200,
+        width: isSuperAdmin ? 230 : 130,
         render: (_, record) => (
           <div className="approval-actions">
             {/* 「详细」进入成员详情页：资料 / 系统角色 / 组织任职的编辑入口都在详情页内（与组织架构一致） */}
@@ -568,37 +567,36 @@ export default function UsersAdminView() {
                 </Button>
               </Popconfirm>
             )}
-            <Button
-              type="link"
-              size="small"
-              icon={<KeyOutlined />}
-              onClick={() => openResetPassword(record.uid)}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'reset-password', label: t('adminUsers.resetPassword') },
+                  ...(myUid !== null && myUid !== record.uid
+                    ? [{ key: 'delete', label: t('adminOrg.delete'), danger: true }]
+                    : []),
+                ],
+                onClick: ({ key }) => {
+                  if (key === 'reset-password') {
+                    openResetPassword(record.uid)
+                    return
+                  }
+                  if (key !== 'delete') return
+                  modal.confirm({
+                    title: t('adminUsers.deleteConfirm'),
+                    content: `${record.name || record.uid} (${record.uid})`,
+                    okText: t('adminOrg.delete'),
+                    cancelText: t('approval.cancel'),
+                    okButtonProps: { danger: true },
+                    onOk: () => doDelete(record.uid),
+                  })
+                },
+              }}
             >
-              {t('adminUsers.resetPassword')}
-            </Button>
-            {myUid !== null && myUid !== record.uid && (
-              <Dropdown
-                trigger={['click']}
-                menu={{
-                  items: [{ key: 'delete', label: t('adminOrg.delete'), danger: true }],
-                  onClick: ({ key }) => {
-                    if (key !== 'delete') return
-                    modal.confirm({
-                      title: t('adminUsers.deleteConfirm'),
-                      content: `${record.name || record.uid} (${record.uid})`,
-                      okText: t('adminOrg.delete'),
-                      cancelText: t('approval.cancel'),
-                      okButtonProps: { danger: true },
-                      onOk: () => doDelete(record.uid),
-                    })
-                  },
-                }}
-              >
-                <Tooltip title={t('adminUsers.moreActions')}>
-                  <Button type="text" size="small" icon={<MoreOutlined />} loading={actingUid === record.uid} aria-label={t('adminUsers.moreActions')} />
-                </Tooltip>
-              </Dropdown>
-            )}
+              <Tooltip title={t('adminUsers.moreActions')}>
+                <Button type="text" size="small" icon={<MoreOutlined />} loading={actingUid === record.uid} aria-label={t('adminUsers.moreActions')} />
+              </Tooltip>
+            </Dropdown>
           </div>
         ),
       },

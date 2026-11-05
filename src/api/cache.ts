@@ -8,6 +8,22 @@ export { makeCacheKey } from '../utils/getRequestCache'
 export type { CachedGetOptions } from '../utils/getRequestCache'
 
 const cache = new GetRequestCache((url, params) => http.get(url, { params }).then((res) => res.data))
+// 组织成员管理相关数据保存在浏览器本地，不按时间自动过期。
+const storageKey = 'campus-organization-data-v1'
+const localCache = new GetRequestCache(
+  (url, params) => http.get(url, { params }).then((res) => res.data), Date.now, Infinity,
+  {
+    read: () => {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
+      return saved?.owner === useAuthStore.getState().username ? JSON.stringify(saved.entries) : null
+    },
+    write: (entries) => localStorage.setItem(storageKey, JSON.stringify({
+      owner: useAuthStore.getState().username, entries: JSON.parse(entries),
+    })),
+  },
+)
+const isOrganizationData = (url: string) => /^\/(organizations|organization-members|users|positions)(\/|$)/.test(url) ||
+  /^\/party\/scores(\/|$)/.test(url)
 const listeners = new Set<(prefix?: string) => void>()
 
 /**
@@ -18,7 +34,9 @@ const listeners = new Set<(prefix?: string) => void>()
  * @returns 类型：Promise<T>
  */
 export function cachedGet<T>(url: string, params?: Record<string, unknown>, opts?: CachedGetOptions): Promise<T> {
-  return cache.get<T>(url, params, opts)
+  return isOrganizationData(url)
+    ? localCache.get<T>(url, params, { ...opts, maxAgeMs: Infinity })
+    : cache.get<T>(url, params, opts)
 }
 
 /**
@@ -28,6 +46,7 @@ export function cachedGet<T>(url: string, params?: Record<string, unknown>, opts
  */
 export function invalidate(prefix?: string): void {
   cache.invalidate(prefix)
+  localCache.invalidate(prefix)
   for (const listener of listeners) listener(prefix)
 }
 
@@ -45,7 +64,11 @@ export function subscribeCacheInvalidation(listener: (prefix?: string) => void):
  * cacheSize 的参数与返回值说明。
  * @returns 类型：{ resolved: number; inFlight: number; }
  */
-export function cacheSize() { return cache.size() }
+export function cacheSize() {
+  const main = cache.size()
+  const local = localCache.size()
+  return { resolved: main.resolved + local.resolved, inFlight: main.inFlight + local.inFlight }
+}
 
 useAuthStore.subscribe((state, previous) => {
   if (state.token !== previous.token) invalidate()

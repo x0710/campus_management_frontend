@@ -7,6 +7,7 @@ import {
   EditOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -17,6 +18,7 @@ import {
   Alert,
   App as AntdApp,
   Button,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -57,6 +59,7 @@ import type {
 } from '../../api/types/organizations'
 import UsablePositionSelect from '../../components/UsablePositionSelect'
 import { getPartyScoreOrganizationAverage, getPartyScoreTotals } from '../../api/partyScores'
+import { invalidate } from '../../api/cache'
 import { resetUserPassword } from '../../api/users'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
@@ -75,6 +78,7 @@ import { useT } from '../../i18n'
 import { formatPaginationTotal } from '../../utils/pagination'
 import { ORG_SEARCH_DEBOUNCE_MS } from '../../config/organization'
 import { BULK_ADD_MEMBERS_ROUTE } from '../../config/bulkMembers'
+import { useAuthStore } from '../../store/auth'
 import { useUiStateStore } from '../../store/uiState'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../../utils/partyScore'
@@ -230,7 +234,7 @@ export default function OrgAdminView({
   showBulkAdd = false,
 }: OrgAdminViewProps) {
   const t = useT()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const navigate = useNavigate()
   const { portalKey } = useParams<{ portalKey: string }>()
 
@@ -253,6 +257,8 @@ export default function OrgAdminView({
 
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
+  const memberRequestRef = useRef(0)
+  const [membersOrgId, setMembersOrgId] = useState<number | null>(null)
   // 成员表页码按模块 key 记忆：进入成员详情再返回时仍停留在搜索命中的那一页
   const memberPage = useUiStateStore((s) => s.memberPages[uiKey] ?? 1)
   const setMemberPage = useUiStateStore((s) => s.setMemberPage)
@@ -268,6 +274,10 @@ export default function OrgAdminView({
   const [positionFilter, setPositionFilter] = useState<string[]>([])
   /** 党委学校端：先锋等级排序方向（null 表示不排序） */
   const [scoreSort, setScoreSort] = useState<'ascend' | 'descend' | null>(null)
+  const [positionFilterOpened, setPositionFilterOpened] = useState(false)
+  const [filterOrgId, setFilterOrgId] = useState<number | null>(null)
+  const needsAllMembers = partyScoreColumns && filterOrgId === selectedId && (positionFilterOpened || positionFilter.length > 0 || scoreSort !== null)
+  const [refreshVersion, setRefreshVersion] = useState(0)
   /** 当前组织平均成绩（后端 DecimalText；仅党委学校端展示） */
   const [orgAverageScore, setOrgAverageScore] = useState<string | null>(null)
   const [orgAverageLoading, setOrgAverageLoading] = useState(false)
@@ -323,20 +333,27 @@ export default function OrgAdminView({
 
   const loadMembers = useCallback(
     async (orgId: number, page: number, force?: boolean) => {
+      const requestId = ++memberRequestRef.current
+      const token = useAuthStore.getState().token
+      const isCurrent = () => requestId === memberRequestRef.current && token === useAuthStore.getState().token
       setMembersLoading(true)
       try {
-        if (partyScoreColumns) {
-          // 党委学校端：职位筛选与分数排序需要覆盖全量成员，循环取完该组织全部分页
+        if (needsAllMembers) {
+          // 仅启用跨页筛选或排序时才读取全部成员
           const all: OrganizationMember[] = []
           for (let current = 1; ; current += 1) {
+            if (!isCurrent()) return
             const res = await queryOrgMembers(
               orgId,
               { page: current, page_size: MEMBER_PAGE_SIZE },
               force,
             )
+            if (!isCurrent()) return
             all.push(...res.data)
             if (current >= res.total_pages || res.data.length < MEMBER_PAGE_SIZE) break
           }
+          if (!isCurrent()) return
+          setMembersOrgId(orgId)
           setMembers(all)
           setMemberTotal(all.length)
           return
@@ -346,23 +363,25 @@ export default function OrgAdminView({
           { page, page_size: MEMBER_PAGE_SIZE },
           force,
         )
+        if (!isCurrent()) return
+        setMembersOrgId(orgId)
         setMembers(res.data)
         setMemberTotal(res.total)
       } catch (err) {
-        if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
+        if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
       } finally {
-        setMembersLoading(false)
+        if (isCurrent()) setMembersLoading(false)
       }
     },
-    [partyScoreColumns, reportError],
+    [needsAllMembers, reportError],
   )
 
   // 成员表展示行：同一成员在当前组织有多个职位时合并为一行（避免出现两个一样的人）
-  const memberRows = useMemo(() => groupOrganizationMembers(members), [members])
+  const memberRows = useMemo(() => groupOrganizationMembers(membersOrgId === selectedId ? members : []), [members, membersOrgId, selectedId])
   // 全量成员用户 ID（按展示行去重）→ 先锋等级（排序需覆盖全部成员）
   const allMemberIds = useMemo(() => memberRows.map((m) => m.user_id), [memberRows])
   // 职位编码 → 职位名称（成员接口只返回编码，展示时映射为名称，管理员附带编号）
-  const positionLabel = usePositionLabel()
+  const positionLabel = usePositionLabel(memberRows.length > 0)
 
   /** 党委学校端职位筛选可选项：当前组织全量成员中实际出现的职位 */
   const memberPositionOptions = useMemo(() => {
@@ -399,15 +418,15 @@ export default function OrgAdminView({
     })
   }, [partyScoreColumns, memberRows, positionFilter, scoreSort, partyScores])
 
-  // 表格分页总数：党委学校端取筛选后的行数，其余模式沿用接口总数
-  const displayTotal = partyScoreColumns ? filteredRows.length : memberTotal
+  // 跨页筛选或排序时使用合并后的行数，普通浏览使用接口总数
+  const displayTotal = needsAllMembers ? filteredRows.length : memberTotal
 
-  // 当前页展示行：党委学校端由前端切片；其余模式接口已按页返回
+  // 全量数据仅在跨页操作时切片，普通浏览直接展示接口返回的当前页
   const visibleRows = useMemo(() => {
-    if (!partyScoreColumns) return memberRows
+    if (!needsAllMembers) return memberRows
     const start = (memberPage - 1) * MEMBER_PAGE_SIZE
     return filteredRows.slice(start, start + MEMBER_PAGE_SIZE)
-  }, [partyScoreColumns, memberRows, filteredRows, memberPage])
+  }, [needsAllMembers, memberRows, filteredRows, memberPage])
 
   // 当前页用户 ID：姓名 / 任职组织仅需解析当前展示页
   const visibleMemberIds = useMemo(
@@ -427,6 +446,7 @@ export default function OrgAdminView({
 
   // 切换组织时清空职位筛选与排序：不同组织的职位集合不同
   useEffect(() => {
+    setPositionFilterOpened(false)
     setPositionFilter([])
     setScoreSort(null)
   }, [selectedId])
@@ -453,15 +473,15 @@ export default function OrgAdminView({
     return () => {
       cancelled = true
     }
-  }, [partyScoreColumns, selectedId])
+  }, [partyScoreColumns, selectedId, refreshVersion])
 
   // 筛选后总页数变少时把页码收敛到末页（加载中不收敛，避免覆盖搜索目标页）
   useEffect(() => {
-    if (!partyScoreColumns || membersLoading) return
+    if (!needsAllMembers || membersLoading) return
     const maxPage = Math.max(1, Math.ceil(displayTotal / MEMBER_PAGE_SIZE))
     if (memberPage > maxPage) setMemberPage(uiKey, maxPage)
   }, [
-    partyScoreColumns,
+    needsAllMembers,
     membersLoading,
     displayTotal,
     memberPage,
@@ -482,7 +502,7 @@ export default function OrgAdminView({
     },
     memberRows: visibleRows,
     // 党委学校端在前端过滤 / 排序 / 分页，搜索命中后按当前行序计算目标页
-    resolveMemberPage: partyScoreColumns ? resolveMemberPage : undefined,
+    resolveMemberPage: needsAllMembers ? resolveMemberPage : undefined,
     // 搜索状态按模块 key 记忆：进入成员详情再返回后继续展示上一次的模糊匹配结果
     persistKey: uiKey,
   })
@@ -508,9 +528,13 @@ export default function OrgAdminView({
       setMemberPage(uiKey, targetPage)
       void loadMembers(selectedId, targetPage)
     } else {
+      memberRequestRef.current += 1
+      setMembersLoading(false)
+      setMembersOrgId(null)
       setMembers([])
       setMemberTotal(0)
     }
+    return () => { memberRequestRef.current += 1 }
   }, [selectedId, loadMembers, consumePendingPage, uiKey, setMemberPage])
 
   // parent_id -> children 组树：搜索关键词仅前端过滤名称/编码（见 utils/orgTree）
@@ -546,23 +570,26 @@ export default function OrgAdminView({
     [orgsInTree, selectedId],
   )
 
-  // 当前成员页内的用户 ID → 姓名 / 任职组织（均走会话缓存，相同 ID 不重复请求）
-  const memberNames = useUserNames(visibleMemberIds)
-  const memberOrgs = useUserOrganizations(visibleMemberIds)
+  const displayedMemberIds = useMemo(() => search.matchOnly ? [] : visibleMemberIds, [search.matchOnly, visibleMemberIds])
+  const scoreMemberIds = useMemo(() => search.matchOnly ? [] : scoreSort !== null ? allMemberIds : visibleMemberIds, [search.matchOnly, scoreSort, allMemberIds, visibleMemberIds])
 
-  // 成员列表「先锋等级」列：批量查询全量成员党建加分总计（排序需覆盖全部成员）
+  // 当前成员页内的用户 ID → 姓名 / 任职组织（均走会话缓存，相同 ID 不重复请求）
+  const memberNames = useUserNames(displayedMemberIds, reportError, refreshVersion)
+  const memberOrgs = useUserOrganizations(displayedMemberIds, refreshVersion)
+
+  // 默认只查询可见成员积分；启用分数排序时才查询全部成员积分。
   useEffect(() => {
-    if (!partyScoreColumns || allMemberIds.length === 0) {
+    if (!partyScoreColumns || scoreMemberIds.length === 0) {
       setPartyScores(new Map())
       setPartyScoresLoading(false)
       return
     }
     let cancelled = false
     setPartyScoresLoading(true)
-    getPartyScoreTotals(allMemberIds)
+    getPartyScoreTotals(scoreMemberIds)
       .then((items) => {
         if (cancelled) return
-        const next = new Map<number, string>(allMemberIds.map((uid) => [uid, '0']))
+        const next = new Map<number, string>(scoreMemberIds.map((uid) => [uid, '0']))
         for (const [uid, score] of items) next.set(uid, score)
         setPartyScores(next)
       })
@@ -575,7 +602,7 @@ export default function OrgAdminView({
     return () => {
       cancelled = true
     }
-  }, [allMemberIds, partyScoreColumns])
+  }, [scoreMemberIds, partyScoreColumns, refreshVersion])
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
     // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
@@ -780,7 +807,7 @@ export default function OrgAdminView({
         width: 80,
       },
       {
-        // 通过 GET /api/users/{id} 解析出的真实姓名
+        // 批量解析姓名，缺失项保留占位符
         title: t('profile.name'),
         key: 'user_name',
         width: 130,
@@ -820,6 +847,12 @@ export default function OrgAdminView({
         // 党委学校端：点击「身份」表头弹出当前组织的全部职位，可多选筛选
         title: partyScoreColumns ? (
           <MultiSelectHeaderFilter
+            onOpenChange={(open) => {
+              if (open) {
+                setFilterOrgId(selectedId)
+                setPositionFilterOpened(true)
+              }
+            }}
             title={t('adminOrg.colIdentity')}
             allLabel={t('common.all')}
             options={memberPositionOptions}
@@ -853,7 +886,7 @@ export default function OrgAdminView({
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: showResetPassword ? 210 : 140,
+        width: showResetPassword ? 170 : 140,
         render: (_, record) => (
           <div className="approval-actions">
             <Tooltip title={t('adminOrg.viewUser')}>
@@ -866,21 +899,24 @@ export default function OrgAdminView({
               </Button>
             </Tooltip>
             {showResetPassword && (
-              // 重置密码属高风险操作：先弹二次确认（与「移除成员」一致），确认后再打开密码弹窗
-              <Popconfirm
-                title={t('adminOrg.memberResetConfirm', {
-                  name: memberNames.has(record.user_id)
-                    ? `${memberNames.get(record.user_id)}（${record.user_id}）`
-                    : `#${record.user_id}`,
-                })}
-                okText={t('adminUsers.resetPassword')}
-                cancelText={t('approval.cancel')}
-                onConfirm={() => openResetPassword(record.user_id)}
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [{ key: 'reset-password', label: t('adminUsers.resetPassword') }],
+                  onClick: () => modal.confirm({
+                    title: t('adminOrg.memberResetConfirm', {
+                      name: memberNames.get(record.user_id)
+                        ? `${memberNames.get(record.user_id)}（${record.user_id}）`
+                        : `#${record.user_id}`,
+                    }),
+                    okText: t('adminUsers.resetPassword'),
+                    cancelText: t('approval.cancel'),
+                    onOk: () => openResetPassword(record.user_id),
+                  }),
+                }}
               >
-                <Button type="link" size="small">
-                  {t('adminUsers.resetPassword')}
-                </Button>
-              </Popconfirm>
+                <Button type="text" size="small" icon={<MoreOutlined />} aria-label={t('adminUsers.moreActions')} />
+              </Dropdown>
             )}
             <Popconfirm
               title={t('adminOrg.memberRemoveConfirm')}
@@ -912,6 +948,7 @@ export default function OrgAdminView({
       openMemberDetail,
       workplaceOrScoreColumn,
       showResetPassword,
+      modal,
       openResetPassword,
       removeMember,
       memberPositionOptions,
@@ -1040,7 +1077,14 @@ export default function OrgAdminView({
                 <Button
                   size="small"
                   icon={<ReloadOutlined />}
-                  onClick={() => void loadMembers(selectedOrg.id, memberPage, true)}
+                  onClick={() => {
+                    invalidate(`GET /organizations/${selectedOrg.id}/members`)
+                    invalidate('GET /users')
+                    invalidate('GET /organization-members')
+                    invalidate('GET /party/scores')
+                    setRefreshVersion((value) => value + 1)
+                    void loadMembers(selectedOrg.id, memberPage)
+                  }}
                 />
               </Tooltip>
               <Button size="small" icon={<PlusOutlined />} onClick={() => openCreate(selectedOrg)}>
@@ -1153,13 +1197,15 @@ export default function OrgAdminView({
                   if (partyScoreColumns) {
                     // 排序变化：重置到第 1 页，按前端重新排序后的数据切片
                     if (order !== scoreSort) {
+                      setFilterOrgId(selectedId)
                       setScoreSort(order)
                       setMemberPage(uiKey, 1)
                       return
                     }
-                    // 仅翻页：前端已加载全量数据，直接切换页码
-                    if (nextPage !== memberPage) setMemberPage(uiKey, nextPage)
-                    return
+                    if (needsAllMembers) {
+                      if (nextPage !== memberPage) setMemberPage(uiKey, nextPage)
+                      return
+                    }
                   }
                   // 服务端分页模式：翻页时重新请求该页
                   if (nextPage !== memberPage) {
@@ -1235,7 +1281,6 @@ export default function OrgAdminView({
         }}
         onCancel={() => setAddModalOpen(false)}
         onOk={() => void addMember()}
-        forceRender
         destroyOnHidden
       >
         <Form layout="vertical" style={{ marginTop: 12 }}>

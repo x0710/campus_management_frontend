@@ -36,11 +36,25 @@ export class GetRequestCache {
   private fetch: (url: string, params: Params) => Promise<unknown>
   private now: () => number
   private capacity: number
+  private storage?: { read: () => string | null; write: (value: string) => void }
 
-  constructor(fetch: (url: string, params: Params) => Promise<unknown>, now = Date.now, capacity = 500) {
+  constructor(fetch: (url: string, params: Params) => Promise<unknown>, now = Date.now, capacity = 500, storage?: { read: () => string | null; write: (value: string) => void }) {
     this.fetch = fetch
     this.now = now
     this.capacity = capacity
+    this.storage = storage
+    try {
+      const entries = JSON.parse(storage?.read() ?? '[]') as [string, { data: unknown; expiresAt: number | null }][]
+      for (const [key, entry] of entries) {
+        if (entry.expiresAt === null || entry.expiresAt > now()) {
+          this.resolved.set(key, { ...entry, expiresAt: entry.expiresAt ?? Infinity })
+        }
+      }
+    } catch { /* 本地缓存不可用时仍正常请求。 */ }
+  }
+
+  private persist() {
+    try { this.storage?.write(JSON.stringify([...this.resolved])) } catch { /* 存储不可用时保留内存缓存。 */ }
   }
 
   get<T>(url: string, params?: Params, options?: CachedGetOptions): Promise<T> {
@@ -68,6 +82,7 @@ export class GetRequestCache {
           this.resolved.delete(this.resolved.keys().next().value!)
         }
       }
+      this.persist()
       return data as T
     }).finally(() => {
       if (this.pending.get(key) === request) this.pending.delete(key)
@@ -83,6 +98,7 @@ export class GetRequestCache {
     for (const key of this.pending.keys()) {
       if (!prefix || key.startsWith(prefix)) this.pending.delete(key)
     }
+    this.persist()
   }
 
   size() { return { resolved: this.resolved.size, inFlight: this.pending.size } }

@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { listUserOrganizationsBatch } from '../api/organizations'
+import { useAuthStore } from '../store/auth'
 import type { UserOrganization } from '../api/types/organizations'
 
 /**
@@ -20,6 +21,7 @@ import type { UserOrganization } from '../api/types/organizations'
  */
 export function useUserOrganizations(
   ids: number[],
+  refreshVersion = 0,
 ): Map<number, UserOrganization[]> {
   const [orgMap, setOrgMap] = useState<Map<number, UserOrganization[]>>(new Map())
 
@@ -32,6 +34,7 @@ export function useUserOrganizations(
     if (uniqueIds.length === 0) return
 
     let cancelled = false
+    const token = useAuthStore.getState().token
 
     void (async () => {
       // 先按请求的 ID 全部初始化为空数组，再按返回结果分组；
@@ -48,7 +51,7 @@ export function useUserOrganizations(
       } catch {
         // 批量请求失败：全部 ID 保持空数组，不影响页面其他内容
       }
-      if (!cancelled) {
+      if (!cancelled && token === useAuthStore.getState().token) {
         // 与旧状态合并，保留其它 ID 的已解析结果
         setOrgMap((prev) => {
           const next = new Map(prev)
@@ -61,7 +64,7 @@ export function useUserOrganizations(
     return () => {
       cancelled = true
     }
-  }, [uniqueIds])
+  }, [uniqueIds, refreshVersion])
 
   return orgMap
 }

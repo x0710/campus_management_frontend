@@ -1,6 +1,6 @@
 /**
  * 用户 ID → 姓名批量解析 Hook：
- * 传入任意数量的用户 ID，去重后通过 queryUsers 的 uid 批量参数一次查询（走会话内缓存 cachedGet），
+ * 传入任意数量的用户 ID，分批查询姓名（共享接口缓存），
  * 返回 Map<id, name | null>。请求失败或不存在的 ID 映射为 null，不阻塞其他解析。
  * 适用于公告列表发布人列、公告详情发布人、组织成员表等需要批量展示姓名的场景。
  *
@@ -13,14 +13,17 @@
  * 已解析 ID 再次进入时由 API 层缓存直接返回，不会产生额外网络请求。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { queryUsers } from '../api/users'
+import axios from 'axios'
+import { useAuthStore } from '../store/auth'
+import { resolveUserNames } from '../api/userNames'
 
 /**
  * useUserNames 的参数与返回值说明。
  * @param ids 类型：number[]；默认值：无；是否必填：必填
+ * @param onError 查询失败时的提示回调（可选）；取消、过期会话与登录失效由统一流程处理
  * @returns 类型：Map<number, string | null>
  */
-export function useUserNames(ids: number[]): Map<number, string | null> {
+export function useUserNames(ids: number[], onError?: (error: unknown) => void, refreshVersion = 0): Map<number, string | null> {
   const [names, setNames] = useState<Map<number, string | null>>(new Map())
 
   // 依赖稳定的字符串 key 而不是数组引用：调用方常写成
@@ -37,25 +40,23 @@ export function useUserNames(ids: number[]): Map<number, string | null> {
 
     const uniqueIds = idsKey.split(',').map(Number)
     let cancelled = false
-    const fetched = new Map<number, string | null>()
+    const token = useAuthStore.getState().token
+    const isCurrent = () => !cancelled && token === useAuthStore.getState().token
+    let fetched = new Map<number, string | null>()
 
     void (async () => {
-      try{
-        // 后端已支持 uid 批量查询：一次请求取回所有用户姓名
-        const res = await queryUsers({
-          ids: uniqueIds.join(','),
-          page: 1,
-          page_size: Math.min(uniqueIds.length, 100),
-        })
-        for (const user of res.data) {
-          fetched.set(user.uid, user.name || null)
+      try {
+        const result = await resolveUserNames(uniqueIds, isCurrent)
+        fetched = result.names
+        if (isCurrent() && result.error) onError?.(result.error)
+      } catch (err) {
+        if (isCurrent() && !axios.isCancel(err) && !(axios.isAxiosError(err) && err.response?.status === 401)) {
+          onError?.(err)
         }
-      }catch{
-        // 批量请求失败时保持 Map 缺失，由渲染层兜底
         for (const id of uniqueIds) fetched.set(id, null)
       }
 
-      if (!cancelled) {
+      if (isCurrent()) {
         // 与旧状态合并，保留其它 ID 的已解析结果
         setNames((prev) => {
           const next = new Map(prev)
@@ -68,7 +69,7 @@ export function useUserNames(ids: number[]): Map<number, string | null> {
     return () => {
       cancelled = true
     }
-  }, [idsKey])
+  }, [idsKey, onError, refreshVersion])
 
   return names
 }

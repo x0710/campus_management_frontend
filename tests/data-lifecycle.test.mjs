@@ -191,3 +191,29 @@ test('共享数据强制刷新绕过在途请求，并将刷新标记传给接�
   await old
   assert.deepEqual(resource.getSnapshot().data, ['new'])
 })
+
+
+test('本地缓存重新创建后仍复用，时间经过不自动请求，刷新和失效才更新', async () => {
+  let saved = null, calls = 0, now = 0
+  const storage = { read: () => saved, write: (value) => { saved = value } }
+  const create = () => new GetRequestCache(async () => ++calls, () => now, Infinity, storage)
+  const first = create()
+  assert.equal(calls, 0)
+  assert.equal(await first.get('/organizations', undefined, { maxAgeMs: Infinity }), 1)
+  now = 10 ** 12
+  const restored = create()
+  assert.equal(await restored.get('/organizations'), 1)
+  assert.equal(calls, 1)
+  assert.equal(await restored.get('/organizations', undefined, { force: true, maxAgeMs: Infinity }), 2)
+  restored.invalidate('GET /organizations')
+  assert.equal(await create().get('/organizations'), 3)
+})
+
+test('本地存储不可用或内容损坏时仍可正常请求和复用内存缓存', async () => {
+  let calls = 0
+  const cache = new GetRequestCache(async () => ++calls, Date.now, 500, {
+    read: () => '{bad json', write: () => { throw new Error('quota exceeded') },
+  })
+  assert.equal(await cache.get('/organizations'), 1)
+  assert.equal(await cache.get('/organizations'), 1)
+})

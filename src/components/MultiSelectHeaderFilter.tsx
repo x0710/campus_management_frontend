@@ -15,6 +15,7 @@ export default function MultiSelectHeaderFilter({
   options,
   value,
   onChange,
+  onOpenChange,
 }: {
   /** 表头文案 */
   title: string
@@ -23,11 +24,13 @@ export default function MultiSelectHeaderFilter({
   options: { value: string; label: string }[]
   /** 已选值；空数组表示「全部」 */
   value: string[]
+  onOpenChange?: (open: boolean) => void
   onChange: (next: string[]) => void
 }) {
   return (
     <Dropdown
       trigger={['click']}
+      onOpenChange={onOpenChange}
       menu={{
         items: [
           { key: '__all__', label: allLabel },

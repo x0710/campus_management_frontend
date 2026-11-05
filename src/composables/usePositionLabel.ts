@@ -10,8 +10,8 @@ import { usePositionNames } from './usePositionNames'
  * 职位统一展示：普通用户只看名称，管理员附带编码；提交值仍使用原编码。
  * @returns 类型：(code: string, name?: string | null | undefined) => string
  */
-export function usePositionLabel() {
-  return usePositionFormatter(usePositionNames())
+export function usePositionLabel(enabled = true) {
+  return usePositionFormatter(usePositionNames(enabled), enabled)
 }
 
 /**
@@ -19,9 +19,9 @@ export function usePositionLabel() {
  * @param names 类型：ReadonlyMap<string, string>；默认值：无；是否必填：必填
  * @returns 类型：(code: string, name?: string | null | undefined) => string
  */
-export function usePositionFormatter(names: ReadonlyMap<string, string>) {
+export function usePositionFormatter(names: ReadonlyMap<string, string>, enabled = true) {
   const t = useT()
-  const { data: roles } = useSharedResource(myRolesResource)
+  const { data: roles } = useSharedResource(myRolesResource, enabled)
   const isAdmin = roles.some((role) => ['admin', 'super_admin'].includes(role.code))
   return useCallback((code: string, name?: string | null) => {
     const label = name?.trim() || names.get(code)?.trim() || t('common.unknown')
