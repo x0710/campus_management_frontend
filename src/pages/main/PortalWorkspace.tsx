@@ -23,10 +23,20 @@ import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-rou
 import PortalHeader from '../../components/PortalHeader'
 import PageLoading from '../../components/PageLoading'
 import { getPortal, isPortalDisabled, type PortalModule } from '../../config/portals'
-import { useT } from '../../i18n'
+import { PartyTerminologyContext, useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 
 export default function PortalWorkspace() {
+  const { portalKey } = useParams<{ portalKey: string }>()
+  const partyPortal = ['party', 'branch', 'academy', 'school'].includes(portalKey ?? '')
+  return (
+    <PartyTerminologyContext value={partyPortal}>
+      <PortalWorkspaceContent />
+    </PartyTerminologyContext>
+  )
+}
+
+function PortalWorkspaceContent() {
   const t = useT()
   const navigate = useNavigate()
   const location = useLocation()

@@ -90,6 +90,7 @@ export default function FeedbackFormModal({
   useEffect(() => {
     if (!open) return
     if (mode === 'create') {
+      setLoading(false)
       setDetail(null)
       setLoadError(null)
       form.setFieldsValue({ category: 'suggestion' })
@@ -129,7 +130,13 @@ export default function FeedbackFormModal({
 
   /** 提交：新增 → POST；编辑 → PATCH */
   const submit = async () => {
-    const values = await form.validateFields()
+    if (loading || loadError || saving) return
+    let values: FeedbackFormValues
+    try {
+      values = await form.validateFields()
+    } catch {
+      return
+    }
     setSaving(true)
     try {
       if (isEdit && feedbackId !== undefined) {
@@ -178,7 +185,7 @@ export default function FeedbackFormModal({
       width={640}
       okText={readOnly ? t('common.close') : t('common.confirm')}
       cancelText={t('common.cancel')}
-      okButtonProps={readOnly ? { style: { display: 'none' } } : undefined}
+      okButtonProps={readOnly ? { style: { display: 'none' } } : { disabled: loading || !!loadError }}
       footer={
         readOnly
           ? [
@@ -211,7 +218,7 @@ export default function FeedbackFormModal({
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : readOnly ? (
         detail && (
-          <Descriptions column={1} bordered size="small">
+          <Descriptions className="feedback-detail" column={1} bordered size="small">
             <Descriptions.Item label={t('common.id')}>
               {detail.id}
             </Descriptions.Item>
@@ -235,8 +242,9 @@ export default function FeedbackFormModal({
             </Descriptions.Item>
           </Descriptions>
         )
-      ) : (
-        <Form form={form} layout="vertical">
+      ) : null}
+      {!readOnly && (
+        <Form form={form} layout="vertical" style={{ display: loading || loadError ? 'none' : undefined }}>
           <Form.Item
             name="category"
             label={t('feedback.fieldCategory')}

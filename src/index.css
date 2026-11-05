@@ -1491,7 +1491,8 @@ h3 {
 }
 
 .feedback-layout > .feedback-contact-card {
-  flex: 0 0 480px;
+  flex: 0 0 clamp(240px, 25%, 360px);
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -1510,6 +1511,7 @@ h3 {
   height: auto;
   max-height: 620px;
   object-fit: contain;
+  flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.03);
@@ -1523,9 +1525,36 @@ h3 {
   text-align: center;
 }
 
-@media (max-width: 900px) {
+.feedback-main-card > .panel-card-header {
+  flex-wrap: wrap;
+}
+
+.feedback-main-card .student-toolbar {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.feedback-main-card .student-toolbar > * {
+  max-width: 100%;
+}
+
+.feedback-detail .ant-descriptions-item-content {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* 包含侧栏和内边距后，中等屏幕的剩余宽度不足以并排展示两张卡片。 */
+@media (max-width: 1200px) {
   .data-page-view.feedback-layout {
     flex-direction: column;
+    height: auto;
+    max-height: none;
+  }
+
+  .feedback-layout > .feedback-main-card {
+    flex: none;
+    min-height: 320px;
   }
 
   .feedback-layout > .feedback-contact-card {
