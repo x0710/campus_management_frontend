@@ -41,6 +41,7 @@ import {
   uniqueWorkplaces,
 } from '../../../utils/userOrganization'
 import ErrorState from '../../../components/ErrorState'
+import PartyPersonalDetails from '../../../components/PartyPersonalDetails'
 import { type EditSection } from '../../admin/UserEditPanel'
 
 /** 党员档案编辑表单值（党员编号 / 入党时间） */
@@ -52,7 +53,7 @@ interface PartyProfileFormValues {
 const { Text } = Typography
 
 /**
- * 基本信息面板：用户资料 + 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载）。
+ * 基本信息面板：用户资料 + 个人资料（部分来源）+ 党员信息（部分来源）+ 系统角色 + 组织任职（角色/组织在本面板内按需加载）。
  * 支部端 / 学院端来源不展示「系统角色」「组织任职」两张卡片（showRoleOrgCards=false），
  * 此时跳过角色请求，组织任职仍加载以供「党员信息」卡片使用。
  * @param props 类型：{ user: UserDetail | null loading: boolean genderLabel: string locale: 'zh' | 'en' t: TranslateFn 是否展示编辑入口（管理端 / 党委学校端等来源为 true） canEdit: boolean 是否展示「党员信息」卡片（支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） showPar；默认值：无；是否必填：必填
@@ -300,6 +301,9 @@ export default function BasicInfoPanel({
           />
         </Card>
       </div>
+
+      {/* 个人资料（支部端 / 学院端 / 学校端）：与党员端「我的」页的个人资料卡片一致，仅展示 */}
+      {showPartyInfo && <PartyPersonalDetails userId={user.id} readOnly />}
 
       {/* 党员信息（支部端 / 学院端 / 学校端）：与党员端「我的」页展示一致的党员端扩展信息 */}
       {showPartyInfo && (

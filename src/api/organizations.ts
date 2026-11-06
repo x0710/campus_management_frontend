@@ -132,7 +132,7 @@ export async function queryOrgMembers(
  * 人数需实时，故不走会话缓存；条件为空时直接返回空数组，不发请求。
  *
  * @param requests 统计条件数组（必填，超过单批上限时自动分批请求）
- * @param include 需要额外返回的信息（可选；gender / organization_name / personnel，
+ * @param include 需要额外返回的信息（可选；ethnic / gender / organization_name / personnel，
  *   去重后按逗号拼接为查询参数，统一作用于本批所有条件）
  * @returns Promise<OrganizationMemberCountItem[]> 与 requests 顺序一致的统计结果
  */

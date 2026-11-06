@@ -63,13 +63,16 @@ export default function StudentProfileView() {
   // 错误文案：extractErrorReason 生成的「状态码 + 中文原因」完整提示
   const [error, setError] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  // 登录账户名：来自 /credentials/me，随用户详情一起刷新
+  const [accountName, setAccountName] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      // 1) 当前登录用户 uid
+      // 1) 当前登录用户 uid / 账户名
       const me = await getCurrentUser()
+      setAccountName(me.username?.trim() ?? '')
 
       // 2) 并行拉取用户详情、角色关联、组织任职
       const [detail, relations, userOrgs] = await Promise.all([
@@ -180,6 +183,9 @@ export default function StudentProfileView() {
                 <Descriptions column={2} bordered size="small">
                   <Descriptions.Item label={t('profile.name')}>
                     {user.name ?? t('profile.noData')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('profile.accountName')}>
+                    {accountName || t('profile.noData')}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('profile.gender')}>
                     {genderLabel}

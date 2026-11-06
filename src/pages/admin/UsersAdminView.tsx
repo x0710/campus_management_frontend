@@ -20,6 +20,7 @@ import {
   Dropdown,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Select,
@@ -69,6 +70,8 @@ import { normalizeGender } from '../../utils/gender'
 import { DEFAULT_TABLE_PAGE_SIZE } from '../../config/table'
 
 interface CreateFormValues {
+  /** 用户 ID（学号/工号），后端不再自动生成 */
+  uid: number
   username: string
   password?: string
   name?: string
@@ -78,6 +81,8 @@ interface CreateFormValues {
 
 /** 批量新增：CSV 解析后的单行（对应 /api/users 的 UserCreateRequest 各字段） */
 interface ParsedUser {
+  /** 用户 ID（学号/工号），字符串便于校验，提交时转为数字 */
+  uid: string
   username: string
   password: string
   name: string
@@ -302,6 +307,7 @@ export default function UsersAdminView() {
     try {
       const count = await createUsers([
         {
+          uid: values.uid,
           username: values.username.trim(),
           password: values.password?.trim() || undefined,
           name: values.name?.trim() || undefined,
@@ -340,9 +346,9 @@ export default function UsersAdminView() {
    * 解析 CSV 文本为 ParsedUser[]。
    * - `#` 开头的行视为注释跳过，空行跳过。
    * - 首个非注释行若包含 "username" 视为表头并跳过，否则按固定列顺序解析。
-   * - 列顺序固定为 BATCH_COLUMNS：username,password,name,gender,org,pos,workplaces。
+   * - 列顺序固定为：uid,username,password,name,gender,org,pos,workplaces。
    * - org/pos/workplaces 多值用 `|` 分隔，三者在后端按下标并行组成任职。
-   * - username 必填，为空标记 error。
+   * - uid 必填且为正整数（后端不再自动生成）；username 必填，为空标记 error。
    */
   const parseBatchCSV = (text: string): ParsedUser[] => {
     const out: ParsedUser[] = []
@@ -355,25 +361,29 @@ export default function UsersAdminView() {
         if (line.toLowerCase().includes('username')) continue
       }
       const cells = line.split(',').map((c) => c.trim())
-      const username = cells[0] ?? ''
-      const gender = (cells[3] ?? '').toLowerCase()
-      const orgStr = cells[4] ?? ''
+      const uid = cells[0] ?? ''
+      const username = cells[1] ?? ''
+      const gender = (cells[4] ?? '').toLowerCase()
+      const orgStr = cells[5] ?? ''
       const error =
-        !username
-          ? t('adminUsers.batchErrUsername')
-          : gender && !normalizeGender(gender)
-            ? t('adminUsers.batchErrGender')
-            : orgStr && orgStr.split('|').some((o) => o && isNaN(Number(o)))
-              ? t('adminUsers.batchErrOrg')
-              : undefined
+        !uid || !/^[1-9]\d*$/.test(uid)
+          ? t('adminUsers.batchErrUid')
+          : !username
+            ? t('adminUsers.batchErrUsername')
+            : gender && !normalizeGender(gender)
+              ? t('adminUsers.batchErrGender')
+              : orgStr && orgStr.split('|').some((o) => o && isNaN(Number(o)))
+                ? t('adminUsers.batchErrOrg')
+                : undefined
       out.push({
+        uid,
         username,
-        password: cells[1] ?? '',
-        name: cells[2] ?? '',
-        gender: cells[3] ?? '',
+        password: cells[2] ?? '',
+        name: cells[3] ?? '',
+        gender: cells[4] ?? '',
         org: orgStr,
-        pos: cells[5] ?? '',
-        workplaces: cells[6] ?? '',
+        pos: cells[6] ?? '',
+        workplaces: cells[7] ?? '',
         error,
       })
     }
@@ -400,6 +410,7 @@ export default function UsersAdminView() {
     const workplaces = split(u.workplaces)
     const gender = normalizeGender(u.gender)
     return {
+      uid: Number(u.uid),
       username: u.username,
       password: u.password || undefined,
       name: u.name || undefined,
@@ -714,6 +725,22 @@ export default function UsersAdminView() {
         <Form form={createForm} layout="vertical" initialValues={{ posts: [] }}>
           <div className="leave-form-grid">
             <Form.Item
+              name="uid"
+              label={t('adminUsers.fieldUid')}
+              extra={t('adminUsers.uidHint')}
+              rules={[
+                { required: true, message: t('adminUsers.uidRequired') },
+                {
+                  validator: (_, value: number | null) =>
+                    value === null || value === undefined || (Number.isInteger(value) && value > 0)
+                      ? Promise.resolve()
+                      : Promise.reject(new Error(t('adminUsers.uidInvalid'))),
+                },
+              ]}
+            >
+              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
               name="username"
               label={t('adminUsers.fieldUsername')}
               rules={[{ required: true, message: t('adminUsers.usernameRequired') }]}
@@ -891,6 +918,12 @@ export default function UsersAdminView() {
                 key: 'idx',
                 width: 50,
                 render: (_, __, i) => i + 1,
+              },
+              {
+                title: t('adminUsers.fieldUid'),
+                dataIndex: 'uid',
+                key: 'uid',
+                width: 110,
               },
               {
                 title: t('adminUsers.fieldUsername'),

@@ -60,8 +60,9 @@ export interface BulkTemplateColumn {
 }
 
 /**
- * 样表十一列：与「添加新成员列表.xlsx」表头逐列对应。
+ * 样表十五列：与「添加新成员列表.xlsx」表头逐列对应。
  * 示例值取自样表本身，便于用户照抄格式；「系统角色」只写角色 ID 数字，不写角色名称。
+ * 后四列（民族 / 籍贯 / 户口所在地 / 户口性质）为可选项，导入时写入该账号的个人档案。
  */
 export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
   {
@@ -162,6 +163,42 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     sampleA: '123456',
     sampleB: '123456',
     excelWidth: 14,
+  },
+  {
+    key: 'ethnic',
+    labelKey: 'bulkMembers.col.ethnic',
+    descKey: 'bulkMembers.colDesc.ethnic',
+    required: false,
+    sampleA: '苗族',
+    sampleB: '回族',
+    excelWidth: 12,
+  },
+  {
+    key: 'nativePlace',
+    labelKey: 'bulkMembers.col.nativePlace',
+    descKey: 'bulkMembers.colDesc.nativePlace',
+    required: false,
+    sampleA: '贵州黔东南',
+    sampleB: '宁夏银川',
+    excelWidth: 18,
+  },
+  {
+    key: 'householdLocation',
+    labelKey: 'bulkMembers.col.householdLocation',
+    descKey: 'bulkMembers.colDesc.householdLocation',
+    required: false,
+    sampleA: '贵州省凯里市幸福路 12 号',
+    sampleB: '宁夏银川市金凤区团结路 45 号',
+    excelWidth: 30,
+  },
+  {
+    key: 'householdType',
+    labelKey: 'bulkMembers.col.householdType',
+    descKey: 'bulkMembers.colDesc.householdType',
+    required: false,
+    sampleA: '城镇',
+    sampleB: '农村',
+    excelWidth: 12,
   },
 ]
 

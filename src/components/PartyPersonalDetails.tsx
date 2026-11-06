@@ -18,7 +18,18 @@ const fields = [
 ] as const
 type Values = Record<(typeof fields)[number][0], string>
 
-export default function PartyPersonalDetails({ userId }: { userId: number }) {
+/**
+ * 党员「我的」页 / 成员详情中的个人资料卡片（民族、籍贯、户口所在地、户口性质）。
+ * @param userId 目标用户 ID（必填）
+ * @param readOnly 只读展示（成员详情中由支部书记 / 学院党委 / 学校党委查看时为 true）
+ */
+export default function PartyPersonalDetails({
+  userId,
+  readOnly = false,
+}: {
+  userId: number
+  readOnly?: boolean
+}) {
   const t = useT()
   const { message } = App.useApp()
   const requests = useRequestSequence()
@@ -83,31 +94,33 @@ export default function PartyPersonalDetails({ userId }: { userId: number }) {
   }
 
   return (
-    <Card size="small" title={t('partyProfile.personalDetailsTitle')} extra={
+    <Card size="small" title={t('partyProfile.personalDetailsTitle')} extra={readOnly ? undefined : (
       <Button size="small" icon={<EditOutlined />} disabled={loading || !!error || !profile} onClick={() => {
         form.setFieldsValue(Object.fromEntries(fields.map(([key]) => [key, profile?.[key] ?? ''])))
         setOpen(true)
       }}>{t('common.edit')}</Button>
-    }>
+    )}>
       {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : error ? (
         <ErrorState message={error} onRetry={() => void load()} />
       ) : <>
-        {!profile && <Alert type="info" showIcon title={t('partyProfile.personalDetailsMissing')} style={{ marginBottom: 12 }} />}
+        {!profile && <Alert type="info" showIcon title={readOnly ? t('partyProfile.personalDetailsMissingReadOnly') : t('partyProfile.personalDetailsMissing')} style={{ marginBottom: 12 }} />}
         <Descriptions bordered size="small" column={2}>
           {fields.map(([key, label]) => <Descriptions.Item key={key} label={t(`memberDetail.${label}`)}>
             {profile?.[key]?.trim() || '-'}
           </Descriptions.Item>)}
         </Descriptions>
       </>}
-      <Modal open={open} title={t('partyProfile.personalDetailsTitle')} okText={t('common.save')}
-        cancelText={t('common.cancel')} confirmLoading={saving} onOk={() => void save()}
-        onCancel={() => { if (!saving) setOpen(false) }} closable={!saving} maskClosable={!saving} destroyOnHidden>
-        <Form form={form} layout="vertical" autoComplete="off" disabled={saving}>
-          {fields.map(([key, label]) => <Form.Item key={key} name={key} label={t(`memberDetail.${label}`)}>
-            <Input />
-          </Form.Item>)}
-        </Form>
-      </Modal>
+      {!readOnly && (
+        <Modal open={open} title={t('partyProfile.personalDetailsTitle')} okText={t('common.save')}
+          cancelText={t('common.cancel')} confirmLoading={saving} onOk={() => void save()}
+          onCancel={() => { if (!saving) setOpen(false) }} closable={!saving} maskClosable={!saving} destroyOnHidden>
+          <Form form={form} layout="vertical" autoComplete="off" disabled={saving}>
+            {fields.map(([key, label]) => <Form.Item key={key} name={key} label={t(`memberDetail.${label}`)}>
+              <Input />
+            </Form.Item>)}
+          </Form>
+        </Modal>
+      )}
     </Card>
   )
 }

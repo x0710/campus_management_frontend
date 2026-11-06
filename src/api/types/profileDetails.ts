@@ -87,4 +87,6 @@ export interface ProfileDetailQuery extends PageQuery {
   user_id?: number
   /** 按班级 ID 精确筛选 */
   class_id?: number
+  /** 按用户 ID 批量筛选（逗号分隔，如 "1,2,3"；配合 page_size 使用） */
+  uids?: string
 }

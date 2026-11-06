@@ -96,6 +96,7 @@ import { PARTY_PROBATIONARY_STATUS_NAME } from '../../config/partyProfile'
 import { useT } from '../../i18n'
 import { formatPaginationTotal } from '../../utils/pagination'
 import { useUiStateStore } from '../../store/uiState'
+import { countEthnicMinority } from '../../utils/ethnic'
 import { formatPartyScoreTotalDecimal } from '../../utils/partyScore'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 
@@ -105,6 +106,8 @@ interface OrgChildStats {
   memberCount: number | null
   /** 预备党员人数（含下级组织） */
   reserveMemberCount: number | null
+  /** 少数民族人数（民族分布中排除汉族与 unknown，含下级组织） */
+  minorityCount: number | null
   /** 先锋指数平均分（后端 DecimalText，含下级组织） */
   averageScore: string | null
 }
@@ -186,7 +189,8 @@ async function loadChildStats(
   const [averageResult, countsResult] = await Promise.allSettled([
     getPartyScoreOrganizationAverage({ organization_id: childId, recursive: true }, force),
     // 人数需实时，批量人数接口本身不走会话缓存
-    queryOrganizationMemberCounts(countRequests),
+    // include=ethnic 同时返回民族分布，用于统计少数民族人数（统一作用于本批所有条件）
+    queryOrganizationMemberCounts(countRequests, ['ethnic']),
   ])
 
   // 平均分与人数都失败说明该组织统计整体不可用：抛出首个错误由调用方统一提示
@@ -202,9 +206,16 @@ async function loadChildStats(
       ? null
       : countsResult.value.slice(1).reduce((sum, item) => sum + item.member_count, 0)
 
+  // 少数民族人数：与总人数同一次统计，失败时保持 null（占位符）
+  const minorityCount =
+    countsResult.status === 'fulfilled'
+      ? countEthnicMinority(countsResult.value[0]?.ethnic_counts)
+      : null
+
   return {
     memberCount,
     reserveMemberCount,
+    minorityCount,
     averageScore: averageResult.status === 'fulfilled' ? averageResult.value.average_score : null,
   }
 }
@@ -535,7 +546,12 @@ export default function SchoolOrgOverviewView() {
               firstError ??= err
               return [
                 childId,
-                { memberCount: null, reserveMemberCount: null, averageScore: null },
+                {
+                  memberCount: null,
+                  reserveMemberCount: null,
+                  minorityCount: null,
+                  averageScore: null,
+                },
               ] as const
             }
           }),
@@ -578,6 +594,7 @@ export default function SchoolOrgOverviewView() {
           parentName: org.parent_id !== null ? (orgNameById.get(org.parent_id) ?? '—') : '—',
           memberCount: item?.memberCount ?? null,
           reserveMemberCount: item?.reserveMemberCount ?? null,
+          minorityCount: item?.minorityCount ?? null,
           averageScore: item?.averageScore ?? null,
         }
       }),
@@ -707,6 +724,18 @@ export default function SchoolOrgOverviewView() {
             <span className="cell-sub">{t('common.loading')}</span>
           ) : (
             (record.memberCount ?? '—')
+          ),
+      },
+      {
+        title: t('schoolOrgOverview.colMinorityMembers'),
+        key: 'minorityCount',
+        width: 130,
+        sorter: (a, b, order) => compareNullableNumber(a.minorityCount, b.minorityCount, order),
+        render: (_, record) =>
+          statsLoading ? (
+            <span className="cell-sub">{t('common.loading')}</span>
+          ) : (
+            (record.minorityCount ?? '—')
           ),
       },
       {

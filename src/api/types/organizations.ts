@@ -57,11 +57,16 @@ export interface OrganizationMemberCountRequest {
 /**
  * 批量人数统计可额外返回的信息（POST /organizations/member-counts?include=...）。
  * 多个选项用英文逗号拼接，统一作用于请求体中的每一项：
+ * - ethnic：返回 ethnic_counts（民族名称 → 人数）；
  * - gender：返回 gender_counts；
  * - organization_name：返回根组织名称 organization_name；
  * - personnel：返回 personnel_counts（学生 / 职工 / 其他）。
  */
-export type OrganizationMemberCountInclude = 'gender' | 'organization_name' | 'personnel'
+export type OrganizationMemberCountInclude =
+  | 'ethnic'
+  | 'gender'
+  | 'organization_name'
+  | 'personnel'
 
 /** 当前统计范围内的性别分布：未填写、异常值或无对应用户归入 unknown；三项之和等于 member_count */
 export interface OrganizationMemberGenderCounts {
@@ -93,6 +98,11 @@ export interface OrganizationMemberCountItem {
   recursive: boolean
   /** 按用户 ID 去重的人数（非负；无匹配成员时为 0） */
   member_count: number
+  /**
+   * 仅 ?include=ethnic 时返回的民族分布（民族名称 → 人数）。
+   * 名称已去除首尾空格，未填写或无档案归入 `unknown`，各项之和等于 member_count。
+   */
+  ethnic_counts?: Record<string, number> | null
   /** 仅 ?include=gender 时返回的性别分布 */
   gender_counts?: OrganizationMemberGenderCounts | null
   /** 仅 ?include=organization_name 时返回（递归统计仍为根组织名称；组织不存在时为 null） */

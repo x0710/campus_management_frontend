@@ -3,6 +3,7 @@
  *
  * 统计口径（人数均以「学院党委」容器 ID=2 为起点，含全部下级组织、按用户去重）：
  * - 组织人数：POST /api/organizations/member-counts（{ org_id: 2, recursive: true }）
+ * - 少数民族人数：同一次统计加 ?include=ethnic，从 ethnic_counts 中排除「汉族 / unknown」后求和
  * - 中共党员人数 / 中共预备党员人数：按职位名称（身份）解析职位编码后递归统计
  * - 平均分：GET /api/party/scores/organization-average?organization_id=2&recursive=true
  * - 党组织个数：「学院党委」及其全部下级组织总数（组织树子树节点数）
@@ -22,10 +23,9 @@ import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { subscribeCacheInvalidation } from '../../api/cache'
 import { extractErrorReason } from '../../api/common'
-import { listAllOrganizations } from '../../api/organizations'
+import { listAllOrganizations, queryOrganizationMemberCounts } from '../../api/organizations'
 import { getPartyScoreOrganizationAverage } from '../../api/partyScores'
 import ErrorState from '../../components/ErrorState'
-import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import { countOrgMembersByPositionNames } from '../../composables/useOrgPositionMemberCounts'
 import {
   ORG_BRANCH_NAME_KEYWORD,
@@ -38,6 +38,7 @@ import {
 } from '../../config/partyProfile'
 import { useT } from '../../i18n'
 import { formatPartyScoreTotalDecimal } from '../../utils/partyScore'
+import { countEthnicMinority } from '../../utils/ethnic'
 import { collectOrgSubtree } from '../../utils/orgTree'
 import SchoolOrgOverviewView from './SchoolOrgOverviewView'
 
@@ -45,6 +46,8 @@ import SchoolOrgOverviewView from './SchoolOrgOverviewView'
 interface OverviewStats {
   /** 组织人数（学院党委及其全部下级组织） */
   orgMembers: number | null
+  /** 少数民族人数（民族分布中排除汉族与 unknown 后的人数） */
+  minorityMembers: number | null
   /** 中共党员人数 */
   fullMembers: number | null
   /** 中共预备党员人数 */
@@ -63,6 +66,7 @@ interface OverviewStats {
 
 const EMPTY_STATS: OverviewStats = {
   orgMembers: null,
+  minorityMembers: null,
   fullMembers: null,
   probationaryMembers: null,
   averageScore: null,
@@ -85,12 +89,16 @@ subscribeCacheInvalidation(() => {
 })
 
 /**
- * 拉取总览的全部统计项（组织人数 / 党员身份人数 / 平均分 / 各类组织个数）。
+ * 拉取总览的全部统计项（组织人数 / 少数民族人数 / 党员身份人数 / 平均分 / 各类组织个数）。
  * @returns Promise<OverviewStats> 统计结果
  */
 async function fetchOverviewStats(): Promise<OverviewStats> {
-  const [memberTotal, average, organizations, partyCounts] = await Promise.all([
-    countOrgMemberTotal(SCHOOL_COLLEGE_PARENT_ORG_ID),
+  const [memberCounts, average, organizations, partyCounts] = await Promise.all([
+    // 组织人数与少数民族人数同一次统计：include=ethnic 返回 ethnic_counts
+    queryOrganizationMemberCounts(
+      [{ org_id: SCHOOL_COLLEGE_PARENT_ORG_ID, recursive: true }],
+      ['ethnic'],
+    ),
     getPartyScoreOrganizationAverage({
       organization_id: SCHOOL_COLLEGE_PARENT_ORG_ID,
       recursive: true,
@@ -123,7 +131,8 @@ async function fetchOverviewStats(): Promise<OverviewStats> {
   ).length
 
   return {
-    orgMembers: memberTotal,
+    orgMembers: memberCounts[0]?.member_count ?? 0,
+    minorityMembers: countEthnicMinority(memberCounts[0]?.ethnic_counts),
     fullMembers: partyCounts[PARTY_FULL_MEMBER_STATUS_NAME] ?? null,
     probationaryMembers: partyCounts[PARTY_PROBATIONARY_STATUS_NAME] ?? null,
     averageScore: average.average_score,
@@ -196,6 +205,12 @@ export default function SchoolOverviewView() {
       key: 'orgMembers',
       label: t('school.statOrgMembers'),
       value: statText(stats.orgMembers),
+      unit: t('school.membersUnit'),
+    },
+    {
+      key: 'minorityMembers',
+      label: t('school.statMinorityMembers'),
+      value: statText(stats.minorityMembers),
       unit: t('school.membersUnit'),
     },
     {
