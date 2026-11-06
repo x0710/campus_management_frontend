@@ -42,18 +42,16 @@ export interface ProfileDetail {
 
 /**
  * 创建档案请求（POST /api/profile-details）。
- * 必填：user_id、id_card、ethnic、birth_date、class_id；其余字段可省略或传 null。
+ * 仅 user_id 必填；其余字段可省略或传 null。
  */
 export interface ProfileDetailCreateRequest {
   user_id: number
-  /** 身份证号（必填） */
-  id_card: string
-  /** 民族（必填） */
-  ethnic: string
-  /** 出生日期（YYYY-MM-DD，必填） */
-  birth_date: string
-  /** 班级 ID（必填） */
-  class_id: number
+  /** 身份证号（可选） */
+  id_card?: string | null
+  /** 民族（可选） */
+  ethnic?: string | null
+  /** 出生日期（YYYY-MM-DD，可选） */
+  birth_date?: string | null
   /** 籍贯 */
   native_place?: string | null
   /** 户口所在地 */

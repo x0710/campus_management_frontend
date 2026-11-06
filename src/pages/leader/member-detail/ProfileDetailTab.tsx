@@ -22,10 +22,9 @@ import type { Dayjs } from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { extractErrorReason } from '../../../api/common'
 import {
-  createProfileDetail,
   deleteProfileDetail,
   queryProfileDetails,
-  updateProfileDetail,
+  saveProfileDetail,
 } from '../../../api/profileDetails'
 import type { ProfileDetail } from '../../../api/types/profileDetails'
 import { useErrorFeedback } from '../../../composables/useErrorFeedback'
@@ -164,19 +163,14 @@ export default function ProfileDetailTab({
     mother_company: values.mother_company?.trim() || null,
   })
 
-  /** 提交：新增 → POST；编辑 → PATCH（user_id 不可变，更新时不带） */
+  /** 按 user_id 保存，由后端决定创建或更新。 */
   const submit = async () => {
     const values = await form.validateFields()
     setSaving(true)
     try {
       const body = buildBody(values)
-      if (editing) {
-        await updateProfileDetail(editing.id, body)
-        message.success(t('memberDetail.profileUpdateSuccess'))
-      } else {
-        await createProfileDetail({ user_id: uid, ...body })
-        message.success(t('memberDetail.profileCreateSuccess'))
-      }
+      await saveProfileDetail({ user_id: uid, ...body })
+      message.success(t(editing ? 'memberDetail.profileUpdateSuccess' : 'memberDetail.profileCreateSuccess'))
       setModalOpen(false)
       // 保存后强制刷新，展示最新档案
       setReload((r) => ({ seq: r.seq + 1, force: true }))

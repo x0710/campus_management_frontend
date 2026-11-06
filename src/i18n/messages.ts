@@ -1073,6 +1073,8 @@ const messages = {
       scopeOrgDesc: '可访问本人所在组织的数据',
       scopeOrgAndChild: '本组织及下级',
       scopeOrgAndChildDesc: '可访问本人所在组织及其全部下级组织的数据',
+      scopeOrgAndParent: '本组织及上级',
+      scopeOrgAndParentDesc: '可访问本人所在组织及其全部上级组织的数据',
       scopeCustom: '自定义',
       scopeCustomDesc: '仅可访问白名单内组织的数据',
     },
@@ -1554,7 +1556,7 @@ const messages = {
     partyProfile: {
       personalDetailsTitle: '个人资料',
       pendingApprovalHint: '您有待处理的审批，请及时查看。',
-      personalDetailsMissing: '暂无个人档案，请联系管理员建立档案后再编辑。',
+      personalDetailsMissing: '暂无个人档案，点击“编辑”填写并保存即可创建。',
       tabProfile: '我的档案',
       tabScores: '我的成绩记录',
       tabReport: '年度评价报告',
@@ -2771,6 +2773,9 @@ const messages = {
       scopeOrgAndChild: 'Organization & descendants',
       scopeOrgAndChildDesc:
         'Access data of your organization and all of its descendant organizations',
+      scopeOrgAndParent: 'Organization & ancestors',
+      scopeOrgAndParentDesc:
+        'Access data of your organization and all of its ancestor organizations',
       scopeCustom: 'Custom',
       scopeCustomDesc: 'Access only data of the organizations in the allowlist',
     },
@@ -3258,7 +3263,7 @@ const messages = {
     partyProfile: {
       personalDetailsTitle: 'Personal Details',
       pendingApprovalHint: 'You have approvals waiting for your review.',
-      personalDetailsMissing: 'No personal profile is available. Contact an administrator to create one before editing.',
+      personalDetailsMissing: 'No personal profile yet. Click Edit to fill in your details and save to create one.',
       tabProfile: 'My Profile',
       tabScores: 'My Scores',
       tabReport: 'Annual Review Report',

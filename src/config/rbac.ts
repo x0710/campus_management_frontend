@@ -32,6 +32,11 @@ export const DATA_SCOPE_OPTIONS: DataScopeOption[] = [
     labelKey: 'adminRoles.scopeOrgAndChild',
     descKey: 'adminRoles.scopeOrgAndChildDesc',
   },
+  {
+    value: 'org_and_parent',
+    labelKey: 'adminRoles.scopeOrgAndParent',
+    descKey: 'adminRoles.scopeOrgAndParentDesc',
+  },
   { value: 'custom', labelKey: 'adminRoles.scopeCustom', descKey: 'adminRoles.scopeCustomDesc' },
 ]
 

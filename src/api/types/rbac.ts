@@ -80,7 +80,7 @@ export interface UserRoleRelation {
 }
 
 /** 数据权限范围（对应后端 DataScope，按 snake_case 序列化） */
-export type DataScope = 'all' | 'self_only' | 'org' | 'org_and_child' | 'custom'
+export type DataScope = 'all' | 'self_only' | 'org' | 'org_and_child' | 'org_and_parent' | 'custom'
 
 /** 角色单条数据范围配置（GET /api/rbac/roles/{role_id}/data-scopes 返回元素） */
 export interface RoleDataScopeInfo {

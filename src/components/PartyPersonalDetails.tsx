@@ -3,7 +3,7 @@ import { Alert, App, Button, Card, Descriptions, Form, Input, Modal, Skeleton } 
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { extractErrorReason } from '../api/common'
-import { queryProfileDetails, updateProfileDetail } from '../api/profileDetails'
+import { queryProfileDetails, saveProfileDetail } from '../api/profileDetails'
 import type { ProfileDetail } from '../api/types/profileDetails'
 import { useRequestSequence } from '../composables/useRequestSequence'
 import { useT } from '../i18n'
@@ -53,24 +53,24 @@ export default function PartyPersonalDetails({ userId }: { userId: number }) {
   }, [load, requests])
 
   const save = async () => {
-    if (!profile || saving) return
+    if (saving) return
     let values: Values
     try {
       values = await form.validateFields()
     } catch {
       return
     }
-    // 白名单构造 PATCH，空民族保存为空字符串，其他可空字段保存为 null。
+    // 只提交本页维护的字段；空字符串用于清空原值。
     const changes = {
-      ethnic: values.ethnic.trim(),
-      native_place: values.native_place.trim() || null,
-      household_location: values.household_location.trim() || null,
-      household_type: values.household_type.trim() || null,
+      ethnic: (values.ethnic ?? '').trim(),
+      native_place: (values.native_place ?? '').trim(),
+      household_location: (values.household_location ?? '').trim(),
+      household_type: (values.household_type ?? '').trim(),
     }
     setSaving(true)
     try {
-      await updateProfileDetail(profile.id, changes)
-      setProfile({ ...profile, ...changes })
+      const saved = await saveProfileDetail({ user_id: userId, ...changes })
+      setProfile(saved)
       setOpen(false)
       message.success(t('profile.saveSuccess'))
     } catch (err) {
@@ -84,7 +84,7 @@ export default function PartyPersonalDetails({ userId }: { userId: number }) {
 
   return (
     <Card size="small" title={t('partyProfile.personalDetailsTitle')} extra={
-      <Button size="small" icon={<EditOutlined />} disabled={loading || !!error || !profile} onClick={() => {
+      <Button size="small" icon={<EditOutlined />} disabled={loading || !!error || saving} onClick={() => {
         form.setFieldsValue(Object.fromEntries(fields.map(([key]) => [key, profile?.[key] ?? ''])))
         setOpen(true)
       }}>{t('common.edit')}</Button>
