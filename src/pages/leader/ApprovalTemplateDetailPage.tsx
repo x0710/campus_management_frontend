@@ -109,7 +109,17 @@ export default function ApprovalTemplateDetailPage() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [infoForm] = Form.useForm<TemplateInfoFormValues>()
-  const [stepModal, setStepModal] = useState<StepModalState | null>(null)
+  const [stepModal, setStepModal] = useState<StepModalState | null>(() =>
+    new URLSearchParams(location.search).get('action') === 'add-step' ? { mode: 'create' } : null,
+  )
+  const closeStepModal = () => {
+    setStepModal(null)
+    const query = new URLSearchParams(location.search)
+    if (query.get('action') === 'add-step') {
+      query.delete('action')
+      navigate({ pathname: location.pathname, search: query.toString() }, { replace: true })
+    }
+  }
   const [deletingStepId, setDeletingStepId] = useState<number | null>(null)
 
   const reportError = useErrorFeedback()
@@ -524,9 +534,9 @@ export default function ApprovalTemplateDetailPage() {
           step={stepModal?.step ?? null}
           positionOptions={positionOptions.map((option) => ({ ...option, label: positionLabel(option.value, option.label) }))}
           positionsLoading={positionsLoading}
-          onCancel={() => setStepModal(null)}
+          onCancel={closeStepModal}
           onSaved={() => {
-            setStepModal(null)
+            closeStepModal()
             void load(true)
           }}
         />

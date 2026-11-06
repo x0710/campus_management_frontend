@@ -5,8 +5,10 @@ import type { OrganizationInfo } from '../api/types/organizations'
 import { extractErrorReason } from '../api/common'
 import { useT } from '../i18n'
 import ErrorState from './ErrorState'
+import { collectOrgSubtree } from '../utils/orgTree'
 
 interface Props {
+  rootOrgId?: number
   value?: number
   onChange?: (value: number | undefined) => void
   disabled?: boolean
@@ -14,7 +16,7 @@ interface Props {
 }
 
 /** 使用可访问的组织构建选择树；缺少上级节点时仍将该组织展示为根节点。 */
-export default function OrganizationSelect(props: Props) {
+export default function OrganizationSelect({ rootOrgId, ...props }: Props) {
   const t = useT()
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,14 +42,15 @@ export default function OrganizationSelect(props: Props) {
   }, [attempt, t])
 
   const treeData = useMemo(() => {
-    const ids = new Set(organizations.map((org) => org.id))
-    return organizations.map((org) => ({
+    const scoped = collectOrgSubtree(organizations, rootOrgId)
+    const ids = new Set(scoped.map((org) => org.id))
+    return scoped.map((org) => ({
       id: org.id,
       pId: org.parent_id !== null && ids.has(org.parent_id) ? org.parent_id : null,
       value: org.id,
       title: `${org.name}（${org.code}）`,
     }))
-  }, [organizations])
+  }, [organizations, rootOrgId])
 
   return (
     <div>

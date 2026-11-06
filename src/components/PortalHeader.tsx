@@ -177,10 +177,10 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     ]
   }, [t, profileModuleKey])
 
-  /** 下拉展开时刷新系统角色与任职职位，避免变更后仍显示旧门户菜单 */
+  /** 展开时复用共享缓存和在途请求；过期或角色/任职变更失效后再查询。 */
   const refreshPortalKeys = () => {
-    void myRolesResource.load(true).catch(() => {})
-    void myPortalPositionsResource.load(true).catch(() => {})
+    void myRolesResource.load().catch(() => {})
+    void myPortalPositionsResource.load().catch(() => {})
   }
 
   /** 打开「重置密码」弹窗并清空上次输入 */

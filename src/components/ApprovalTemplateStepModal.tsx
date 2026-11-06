@@ -1,6 +1,7 @@
 /** 审批步骤表单弹窗（新增 / 编辑审批模板下的步骤）。 */
 
 import { usePositionLabel } from '../composables/usePositionLabel'
+import ApproverSelect from './ApproverSelect'
 /**
  * 审批步骤表单弹窗（可复用组件）：新增 / 编辑审批模板下的一个步骤。
  * - create：空表单（默认值填充，不使用业务数据），提交 POST /api/approvals/templates/{template_id}/steps；
@@ -18,7 +19,6 @@ import { addApprovalTemplateStep, normalizeApprovalTemplateSteps, updateApproval
 import type { ApprovalStep } from '../api/types/approvalmodel'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
-  APPROVAL_STEP_ASSIGNEE_MAX_LENGTH,
   APPROVAL_STEP_DESC_MAX_LENGTH,
 } from '../config/approvalTemplate'
 import { useT } from '../i18n'
@@ -145,10 +145,7 @@ export default function ApprovalTemplateStepModal({
           />
         </Form.Item>
         <Form.Item name="assignee_value" label={t('approvalTemplate.fieldStepAssignee')}>
-          <Input
-            maxLength={APPROVAL_STEP_ASSIGNEE_MAX_LENGTH}
-            placeholder={t('approvalTemplate.fieldStepAssigneePlaceholder')}
-          />
+          <ApproverSelect />
         </Form.Item>
         <Form.Item name="description" label={t('approvalTemplate.fieldStepDescription')}>
           <Input.TextArea

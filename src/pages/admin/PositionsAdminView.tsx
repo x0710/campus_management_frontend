@@ -34,6 +34,7 @@ import {
   deletePosition,
   getPosition,
   queryPositions,
+  queryPositionsInOrganizationSubtree,
   updatePosition,
 } from '../../api/positions'
 import type { PositionUsageScope, PositionDetail } from '../../api/types/positions'
@@ -42,6 +43,7 @@ import ErrorState from '../../components/ErrorState'
 import OrganizationSelect from '../../components/OrganizationSelect'
 import OrganizationName from '../../components/OrganizationName'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { useRequestSequence } from '../../composables/useRequestSequence'
 import {
   POSITION_CODE_MAX_LENGTH,
   POSITION_DESC_MAX_LENGTH,
@@ -65,7 +67,7 @@ type PositionFormValues = {
 /** PositionsAdminView 组件。
  * @returns 类型：Element
  */
-export default function PositionsAdminView() {
+export default function PositionsAdminView({ rootOrgId }: { rootOrgId?: number }) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
@@ -98,30 +100,34 @@ export default function PositionsAdminView() {
   const [detailError, setDetailError] = useState<string | null>(null)
 
   const reportError = useErrorFeedback()
+  const requests = useRequestSequence()
 
   // ============ 列表加载 ============
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
-      const res = await queryPositions(
-        {
-          page,
-          page_size: POSITION_PAGE_SIZE,
-          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-        },
-        reload.force,
-      )
+      const params = {
+        page,
+        page_size: POSITION_PAGE_SIZE,
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      }
+      const res = rootOrgId === undefined
+        ? await queryPositions(params, reload.force)
+        : await queryPositionsInOrganizationSubtree(rootOrgId, params, reload.force)
+      if (!isCurrent()) return
+      if (rootOrgId !== undefined && res.page !== page) setPage(res.page)
       setPositions(res.data)
       setTotal(res.total)
     } catch (err) {
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+      if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) {
         setError(extractErrorReason(err, t))
       }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [page, keyword, reload.seq, reload.force]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, keyword, reload.seq, reload.force, rootOrgId, requests, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void load()
@@ -409,6 +415,7 @@ export default function PositionsAdminView() {
             rules={[{ required: true, message: t('adminPositions.orgRequired') }]}
           >
             <OrganizationSelect
+              rootOrgId={rootOrgId}
               disabled={modal?.mode === 'edit'}
               placeholder={t('adminPositions.orgPlaceholder')}
             />

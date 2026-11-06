@@ -120,28 +120,26 @@ function MemberDetailContent() {
     return () => userRequests.invalidate()
   }, [loadUser, basicReload.seq, basicReload.force, userRequests])
 
-  // 打开指定区块的编辑弹窗：首次打开时并行拉取角色/职位/组织选项（均走会话缓存），失败仅提示不阻塞
+  // 编辑资料、组织任职不需要加载管理用角色列表；仅编辑系统角色时查询角色选项。
+  const editRequests = useRequestSequence()
   const openEdit = useCallback(
     async (section: EditSection) => {
+      const isCurrent = editRequests.begin()
       setEditSection(section)
-      if (editRefs) return
+      setEditRefs(null)
       try {
-        const [roleRes, orgList] = await Promise.all([
-          queryRoles({ page: 1, page_size: 100 }),
-          listAllOrganizations(),
-        ])
-        setEditRefs({
-          roles: roleRes.data,
-          organizations: orgList,
-        })
+        const roles = section === 'roles'
+          ? (await queryRoles({ page: 1, page_size: 100 })).data : []
+        const organizations = section === 'organizations' ? await listAllOrganizations() : []
+        if (isCurrent()) setEditRefs({ roles, organizations })
       } catch (err) {
-        if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) {
           reportError(err)
           setEditSection(null)
         }
       }
     },
-    [editRefs, reportError],
+    [editRequests, reportError],
   )
 
   /**
@@ -267,7 +265,7 @@ function MemberDetailContent() {
         }
         width={editSection === 'roles' ? 560 : 720}
         footer={null}
-        onCancel={() => setEditSection(null)}
+        onCancel={() => { editRequests.invalidate(); setEditSection(null) }}
         destroyOnHidden
       >
         {editRefs ? (

@@ -18,6 +18,7 @@ import { NOTICE_CATEGORY_LABEL_KEYS } from '../config/notices'
 import { useT } from '../i18n'
 import { useSettingsStore } from '../store/settings'
 import { formatDateTime } from '../utils/datetime'
+import { useApprovalNoticeNavigation } from '../composables/useApprovalNoticeNavigation'
 
 /** 顶栏通知弹层单页条数（代码要求 12：单页最多 100 行） */
 const NOTICE_POPOVER_PAGE_SIZE = 20
@@ -26,6 +27,7 @@ const NOTICE_POPOVER_PAGE_SIZE = 20
  * @returns 类型：Element
  */
 export default function PortalNoticeBell() {
+  const openApproval = useApprovalNoticeNavigation()
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
@@ -148,7 +150,13 @@ export default function PortalNoticeBell() {
             <List.Item
               className={item.is_read ? '' : 'notice-item-unread'}
               title={item.is_read ? undefined : t('notice.readHint')}
-              onClick={() => void handleRead(item)}
+              onClick={() => {
+                void handleRead(item)
+                if (item.category === 'approval') {
+                  closePanel()
+                  void openApproval(item)
+                }
+              }}
             >
               <div className="notice-item-body">
                 <div className="notice-item-content">{item.content}</div>
@@ -157,6 +165,12 @@ export default function PortalNoticeBell() {
                   <span className="notice-item-time">{formatDateTime(item.created_at, locale)}</span>
                 </div>
                 <div className="notice-item-actions">
+                  {item.category === 'approval' && <Button type="link" size="small" onClick={(e) => {
+                    e.stopPropagation()
+                    void handleRead(item)
+                    closePanel()
+                    void openApproval(item)
+                  }}>{t('portal.party_m5')}</Button>}
                   {item.is_read ? (
                     <Button
                       type="link"

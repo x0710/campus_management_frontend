@@ -4,8 +4,10 @@ import { isVisibleUserRole } from '../../config/rbac'
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import { usePositionFormatter, usePositionLabel } from '../../composables/usePositionLabel'
 import { BellOutlined, EditOutlined, UserOutlined } from '@ant-design/icons'
-import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, Descriptions, Empty, Form, Input, Modal, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
+import { Alert, App as AntdApp, Avatar, Button, Card, Collapse, DatePicker, Descriptions, Empty, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Skeleton, Space, Spin, Steps, Tabs, Tag } from 'antd'
 import axios from 'axios'
+import dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getApprovalTemplateDetail, mockApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
 import { getMyRoles } from '../../api/auth'
@@ -14,6 +16,7 @@ import { deleteNotice, markNoticeRead, markNoticeUnread, queryNotices } from '..
 import { getPosition } from '../../api/positions'
 import { listUserOrganizations } from '../../api/organizations'
 import { getMyProfile, updateUser } from '../../api/users'
+import { createPartyProfile, updatePartyProfile } from '../../api/partyProfiles'
 import type { ApprovalStep, ApprovalTemplate, MockApprovalApprover } from '../../api/types/approvalmodel'
 import type { Notice } from '../../api/types/notices'
 import type { UserOrganization } from '../../api/types/organizations'
@@ -22,6 +25,7 @@ import type { UserDetail } from '../../api/types/users'
 import ErrorState from '../../components/ErrorState'
 import PartyScoreRecords from '../../components/PartyScoreRecords'
 import PartyScoreSummary from '../../components/PartyScoreSummary'
+import PartyPersonalDetails from '../../components/PartyPersonalDetails'
 import {
   APPROVAL_TEMPLATE_PAGE_SIZE,
 } from '../../config/approvalTemplate'
@@ -30,6 +34,7 @@ import { PARTY_NOTICE_PAGE_SIZE } from '../../config/partyDeclaration'
 import { PARTY_POLITICAL_STATUS_NAMES } from '../../config/partyProfile'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { usePartyProfiles } from '../../composables/usePartyProfiles'
+import { useApprovalNoticeNavigation } from '../../composables/useApprovalNoticeNavigation'
 import { useUserNames } from '../../composables/useUserNames'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
@@ -73,11 +78,15 @@ function ProfileDescriptions() {
   const [basicEditOpen, setBasicEditOpen] = useState(false)
   const [basicSaving, setBasicSaving] = useState(false)
   const [basicForm] = Form.useForm<{ phone: string; email: string }>()
+  const [partyEditOpen, setPartyEditOpen] = useState(false)
+  const [partySaving, setPartySaving] = useState(false)
+  const [partyForm] = Form.useForm<{ party_no: number | null; join_time: Dayjs | null }>()
   // 党员编号 / 入党时间：拿到当前用户 ID 后按需查询党员档案
   const {
     profiles: partyProfiles,
     loading: partyProfilesLoading,
     notFound: partyProfilesNotFound,
+    refresh: refreshPartyProfiles,
   } = usePartyProfiles(user ? [user.id] : [])
 
   const loadExtras = useCallback(async (userId: number) => {
@@ -173,6 +182,41 @@ function ProfileDescriptions() {
   // 党员档案：当前用户的党员编号 / 入党时间（无档案时展示未查到，字段为空时展示暂无数据）
   const partyProfile = user ? partyProfiles.get(user.id) : undefined
   const partyProfileNotFound = user ? partyProfilesNotFound.has(user.id) : false
+  const openPartyEdit = () => {
+    const joinTime = partyProfile?.join_time ? dayjs(partyProfile.join_time) : null
+    partyForm.setFieldsValue({
+      party_no: partyProfile?.party_no ?? null,
+      join_time: joinTime?.isValid() ? joinTime : null,
+    })
+    setPartyEditOpen(true)
+  }
+  const savePartyInfo = async () => {
+    if (!user || partySaving) return
+    let values: { party_no: number | null; join_time: Dayjs | null }
+    try {
+      values = await partyForm.validateFields()
+    } catch {
+      return
+    }
+    setPartySaving(true)
+    try {
+      const body = {
+        party_no: values.party_no ?? null,
+        join_time: values.join_time ? values.join_time.format('YYYY-MM-DD') : null,
+      }
+      if (partyProfile) await updatePartyProfile(user.id, body)
+      else await createPartyProfile({ user_id: user.id, ...body })
+      refreshPartyProfiles()
+      setPartyEditOpen(false)
+      message.success(t('partyProfile.saveSuccess'))
+    } catch (err) {
+      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    } finally {
+      setPartySaving(false)
+    }
+  }
   // 政治面貌：遍历任职组织的职位名称，仅命中党员身份时展示，其余职位（如书记）忽略
   const politicalStatus = orgs
     .map((org) => positionNames.get(org.position)?.trim() ?? '')
@@ -243,7 +287,13 @@ function ProfileDescriptions() {
         </Card>
       </div>
 
-      <Card size="small" title={t('partyProfile.partyInfoTitle')}>
+      <PartyPersonalDetails userId={user.id} />
+
+      <Card size="small" title={t('partyProfile.partyInfoTitle')} extra={
+        <Button type="primary" size="small" icon={<EditOutlined />}
+          disabled={partyProfilesLoading || (!partyProfile && !partyProfileNotFound)}
+          onClick={openPartyEdit}>{t('common.edit')}</Button>
+      }>
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label={t('partyProfile.fieldMemberNo')}>
             {partyProfilesLoading
@@ -328,6 +378,23 @@ function ProfileDescriptions() {
         )}
       </Card>
       </Space>
+
+      <Modal open={partyEditOpen} title={t('partyProfile.editTitle')} width={420}
+        okText={t('common.save')} cancelText={t('common.cancel')} confirmLoading={partySaving}
+        onCancel={() => { if (!partySaving) setPartyEditOpen(false) }}
+        closable={!partySaving} maskClosable={!partySaving}
+        onOk={() => void savePartyInfo()} destroyOnHidden>
+        <Form form={partyForm} layout="vertical" autoComplete="off" disabled={partySaving}>
+          <Form.Item name="party_no" label={t('partyProfile.fieldMemberNo')}>
+            <InputNumber precision={0} min={Number.MIN_SAFE_INTEGER} max={Number.MAX_SAFE_INTEGER}
+              style={{ width: '100%' }} placeholder={t('partyProfile.memberNoPlaceholder')} />
+          </Form.Item>
+          <Form.Item name="join_time" label={t('partyProfile.fieldJoinDate')}>
+            <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD"
+              placeholder={t('partyProfile.joinDatePlaceholder')} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* 基本信息编辑：仅手机号、邮箱可修改 */}
       <Modal
@@ -645,6 +712,7 @@ function ApprovalGuide() {
 
 /** 消息通知列表：分页展示站内通知，点击未读项标记已读 */
 function NotificationsList() {
+  const openApproval = useApprovalNoticeNavigation()
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
@@ -757,7 +825,10 @@ function NotificationsList() {
               item.is_read ? 'party-notif-item' : 'party-notif-item party-notif-item-unread'
             }
             title={item.is_read ? undefined : t('notice.readHint')}
-            onClick={() => void handleRead(item)}
+            onClick={() => {
+              void handleRead(item)
+              void openApproval(item)
+            }}
           >
             <div className="party-notif-head">
               <span className="party-notif-title">
@@ -771,6 +842,11 @@ function NotificationsList() {
             </div>
             <div className="party-notif-body">{item.content}</div>
             <div className="party-notif-actions">
+              {item.category === 'approval' && <Button type="link" size="small" onClick={(e) => {
+                e.stopPropagation()
+                void handleRead(item)
+                void openApproval(item)
+              }}>{t('portal.party_m5')}</Button>}
               {item.is_read ? (
                 <Button type="link" size="small" onClick={(e) => {
                   e.stopPropagation()

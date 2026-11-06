@@ -33,7 +33,7 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import {
   createApprovalTemplate,
@@ -99,7 +99,7 @@ interface ApprovalTemplateFormModalProps {
   /** 取消/关闭时触发（必填） */
   onCancel: () => void
   /** 模板保存成功后触发，用于刷新列表（必填） */
-  onSaved: () => void
+  onSaved: (createdId?: number) => void
   /** 只读模式下点击「编辑」时触发，由调用方把弹窗切换为编辑模式（可选） */
   onEdit?: () => void
   /** 步骤增删改成功后触发，用于刷新外层列表（可选） */
@@ -130,6 +130,7 @@ export default function ApprovalTemplateFormModal({
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const submitting = useRef(false)
   const [stepsLoading, setStepsLoading] = useState(false)
   const [deletingStepId, setDeletingStepId] = useState<number | null>(null)
   // 职位下拉选项：value 为职位编码（提交给后端），label 为职位名称（展示用，代码要求：角色列显示名称）
@@ -287,9 +288,11 @@ export default function ApprovalTemplateFormModal({
 
   /** 提交：新增 → POST；编辑 → PATCH */
   const submit = async () => {
-    const values = await form.validateFields()
-    setSaving(true)
+    if (submitting.current) return
+    submitting.current = true
     try {
+      const values = await form.validateFields()
+      setSaving(true)
       if (isEdit && templateId !== undefined) {
         await updateApprovalTemplate(templateId, {
           name: values.name.trim(),
@@ -299,7 +302,7 @@ export default function ApprovalTemplateFormModal({
         })
         message.success(t('approvalTemplate.updateSuccess'))
       } else {
-        await createApprovalTemplate({
+        const createdId = await createApprovalTemplate({
           // 后端创建接口要求必传所属组织 ID（该校验由表单必填规则保证）
           organization_id: values.organization_id as number,
           // 使用 128 位随机值生成全局唯一编码，兼容非 HTTPS 内网环境。
@@ -312,6 +315,8 @@ export default function ApprovalTemplateFormModal({
           description: values.description?.trim() || null,
         })
         message.success(t('approvalTemplate.createSuccess'))
+        onSaved(createdId)
+        return
       }
       onSaved()
     } catch (err) {
@@ -319,6 +324,7 @@ export default function ApprovalTemplateFormModal({
       if (err && typeof err === 'object' && 'errorFields' in err) return
       reportError(err)
     } finally {
+      submitting.current = false
       setSaving(false)
     }
   }
@@ -450,7 +456,9 @@ export default function ApprovalTemplateFormModal({
         }
         confirmLoading={saving}
         onOk={() => void submit()}
-        onCancel={onCancel}
+        onCancel={() => { if (!submitting.current) onCancel() }}
+        closable={!saving}
+        maskClosable={!saving}
         destroyOnHidden
       >
         {loadError ? (
@@ -519,7 +527,7 @@ export default function ApprovalTemplateFormModal({
             </div>
           )
         ) : (
-          <Form form={form} layout="vertical">
+          <Form form={form} layout="vertical" disabled={saving}>
             {!isEdit && (
               <Form.Item
                 name="organization_id"

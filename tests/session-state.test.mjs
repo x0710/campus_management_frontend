@@ -85,6 +85,33 @@ const { updateRole } = await import('../src/api/rbac.ts')
 const { positionNamesResource, myRolesResource } = await import('../src/store/referenceData.ts')
 const response = (config, data) => ({ config, data, status: 200, statusText: 'OK', headers: {} })
 
+test('反复展开端切换复用角色和任职缓存，并发打开不重复请求', async () => {
+  const { myPortalPositionsResource } = await import('../src/store/referenceData.ts')
+  const previousAdapter = http.defaults.adapter
+  const urls = []
+  http.defaults.adapter = async (config) => {
+    urls.push(config.url)
+    if (config.url === '/credentials/me') return response(config, { uid: 42 })
+    if (config.url === '/rbac/users/roles') return response(config, [{ uid: 42, code: 'admin' }])
+    if (config.url === '/organization-members') return response(config, [{ user_id: 42, position: 'party_branch' }])
+    throw new Error(`Unexpected endpoint: ${config.url}`)
+  }
+  try {
+    useAuthStore.getState().setAuth({ token: 'portal-cache', username: 'portal-cache', lastLoginAt: null })
+    const openSwitcher = () => Promise.all([myRolesResource.load(), myPortalPositionsResource.load()])
+    await Promise.all([openSwitcher(), openSwitcher()])
+    await openSwitcher()
+    await openSwitcher()
+    assert.equal(urls.filter((url) => url === '/credentials/me').length, 1)
+    assert.equal(urls.filter((url) => url === '/rbac/users/roles').length, 1)
+    assert.equal(urls.filter((url) => url === '/organization-members').length, 1)
+    assert.deepEqual(myPortalPositionsResource.getSnapshot().data, [{ code: 'party_branch' }])
+  } finally {
+    http.defaults.adapter = previousAdapter
+    useAuthStore.getState().clearAuth()
+  }
+})
+
 test('真实接口缓存随账号变化清空，并使用新账号凭据重新请求（模拟接口）', async () => {
   const previousAdapter = http.defaults.adapter
   http.defaults.adapter = async (config) => response(config, config.headers.Authorization)

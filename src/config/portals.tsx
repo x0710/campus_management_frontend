@@ -104,6 +104,7 @@ export const PORTALS: PortalDef[] = [
       { key: 'party_m2', status: 'ready', icon: <FormOutlined /> },
       { key: 'party_m3', status: 'preview', icon: <RiseOutlined /> },
       { key: 'party_m4', status: 'ready', icon: <UserOutlined /> },
+      { key: 'party_m5', status: 'ready', icon: <AuditOutlined />, hiddenFromMenu: true },
     ],
   },
   {

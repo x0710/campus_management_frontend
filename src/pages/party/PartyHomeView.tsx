@@ -22,6 +22,7 @@ import { getOrganizationTree } from '../../api/organizations'
 import type { PartyScore } from '../../api/types/partyScores'
 import ErrorState from '../../components/ErrorState'
 import PartyScoreSummary from '../../components/PartyScoreSummary'
+import PartyApprovalEntry from '../../components/PartyApprovalEntry'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { useMyPartyScores } from '../../composables/useMyPartyScores'
 import { usePartyScoreApplicationStatuses } from '../../composables/usePartyScoreApplicationStatuses'
@@ -176,6 +177,7 @@ export default function PartyHomeView() {
 
       {/* 总成绩：先锋指数 + 基础分/加分项/减分 */}
       <PartyScoreSummary />
+      <PartyApprovalEntry />
 
       {/* 近期记录：本人最近若干条成绩申报 */}
       <section className="party-records">

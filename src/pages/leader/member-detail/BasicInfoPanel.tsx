@@ -3,7 +3,7 @@
 import OrganizationName from '../../../components/OrganizationName'
 import { isVisibleUserRole } from '../../../config/rbac'
 import { useRequestSequence } from '../../../composables/useRequestSequence'
-import { usePositionLabel } from '../../../composables/usePositionLabel'
+import { usePositionFormatter } from '../../../composables/usePositionLabel'
 import { BankOutlined, EditOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -25,18 +25,13 @@ import {
 import axios from 'axios'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { extractErrorReason } from '../../../api/common'
-import { listUserOrganizations } from '../../../api/organizations'
-import type { UserOrganization } from '../../../api/types/organizations'
-import { getPosition } from '../../../api/positions'
-import type { PositionDetail } from '../../../api/types/positions'
-import { getRole, queryUserRoleRelations } from '../../../api/rbac'
-import type { RoleInfo, UserRoleRelation } from '../../../api/types/rbac'
+import type { RoleInfo } from '../../../api/types/rbac'
+import { queryMemberIdentity, type MemberOrganization } from '../../../api/memberIdentity'
 import { createPartyProfile, updatePartyProfile } from '../../../api/partyProfiles'
 import type { UserDetail } from '../../../api/types/users'
 import { usePartyProfiles } from '../../../composables/usePartyProfiles'
-import { usePositionNames } from '../../../composables/usePositionNames'
 import { PARTY_POLITICAL_STATUS_NAMES } from '../../../config/partyProfile'
 import { type TranslateFn } from '../../../i18n'
 import { formatDateOnly, formatDateTime } from '../../../utils/datetime'
@@ -52,11 +47,6 @@ import { type EditSection } from '../../admin/UserEditPanel'
 interface PartyProfileFormValues {
   party_no: number | null
   join_time: Dayjs | null
-}
-
-/** 组织任职项（含职位详情，职位接口异常时保留原始 code 兜底） */
-interface OrgItem extends UserOrganization {
-  positionDetail?: PositionDetail
 }
 
 const { Text } = Typography
@@ -98,17 +88,21 @@ export default function BasicInfoPanel({
 }) {
   const [roles, setRoles] = useState<RoleInfo[]>([])
   const visibleRoles = roles.filter(isVisibleUserRole)
-  const [orgs, setOrgs] = useState<OrgItem[]>([])
+  const [orgs, setOrgs] = useState<MemberOrganization[]>([])
   const [extrasLoading, setExtrasLoading] = useState(false)
-  const [extrasError, setExtrasError] = useState<string | null>(null)
+  const [rolesError, setRolesError] = useState<string | null>(null)
+  const [orgsError, setOrgsError] = useState<string | null>(null)
+  const [positionsError, setPositionsError] = useState<string | null>(null)
   const { message } = AntdApp.useApp()
   // 党员档案编辑弹窗：修改党员编号 / 入党时间
   const [partyEditOpen, setPartyEditOpen] = useState(false)
   const [partySaving, setPartySaving] = useState(false)
   const [partyForm] = Form.useForm<PartyProfileFormValues>()
-  // 职位详情接口不可用时的兜底映射：编码 → 名称（未命中仍显示编码）
-  const positionNames = usePositionNames()
-  const positionLabel = usePositionLabel()
+  // 用户职位接口已返回名称与说明，不再加载全量职位字典。
+  const positionNames = useMemo(() => new Map(orgs.flatMap((org) =>
+    org.positionDetail ? [[org.position, org.positionDetail.name] as const] : [],
+  )), [orgs])
+  const positionLabel = usePositionFormatter(positionNames)
 
   // 仅依赖成员 ID（而非整个 user 对象），避免成员详情重新拉取后因对象引用变化而重复请求
   const memberId = user?.id
@@ -124,7 +118,7 @@ export default function BasicInfoPanel({
   const partyProfileNotFound = memberId ? partyProfilesNotFound.has(memberId) : false
 
   /**
-   * 并行加载角色关联与组织任职；单个角色/职位详情失败不影响整体。
+   * 并行读取用户角色、组织任职和用户职位；各部分失败独立展示。
    * 不展示「系统角色」卡片时跳过角色请求（组织任职仍需加载：党员信息卡片依赖它）。
    * @param force 是否绕过会话缓存强制重新请求（必填否，默认 false；保存后刷新传 true）
    */
@@ -134,41 +128,22 @@ export default function BasicInfoPanel({
       const isCurrent = extrasRequests.begin()
       if (!memberId) return
       setExtrasLoading(true)
-      setExtrasError(null)
+      setRolesError(null)
+      setOrgsError(null)
+      setPositionsError(null)
+      setRoles([])
+      setOrgs([])
       try {
-        const [relations, userOrgs] = await Promise.all([
-          showRoleOrgCards
-            ? queryUserRoleRelations(memberId, force)
-            : Promise.resolve([] as UserRoleRelation[]),
-          listUserOrganizations(memberId, force),
-        ])
+        const identity = await queryMemberIdentity(memberId, { includeRoles: showRoleOrgCards, force })
         if (!isCurrent()) return
-        const roleItems = await Promise.all(
-          relations.map(async (rel): Promise<RoleInfo | null> => {
-            try {
-              return await getRole(rel.role_id, force)
-            } catch {
-              return null
-            }
-          }),
-        )
-        if (!isCurrent()) return
-        const orgItems = await Promise.all(
-          userOrgs.map(async (uo): Promise<OrgItem> => {
-            if (!uo.position) return { ...uo }
-            try {
-              return { ...uo, positionDetail: await getPosition(uo.position, force) }
-            } catch {
-              return { ...uo }
-            }
-          }),
-        )
-        if (!isCurrent()) return
-        setRoles(roleItems.filter((r): r is RoleInfo => r !== null))
-        setOrgs(orgItems)
+        setRoles(identity.roles)
+        setOrgs(identity.organizations)
+        if (identity.errors.roles) setRolesError(extractErrorReason(identity.errors.roles, t))
+        if (identity.errors.organizations) setOrgsError(extractErrorReason(identity.errors.organizations, t))
+        if (identity.errors.positions) setPositionsError(extractErrorReason(identity.errors.positions, t))
       } catch (err) {
         if (isCurrent() && !(axios.isAxiosError(err) && err.response?.status === 401)) {
-          setExtrasError(extractErrorReason(err, t))
+          setOrgsError(extractErrorReason(err, t))
         }
       } finally {
         if (isCurrent()) setExtrasLoading(false)
@@ -240,7 +215,7 @@ export default function BasicInfoPanel({
   // 党员信息（支部端 / 学院端 / 学校端）：展示口径与党员端「我的」页一致。
   // 所属支部取第一项任职组织；政治面貌取任职职位名中的党员身份（书记等其他职位忽略）；
   // 党员编号 / 入党时间取 GET /api/party/profiles。
-  const positionNameOf = (uo: OrgItem): string =>
+  const positionNameOf = (uo: MemberOrganization): string =>
     (uo.positionDetail?.name ?? (uo.position ? positionNames.get(uo.position) : '') ?? '').trim()
   const partyBranch =
     orgs.map((uo) => uo.organization_name?.trim() ?? '').find((name) => name.length > 0) ??
@@ -345,6 +320,7 @@ export default function BasicInfoPanel({
             </Tooltip>
           }
         >
+          {(orgsError || positionsError) && <Alert type="warning" showIcon title={orgsError || positionsError} style={{ marginBottom: 12 }} />}
           {extrasLoading || partyProfilesLoading ? (
             <Skeleton active paragraph={{ rows: 1 }} />
           ) : (
@@ -414,8 +390,8 @@ export default function BasicInfoPanel({
               ) : undefined
             }
           >
-            {extrasError ? (
-              <ErrorState message={extrasError} />
+            {rolesError ? (
+              <ErrorState message={rolesError} />
             ) : extrasLoading ? (
               <Skeleton active paragraph={{ rows: 1 }} />
             ) : visibleRoles.length === 0 ? (
@@ -460,8 +436,9 @@ export default function BasicInfoPanel({
               ) : undefined
             }
           >
-            {extrasError ? (
-              <ErrorState message={extrasError} />
+            {positionsError && <Alert type="warning" showIcon title={positionsError} style={{ marginBottom: 12 }} />}
+            {orgsError ? (
+              <ErrorState message={orgsError} />
             ) : extrasLoading ? (
               <Skeleton active paragraph={{ rows: 2 }} />
             ) : orgGroups.length === 0 ? (
@@ -501,7 +478,7 @@ export default function BasicInfoPanel({
                                     return (
                                       <Space key={code} size={4}>
                                         <Tag color={detail ? 'geekblue' : 'default'}>
-                                          {positionLabel(code, detail?.name)}
+                                          {positionLabel(code, detail?.name || code)}
                                         </Tag>
                                         {detail?.description ? (
                                           <Text type="secondary" style={{ marginLeft: 4 }}>

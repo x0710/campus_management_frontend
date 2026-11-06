@@ -1,6 +1,8 @@
 /** 职位模块, 提供职位查询与增删改 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { listAllOrganizations } from './organizations'
+import { collectOrgSubtree } from '../utils/orgTree'
 import type { PaginatedResponse } from './types/common'
 import type {
   PositionCreateRequest,
@@ -43,6 +45,33 @@ export async function listAllPositions(force?: boolean, params: PositionQuery = 
     if (page * pageSize >= res.total || res.data.length === 0) break
   }
   return all
+}
+
+/**
+ * 前端按组织子树限定职位列表：聚合全部匹配职位后过滤、分页，避免只过滤当前页而漏项。
+ * 仅用于指定组织根的门户，普通管理员列表仍走后端分页接口。
+ */
+export async function queryPositionsInOrganizationSubtree(
+  rootOrgId: number,
+  params: PositionQuery = {},
+  force?: boolean,
+): Promise<PaginatedResponse<PositionDetail>> {
+  const { page = 1, page_size: pageSize = 100, ...filters } = params
+  const [organizations, positions] = await Promise.all([
+    listAllOrganizations(force),
+    listAllPositions(force, filters),
+  ])
+  const organizationIds = new Set(collectOrgSubtree(organizations, rootOrgId).map((org) => org.id))
+  const scoped = positions.filter((position) => organizationIds.has(position.organization_id))
+  const totalPages = Math.ceil(scoped.length / pageSize)
+  const currentPage = Math.max(1, Math.min(page, totalPages || 1))
+  return {
+    data: scoped.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    total: scoped.length,
+    page: currentPage,
+    page_size: pageSize,
+    total_pages: totalPages,
+  }
 }
 
 /**

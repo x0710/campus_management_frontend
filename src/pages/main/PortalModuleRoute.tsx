@@ -78,6 +78,11 @@ const SchoolOrgAdminView = () => (
   />
 )
 
+/** 党委身份管理只显示学院党委根组织及其全部下级的身份和组织选项。 */
+const SchoolPositionsAdminView = () => (
+  <PositionsAdminView rootOrgId={SCHOOL_COLLEGE_PARENT_ORG_ID} />
+)
+
 /**
  * 支部端「支部管理」：按组织树深度判定当前用户所属支部后展示其成员
  * （支部还有下级支部时展示「支部 + 全部下级」组织树）。
@@ -110,6 +115,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'branch:branch_m1': BranchWorkbenchView,
   // 支部端「审核管理」：党建活动加分审批（步骤列表前端合成 + PUT 通过/驳回/转交）
   'branch:branch_m3': PartyScoreApprovalView,
+  'party:party_m5': PartyScoreApprovalView,
   // 支部端「我的」：与党员端「我的」复用同一页面
   'branch:branch_m4': PartyProfileView,
   // 支部端「支部管理」：判定所属支部后展示其成员（有下级支部则展示组织树）
@@ -131,7 +137,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   // 党委学校端「我的」：与党员端「我的」复用同一页面
   'school:school_m4': PartyProfileView,
   // 党委学校端「岗位管理」：复用管理端「岗位管理」页面（接真实职位接口）
-  'school:school_m5': PositionsAdminView,
+  'school:school_m5': SchoolPositionsAdminView,
   'student:student_m1': ScheduleView,
   'student:student_m2': LeaveApplyView,
   'student:student_m3': GradesView,

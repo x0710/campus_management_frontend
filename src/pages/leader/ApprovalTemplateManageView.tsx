@@ -318,9 +318,15 @@ export default function ApprovalTemplateManageView() {
         open={createOpen}
         mode="create"
         onCancel={() => setCreateOpen(false)}
-        onSaved={() => {
+        onSaved={(createdId) => {
           setCreateOpen(false)
-          setReload((r) => ({ seq: r.seq + 1, force: false }))
+          if (createdId !== undefined) {
+            const query = new URLSearchParams({ action: 'add-step' })
+            if (moduleKey) query.set('from', moduleKey)
+            navigate(`/portal/${portalKey}/approval-templates/${createdId}?${query}`)
+          } else {
+            setReload((r) => ({ seq: r.seq + 1, force: false }))
+          }
         }}
       />
     </div>
