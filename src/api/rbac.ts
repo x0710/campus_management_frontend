@@ -1,6 +1,7 @@
 /** RBAC 模块, 提供角色、权限、用户角色关联与角色权限分配 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import type { PaginatedResponse } from './types/common'
 import type {
   Permission,
@@ -16,6 +17,7 @@ import type {
   RoleUpdateRequest,
   UserRoleInfo,
   UserRoleRelation,
+  UserRolesBatchItem,
 } from './types/rbac'
 
 // ==================== 角色 ====================
@@ -277,11 +279,34 @@ export function queryUserRoleRelations(uid: number, force?: boolean): Promise<Us
  * POST /api/rbac/users/{uid} 覆盖式分配角色（role_ids 不能为空）
  * @param uid 类型：number；默认值：无；是否必填：必填
  * @param roleIds 类型：number[]；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
  * @returns 类型：Promise<void>
  */
-export async function assignUserRoles(uid: number, roleIds: number[]): Promise<void> {
-  await http.post(`/rbac/users/${uid}`, { role_ids: roleIds })
+export async function assignUserRoles(
+  uid: number,
+  roleIds: number[],
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.post(`/rbac/users/${uid}`, { role_ids: roleIds }, { signal })
   // 失效该用户相关的全部 rbac 缓存：批量角色查询 + 角色关联列表
+  invalidate('GET /rbac/users/roles')
+  invalidate('GET /rbac/users/')
+}
+
+/**
+ * POST /api/rbac/users 批量覆盖用户角色（每人 role_ids 不能为空，整批事务）。
+ * @param body 类型：UserRolesBatchItem[]；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
+ * @returns 类型：Promise<void>
+ */
+export async function batchAssignUserRoles(
+  body: UserRolesBatchItem[],
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.post('/rbac/users', body, {
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
   invalidate('GET /rbac/users/roles')
   invalidate('GET /rbac/users/')
 }

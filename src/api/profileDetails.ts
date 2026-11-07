@@ -1,8 +1,8 @@
 /**
  * 用户详细信息（profile_detail）API：
- * - GET    /api/profile-details        分页查询档案（支持 user_id/class_id/keyword/uids 筛选）
+ * - GET    /api/profile-details        分页查询档案（支持 user_id/uids/keyword 筛选）
  * - GET    /api/profile-details/{id}   获取档案详情
- * - PUT    /api/profile-details        按 user_id 保存档案（不存在则创建，存在则更新）
+ * - PUT    /api/profile-details        按 user_id 新增或更新档案（缺失或 null 的字段保留原值）
  * - POST   /api/profile-details        创建档案（成功 201 返回创建出的完整档案）
  * - PATCH  /api/profile-details/{id}   部分更新档案（成功 204 无 body）
  * - DELETE /api/profile-details/{id}   删除档案（成功 204 无 body）
@@ -12,6 +12,7 @@
  */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import type { PaginatedResponse } from './types/common'
 import type {
   ProfileDetail,
@@ -61,6 +62,40 @@ export async function createProfileDetail(
 }
 
 /**
+ * PUT /api/profile-details 新增或更新档案（以 user_id 为键，缺失或 null 的字段保留原值）
+ * @param body 类型：ProfileDetailCreateRequest；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
+ * @returns 类型：Promise<ProfileDetail>
+ */
+export async function saveProfileDetail(
+  body: ProfileDetailCreateRequest,
+  signal?: AbortSignal,
+): Promise<ProfileDetail> {
+  const res = await http.put<ProfileDetail>('/profile-details', body, { signal })
+  invalidate('GET /profile-details')
+  return res.data
+}
+
+/**
+ * PUT /api/profile-details 批量新增或更新档案（数组请求，按输入顺序返回，任一项失败整批回滚）。
+ * 更新时缺省或 null 的字段保留原值。
+ * @param body 类型：ProfileDetailCreateRequest[]；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
+ * @returns 类型：Promise<ProfileDetail[]>
+ */
+export async function saveProfileDetails(
+  body: ProfileDetailCreateRequest[],
+  signal?: AbortSignal,
+): Promise<ProfileDetail[]> {
+  const res = await http.put<ProfileDetail[]>('/profile-details', body, {
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
+  invalidate('GET /profile-details')
+  return res.data
+}
+
+/**
  * PATCH /api/profile-details/{id} 部分更新档案
  * @param id 类型：number；默认值：无；是否必填：必填
  * @param body 类型：ProfileDetailUpdateRequest；默认值：无；是否必填：必填
@@ -82,13 +117,4 @@ export async function updateProfileDetail(
 export async function deleteProfileDetail(id: number): Promise<void> {
   await http.delete(`/profile-details/${id}`)
   invalidate('GET /profile-details')
-}
-
-/** 按 user_id 保存档案，返回创建或更新后的完整档案；可选字段 null 保留原值。 */
-export async function saveProfileDetail(
-  body: ProfileDetailCreateRequest,
-): Promise<ProfileDetail> {
-  const res = await http.put<ProfileDetail>('/profile-details', body)
-  invalidate('GET /profile-details')
-  return res.data
 }

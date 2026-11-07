@@ -642,7 +642,7 @@ export default function UsersAdminView() {
               style={{ width: 120 }}
               options={[
                 { value: 'all', label: t('publish.filterAll') },
-                { value: 'active', label: t('adminUsers.statusActive') },
+                { value: 'enabled', label: t('adminUsers.statusActive') },
                 { value: 'disabled', label: t('adminUsers.statusDisabled') },
               ]}
               onChange={(v: UserStatus | 'all') => {

@@ -89,3 +89,70 @@ export async function countOrgMembersByPositionNames(
 
   return result
 }
+
+/** 职位名称对应的总人数与性别分布（未取到时均为 null） */
+export interface PositionGenderCount {
+  total: number | null
+  male: number | null
+  female: number | null
+}
+
+/**
+ * 按职位名称统计组织及其全部下级组织的人数，并返回性别分布。
+ * 统计口径与 {@link countOrgMembersByPositionNames} 一致，额外通过 include=gender 取回男女分布。
+ * 职位未配置或统计失败时，total / male / female 均为 null（由调用方展示占位符）。
+ *
+ * @param rootId 根组织 ID（必填）
+ * @param positionNames 职位名称数组（必填；同名职位取全部编码）
+ * @returns 职位名称 → { total, male, female }
+ */
+export async function countOrgMembersByPositionNamesWithGender(
+  rootId: number,
+  positionNames: readonly string[],
+): Promise<Record<string, PositionGenderCount>> {
+  const empty = (): PositionGenderCount => ({ total: null, male: null, female: null })
+  const result: Record<string, PositionGenderCount> = {}
+  for (const name of positionNames) result[name] = empty()
+
+  let codesByName: Map<string, string[]>
+  try {
+    const positions = await listAllPositions()
+    codesByName = new Map(
+      positionNames.map((name) => [
+        name,
+        positions
+          .filter((position) => position.name.trim() === name)
+          .map((position) => position.code),
+      ]),
+    )
+  } catch {
+    return result
+  }
+
+  const requests: { name: string; position: string }[] = []
+  for (const name of positionNames) {
+    const codes = codesByName.get(name) ?? []
+    if (codes.length === 0) continue
+    result[name] = { total: 0, male: 0, female: 0 }
+    for (const code of codes) requests.push({ name, position: code })
+  }
+  if (requests.length === 0) return result
+
+  try {
+    const counts = await queryOrganizationMemberCounts(
+      requests.map(({ position }) => ({ org_id: rootId, position, recursive: true })),
+      ['gender'],
+    )
+    requests.forEach(({ name }, index) => {
+      const item = counts[index]
+      const current = result[name]
+      current.total = (current.total ?? 0) + (item?.member_count ?? 0)
+      current.male = (current.male ?? 0) + (item?.gender_counts?.male ?? 0)
+      current.female = (current.female ?? 0) + (item?.gender_counts?.female ?? 0)
+    })
+  } catch {
+    for (const name of positionNames) result[name] = empty()
+  }
+
+  return result
+}

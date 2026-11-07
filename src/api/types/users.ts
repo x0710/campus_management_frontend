@@ -4,8 +4,8 @@
  */
 import type { PageQuery } from './common'
 
-/** 用户状态 */
-export type UserStatus = 'active' | 'disabled'
+/** 用户状态（对应后端 Status：enabled / disabled） */
+export type UserStatus = 'enabled' | 'disabled'
 
 /** 性别 */
 export type Gender = 'male' | 'female'
@@ -64,4 +64,9 @@ export interface UserUpdateRequest {
   gender?: Gender
   /** 头像（图片地址） */
   avatar?: string
+}
+
+/** PATCH /api/users 批量更新元素（user_id 与可更新字段） */
+export interface UserBatchUpdate extends UserUpdateRequest {
+  user_id: number
 }

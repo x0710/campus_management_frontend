@@ -37,7 +37,7 @@ export interface UserListState {
   page: number
   keyword: string
   uidFilter: string
-  status: 'all' | 'active' | 'disabled'
+  status: 'all' | 'enabled' | 'disabled'
 }
 
 interface UiState {

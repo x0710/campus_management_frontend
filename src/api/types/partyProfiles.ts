@@ -26,3 +26,8 @@ export interface PartyProfileUpdateRequest {
   party_no?: number | null
   join_time?: string | null
 }
+
+/** PATCH /api/party/profiles 批量更新元素（user_id + 可更新字段） */
+export interface PartyProfileBatchUpdate extends PartyProfileUpdateRequest {
+  user_id: number
+}

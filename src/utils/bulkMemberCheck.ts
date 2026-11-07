@@ -8,7 +8,8 @@
  * - 从样表第 5 行开始读数据（第 1 行表头、第 2 行说明、第 3–4 行示例）；
  * - 分隔符同时兼容中英文：全角「：」「；」「／」「，」「（）」会先归一化成半角；
  * - 「组织:身份」写作「组织ID：身份编码」，多身份用「/」、多组织用「；」分隔；
- * - 组织 ID / 身份编码 / 系统角色 ID 必须在系统里存在，否则记录为错误。
+ * - 组织 ID / 身份编码 / 系统角色 ID 必须在系统里存在；身份还必须已向该组织开放
+ *   （按职位的 usage_scope 判断），否则记录为错误，避免提交后才被后端 412 拦截。
  */
 import type { OrganizationInfo } from '../api/types/organizations'
 import type { PositionDetail } from '../api/types/positions'
@@ -99,6 +100,44 @@ function stripParenthetical(text: string): string {
 }
 
 /**
+ * 判断身份（职位）能否用于指定组织。
+ *
+ * 与后端规则一致：
+ * - 职位在其所属组织内始终可用；
+ * - `self_and_children` 可向直属下级组织开放；
+ * - `self_and_descendants` 可向所有下级组织开放；
+ * - 下级组织的职位不能向上级组织使用。
+ *
+ * @param position 身份（职位）定义（必填，至少含所属组织与适用范围）
+ * @param organizationId 目标组织 ID（必填）
+ * @param orgs 组织全量（必填，用于追溯目标组织的上级链）
+ * @returns 该身份能否用于目标组织
+ */
+export function isPositionUsableInOrganization(
+  position: Pick<PositionDetail, 'organization_id' | 'usage_scope'>,
+  organizationId: number,
+  orgs: Pick<OrganizationInfo, 'id' | 'parent_id'>[],
+): boolean {
+  if (position.organization_id === organizationId) return true
+  const parentById = new Map(orgs.map((org) => [org.id, org.parent_id]))
+  const visited = new Set<number>([organizationId])
+  let current = parentById.get(organizationId) ?? null
+  let distance = 1
+  while (current != null && !visited.has(current)) {
+    if (current === position.organization_id) {
+      return (
+        position.usage_scope === 'self_and_descendants' ||
+        (position.usage_scope === 'self_and_children' && distance === 1)
+      )
+    }
+    visited.add(current)
+    current = parentById.get(current) ?? null
+    distance += 1
+  }
+  return false
+}
+
+/**
  * 解析「组织:身份」单元格。
  * @param text 已归一化的单元格文本（必填）
  * @returns 解析出的组织与身份，以及无法解析的片段
@@ -176,6 +215,10 @@ function parseDateText(text: string): string | null {
 
 /**
  * 逐行校验样表数据。
+ *
+ * 除格式与存在性外，还会按职位的 usage_scope 校验「组织:身份」组合是否合法，
+ * 避免分析阶段全部通过、提交时才被后端的 412（该职位不属于目标组织）整批拦截。
+ *
  * @param params.rows 工作表二维数据（必填，下标 0 = 第 1 行）
  * @param params.startRow 从第几行开始分析（必填，1 基，通常为 5）
  * @param params.orgs 组织全量（必填）
@@ -195,7 +238,8 @@ export function analyzeMemberRows(params: {
   const { rows, startRow, orgs, positions, roles, t } = params
 
   const orgIdSet = new Set(orgs.map((org) => org.id))
-  const positionCodeMap = new Map(positions.map((pos) => [pos.code.toUpperCase(), pos.code]))
+  const orgById = new Map(orgs.map((org) => [org.id, org]))
+  const positionByCode = new Map(positions.map((pos) => [pos.code.toUpperCase(), pos]))
   const roleIdSet = new Set(roles.map((role) => role.id))
 
   const members: ParsedMember[] = []
@@ -213,6 +257,7 @@ export function analyzeMemberRows(params: {
 
     const [
       username,
+      password,
       name,
       gender,
       orgIdentity,
@@ -222,7 +267,6 @@ export function analyzeMemberRows(params: {
       email,
       birthday,
       roleText,
-      password,
       ethnic,
       nativePlace,
       householdLocation,
@@ -296,14 +340,22 @@ export function analyzeMemberRows(params: {
         }
         const positionsValid: string[] = []
         for (const code of entry.codes) {
-          const actual = positionCodeMap.get(code.toUpperCase())
-          if (!actual) {
+          const position = positionByCode.get(code.toUpperCase())
+          if (!position) {
             addIssue(
               t('bulkMembers.col.orgIdentity'),
               t('bulkMembers.check.identityNotFound', { value: code }),
             )
+          } else if (!isPositionUsableInOrganization(position, entry.orgId, orgs)) {
+            addIssue(
+              t('bulkMembers.col.orgIdentity'),
+              t('bulkMembers.check.identityNotUsable', {
+                code: position.code,
+                org: orgById.get(entry.orgId)?.name ?? String(entry.orgId),
+              }),
+            )
           } else {
-            positionsValid.push(actual)
+            positionsValid.push(position.code)
           }
         }
         if (positionsValid.length > 0) {

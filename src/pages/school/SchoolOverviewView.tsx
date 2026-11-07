@@ -4,7 +4,8 @@
  * 统计口径（人数均以「学院党委」容器 ID=2 为起点，含全部下级组织、按用户去重）：
  * - 组织人数：POST /api/organizations/member-counts（{ org_id: 2, recursive: true }）
  * - 少数民族人数：同一次统计加 ?include=ethnic，从 ethnic_counts 中排除「汉族 / unknown」后求和
- * - 中共党员人数 / 中共预备党员人数：按职位名称（身份）解析职位编码后递归统计
+ * - 中共党员人数 / 中共预备党员人数：按职位名称（身份）解析职位编码后递归统计，
+ *   并通过 include=gender 同时取回男女分布
  * - 平均分：GET /api/party/scores/organization-average?organization_id=2&recursive=true
  * - 党组织个数：「学院党委」及其全部下级组织总数（组织树子树节点数）
  * - 党委个数：「学院党委」的直接下级组织数（不含再下级）
@@ -26,7 +27,7 @@ import { extractErrorReason } from '../../api/common'
 import { listAllOrganizations, queryOrganizationMemberCounts } from '../../api/organizations'
 import { getPartyScoreOrganizationAverage } from '../../api/partyScores'
 import ErrorState from '../../components/ErrorState'
-import { countOrgMembersByPositionNames } from '../../composables/useOrgPositionMemberCounts'
+import { countOrgMembersByPositionNamesWithGender } from '../../composables/useOrgPositionMemberCounts'
 import {
   ORG_BRANCH_NAME_KEYWORD,
   ORG_GENERAL_BRANCH_NAME_SUFFIX,
@@ -50,8 +51,16 @@ interface OverviewStats {
   minorityMembers: number | null
   /** 中共党员人数 */
   fullMembers: number | null
+  /** 男中共党员人数 */
+  maleFullMembers: number | null
+  /** 女中共党员人数 */
+  femaleFullMembers: number | null
   /** 中共预备党员人数 */
   probationaryMembers: number | null
+  /** 男中共预备党员人数 */
+  maleProbationaryMembers: number | null
+  /** 女中共预备党员人数 */
+  femaleProbationaryMembers: number | null
   /** 全校组织先锋指数平均分（后端 DecimalText） */
   averageScore: string | null
   /** 党组织个数（学院党委及其全部下级组织） */
@@ -68,7 +77,11 @@ const EMPTY_STATS: OverviewStats = {
   orgMembers: null,
   minorityMembers: null,
   fullMembers: null,
+  maleFullMembers: null,
+  femaleFullMembers: null,
   probationaryMembers: null,
+  maleProbationaryMembers: null,
+  femaleProbationaryMembers: null,
   averageScore: null,
   partyOrgCount: null,
   committeeCount: null,
@@ -104,8 +117,8 @@ async function fetchOverviewStats(): Promise<OverviewStats> {
       recursive: true,
     }),
     listAllOrganizations(),
-    // 党员 / 预备党员人数：按职位名称（身份）解析编码后递归统计
-    countOrgMembersByPositionNames(SCHOOL_COLLEGE_PARENT_ORG_ID, [
+    // 党员 / 预备党员人数及男女分布：按职位名称（身份）解析编码后递归统计
+    countOrgMembersByPositionNamesWithGender(SCHOOL_COLLEGE_PARENT_ORG_ID, [
       PARTY_FULL_MEMBER_STATUS_NAME,
       PARTY_PROBATIONARY_STATUS_NAME,
     ]),
@@ -133,8 +146,12 @@ async function fetchOverviewStats(): Promise<OverviewStats> {
   return {
     orgMembers: memberCounts[0]?.member_count ?? 0,
     minorityMembers: countEthnicMinority(memberCounts[0]?.ethnic_counts),
-    fullMembers: partyCounts[PARTY_FULL_MEMBER_STATUS_NAME] ?? null,
-    probationaryMembers: partyCounts[PARTY_PROBATIONARY_STATUS_NAME] ?? null,
+    fullMembers: partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.total ?? null,
+    maleFullMembers: partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.male ?? null,
+    femaleFullMembers: partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.female ?? null,
+    probationaryMembers: partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.total ?? null,
+    maleProbationaryMembers: partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.male ?? null,
+    femaleProbationaryMembers: partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.female ?? null,
     averageScore: average.average_score,
     partyOrgCount: subtree.length,
     committeeCount,
@@ -220,9 +237,33 @@ export default function SchoolOverviewView() {
       unit: t('school.membersUnit'),
     },
     {
+      key: 'maleFullMembers',
+      label: t('school.statMaleFullMembers'),
+      value: statText(stats.maleFullMembers),
+      unit: t('school.membersUnit'),
+    },
+    {
+      key: 'femaleFullMembers',
+      label: t('school.statFemaleFullMembers'),
+      value: statText(stats.femaleFullMembers),
+      unit: t('school.membersUnit'),
+    },
+    {
       key: 'probationaryMembers',
       label: t('school.statProbationaryMembers'),
       value: statText(stats.probationaryMembers),
+      unit: t('school.membersUnit'),
+    },
+    {
+      key: 'maleProbationaryMembers',
+      label: t('school.statMaleProbationaryMembers'),
+      value: statText(stats.maleProbationaryMembers),
+      unit: t('school.membersUnit'),
+    },
+    {
+      key: 'femaleProbationaryMembers',
+      label: t('school.statFemaleProbationaryMembers'),
+      value: statText(stats.femaleProbationaryMembers),
       unit: t('school.membersUnit'),
     },
     {

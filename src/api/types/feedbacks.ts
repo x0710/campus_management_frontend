@@ -27,6 +27,8 @@ export interface FeedbackDto {
 export interface FeedbackQuery extends PageQuery {
   /** 按提交人 ID 筛选 */
   user_id?: number
+  /** 按提交人 ID 批量筛选（逗号分隔，如 "1,2,3"） */
+  uids?: string
   category?: FeedbackCategory
   /** 标题或正文模糊搜索 */
   keyword?: string

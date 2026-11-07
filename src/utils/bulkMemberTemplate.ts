@@ -20,6 +20,7 @@ import {
   BULK_MEMBER_SHEET_NAME,
   BULK_TEMPLATE_COLUMNS,
   BULK_TEMPLATE_GUIDE_SHEET_NAME,
+  POSITION_USAGE_SCOPE_LABEL_KEYS,
 } from '../config/bulkMembers'
 import type { TranslateFn } from '../i18n'
 import type { XlsxSheet } from './xlsx'
@@ -33,6 +34,10 @@ const GUIDE_ROWS: { labelKey: string; descKey: string }[] = [
   { labelKey: 'bulkMembers.guide.exampleItem', descKey: 'bulkMembers.guide.example' },
   { labelKey: 'bulkMembers.guide.passwordItem', descKey: 'bulkMembers.guide.password' },
   { labelKey: 'bulkMembers.guide.orgIdentityItem', descKey: 'bulkMembers.guide.orgIdentity' },
+  {
+    labelKey: 'bulkMembers.guide.orgIdentityScopeItem',
+    descKey: 'bulkMembers.guide.orgIdentityScope',
+  },
   { labelKey: 'bulkMembers.guide.rolesItem', descKey: 'bulkMembers.guide.roles' },
   { labelKey: 'bulkMembers.guide.profileItem', descKey: 'bulkMembers.guide.profile' },
   { labelKey: 'bulkMembers.guide.importItem', descKey: 'bulkMembers.guide.import' },
@@ -76,7 +81,7 @@ export function buildMemberTemplateSheets(input: MemberTemplateInput): MemberTem
         width: col.excelWidth,
       })),
       rows: [
-        // 第 2 行为填写说明，正式导入前需要删除
+        // 第 2 行为填写说明，与第 3–4 行示例一起由导入程序自动跳过
         BULK_TEMPLATE_COLUMNS.map((col) => t(col.descKey)),
         BULK_TEMPLATE_COLUMNS.map((col) => col.sampleA),
         BULK_TEMPLATE_COLUMNS.map((col) => col.sampleB),
@@ -123,12 +128,17 @@ export function buildMemberTemplateSheets(input: MemberTemplateInput): MemberTem
         { header: t('bulkMembers.col.posCode'), width: 24 },
         { header: t('bulkMembers.col.posName'), width: 22 },
         { header: t('bulkMembers.col.posOrg'), width: 30 },
+        { header: t('bulkMembers.col.posScope'), width: 22 },
         { header: t('bulkMembers.col.posDesc'), width: 46 },
       ],
       rows: positions.map((position) => [
         position.code,
         position.name,
         orgNameById.get(position.organization_id) ?? position.organization_id,
+        t(
+          POSITION_USAGE_SCOPE_LABEL_KEYS[position.usage_scope] ??
+            'bulkMembers.scopeSelfOnly',
+        ),
         position.description ?? '',
       ]),
     })

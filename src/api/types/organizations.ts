@@ -21,6 +21,17 @@ export interface OrganizationMemberInput {
   workplace: string | null
 }
 
+/** POST /api/organization-members 批量添加任职元素 */
+export interface MemberBatchCreate extends OrganizationMemberInput {
+  organization_id: number
+}
+
+/** DELETE /api/organization-members 批量删除任职元素 */
+export interface MemberBatchDelete {
+  organization_id: number
+  member_id: number
+}
+
 /** 组织成员记录（GET /organizations/{id}/members 返回项，含成员记录 id 与创建时间） */
 export interface OrganizationMember {
   id: number
@@ -132,4 +143,6 @@ export interface OrganizationQuery {
 export interface OrganizationMemberQuery extends PageQuery {
   position?: string
   user_id?: number
+  /** 按用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */
+  uids?: string
 }

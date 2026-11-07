@@ -79,6 +79,12 @@ export interface UserRoleRelation {
   role_id: number
 }
 
+/** POST /api/rbac/users 批量覆盖角色元素（role_ids 不能为空） */
+export interface UserRolesBatchItem {
+  user_id: number
+  role_ids: number[]
+}
+
 /** 数据权限范围（对应后端 DataScope，按 snake_case 序列化） */
 export type DataScope = 'all' | 'self_only' | 'org' | 'org_and_child' | 'org_and_parent' | 'custom'
 

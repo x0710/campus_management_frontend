@@ -26,6 +26,7 @@ import {
   FileSearchOutlined,
   ImportOutlined,
   InfoCircleOutlined,
+  ReloadOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 import { Alert, App as AntdApp, Button, Modal, Progress, Segmented, Space, Tag, Tooltip } from 'antd'
@@ -48,6 +49,7 @@ import {
   BULK_ORG_IDENTITY_EXAMPLE,
   BULK_ROLE_EXAMPLE,
   BULK_TEMPLATE_COLUMNS,
+  POSITION_USAGE_SCOPE_LABEL_KEYS,
   type BulkLookupKey,
 } from '../../config/bulkMembers'
 import { SCHOOL_ORG_ADMIN_MODULE_KEY } from '../../config/organization'
@@ -56,8 +58,13 @@ import {
   analyzeMemberRows,
   type MemberCheckIssue,
   type MemberCheckResult,
+  type ParsedMember,
 } from '../../utils/bulkMemberCheck'
-import { importMemberRows, type MemberImportOutcome } from '../../utils/bulkMemberImport'
+import {
+  importMemberRows,
+  type MemberImportOutcome,
+  type MemberImportRequestLog,
+} from '../../utils/bulkMemberImport'
 import { buildMemberTemplateSheets } from '../../utils/bulkMemberTemplate'
 import { downloadTextFile } from '../../utils/download'
 import { downloadXlsx } from '../../utils/xlsx'
@@ -73,10 +80,15 @@ type BulkTableKey = BulkLookupKey | 'template'
  */
 function summarizeOutcomes(outcomes: MemberImportOutcome[]) {
   return {
-    created: outcomes.filter((item) => item.action === 'create' && item.status !== 'failed').length,
-    updated: outcomes.filter((item) => item.action === 'update' && item.status !== 'failed').length,
+    created: outcomes.filter(
+      (item) => item.action === 'create' && (item.status === 'success' || item.status === 'partial'),
+    ).length,
+    updated: outcomes.filter(
+      (item) => item.action === 'update' && (item.status === 'success' || item.status === 'partial'),
+    ).length,
     partial: outcomes.filter((item) => item.status === 'partial').length,
     failed: outcomes.filter((item) => item.status === 'failed').length,
+    cancelled: outcomes.filter((item) => item.status === 'cancelled').length,
   }
 }
 
@@ -138,8 +150,17 @@ export default function BulkAddMembersView() {
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 })
   const [importOutcomes, setImportOutcomes] = useState<MemberImportOutcome[] | null>(null)
   const [resultOpen, setResultOpen] = useState(false)
+  /** 未完全成功的行数据：结果弹窗里可只重新上传这些行，导入结束后清空分析也不影响 */
+  const [retryMembers, setRetryMembers] = useState<ParsedMember[]>([])
+  const [retrying, setRetrying] = useState(false)
   /** 本次导入的文件名：导入结束后分析结果会被清空，导出上传日志时仍需要它 */
   const [importFileName, setImportFileName] = useState('')
+  /** 取消句柄：导入 / 重新导入过程中点击「取消」会中断在途请求并停止后续请求 */
+  const importAbortRef = useRef<AbortController | null>(null)
+  /** 本次（含重新导入）已发出的请求日志，导出时按顺序列出「做了哪些请求」 */
+  const importLogsRef = useRef<MemberImportRequestLog[]>([])
+  /** 是否正在取消（取消请求后等待在途请求结束） */
+  const [cancelling, setCancelling] = useState(false)
 
   /**
    * 加载组织对照表。
@@ -287,6 +308,14 @@ export default function BulkAddMembersView() {
         key: 'organization_id',
         width: 240,
         render: (value: number) => orgNameById.get(value) ?? value,
+      },
+      {
+        title: t('bulkMembers.col.posScope'),
+        dataIndex: 'usage_scope',
+        key: 'usage_scope',
+        width: 180,
+        render: (value: PositionDetail['usage_scope']) =>
+          t(POSITION_USAGE_SCOPE_LABEL_KEYS[value] ?? 'bulkMembers.scopeSelfOnly'),
       },
       {
         title: t('bulkMembers.col.posDesc'),
@@ -480,6 +509,9 @@ export default function BulkAddMembersView() {
     event.target.value = ''
     if (!file) return
 
+    // 分析新文件时，上一次导入留下的失败行数据不再适用
+    setRetryMembers([])
+
     if (!file.name.toLowerCase().endsWith(BULK_IMPORT_EXTENSION)) {
       message.error(t('bulkMembers.analyzeOnlyXlsx'))
       return
@@ -540,42 +572,89 @@ export default function BulkAddMembersView() {
     downloadTextFile(t('bulkMembers.log.fileName', { stamp }), lines.join('\r\n'))
   }
 
-  /** 导出本次上传日志：逐行记录新增 / 更新 / 失败及原因，便于排查问题 */
-  const exportUploadLog = () => {
-    if (!importOutcomes) return
+  /**
+   * 导出本次导入日志：逐行结果 + 本次发出的每个请求。
+   * 取消导入后也能导出，用来确认「已经发了哪些请求、完成了哪些数据」。
+   */
+  const exportImportLog = () => {
     const now = new Date()
     const pad = (value: number) => String(value).padStart(2, '0')
     const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
-    const stats = summarizeOutcomes(importOutcomes)
+    const fileName = importFileName || analysis?.fileName || ''
     const lines = [
       t('bulkMembers.uploadLog.title'),
-      t('bulkMembers.uploadLog.file', { name: importFileName || '—' }),
+      t('bulkMembers.uploadLog.file', { name: fileName || '—' }),
       t('bulkMembers.uploadLog.time', { time: now.toLocaleString() }),
-      t('bulkMembers.uploadLog.summaryCreated', { n: stats.created }),
-      t('bulkMembers.uploadLog.summaryUpdated', { n: stats.updated }),
-      t('bulkMembers.uploadLog.summaryPartial', { n: stats.partial }),
-      t('bulkMembers.uploadLog.summaryFailed', { n: stats.failed }),
-      '',
-      t('bulkMembers.uploadLog.header'),
-      ...importOutcomes.map((item) =>
-        t('bulkMembers.uploadLog.line', {
-          row: item.row,
-          uid: item.uid ?? '—',
-          name: item.name || t('bulkMembers.check.unnamed'),
-          action:
-            item.action === 'create'
-              ? t('bulkMembers.uploadLog.actionCreate')
-              : t('bulkMembers.uploadLog.actionUpdate'),
-          status:
-            item.status === 'success'
-              ? t('bulkMembers.uploadLog.statusSuccess')
-              : item.status === 'partial'
-                ? t('bulkMembers.uploadLog.statusPartial')
-                : t('bulkMembers.uploadLog.statusFailed'),
-          message: item.message || '—',
-        }),
-      ),
     ]
+
+    if (importOutcomes) {
+      const stats = summarizeOutcomes(importOutcomes)
+      lines.push(
+        t('bulkMembers.uploadLog.summaryCreated', { n: stats.created }),
+        t('bulkMembers.uploadLog.summaryUpdated', { n: stats.updated }),
+        t('bulkMembers.uploadLog.summaryPartial', { n: stats.partial }),
+        t('bulkMembers.uploadLog.summaryFailed', { n: stats.failed }),
+        t('bulkMembers.uploadLog.summaryCancelled', { n: stats.cancelled }),
+        '',
+        t('bulkMembers.uploadLog.header'),
+        ...importOutcomes.map((item) =>
+          t('bulkMembers.uploadLog.line', {
+            row: item.row,
+            uid: item.uid ?? '—',
+            name: item.name || t('bulkMembers.check.unnamed'),
+            action:
+              item.action === 'create'
+                ? t('bulkMembers.uploadLog.actionCreate')
+                : t('bulkMembers.uploadLog.actionUpdate'),
+            status:
+              item.status === 'success'
+                ? t('bulkMembers.uploadLog.statusSuccess')
+                : item.status === 'partial'
+                  ? t('bulkMembers.uploadLog.statusPartial')
+                  : item.status === 'cancelled'
+                    ? t('bulkMembers.uploadLog.statusCancelled')
+                    : t('bulkMembers.uploadLog.statusFailed'),
+            message: item.message || '—',
+          }),
+        ),
+      )
+    } else {
+      lines.push(
+        t('bulkMembers.requestLog.progress', {
+          done: importProgress.done,
+          total: importProgress.total,
+        }),
+      )
+    }
+
+    // 请求日志：按时间顺序列出每个请求的阶段、接口、条数与结果
+    const requestLogs = importLogsRef.current
+    lines.push('', t('bulkMembers.requestLog.title'))
+    if (requestLogs.length === 0) {
+      lines.push(t('bulkMembers.requestLog.empty'))
+    } else {
+      lines.push(
+        t('bulkMembers.requestLog.header'),
+        ...requestLogs.map((entry) =>
+          t('bulkMembers.requestLog.line', {
+            seq: entry.seq,
+            time: entry.at,
+            phase: t(entry.phaseKey),
+            method: entry.method,
+            path: entry.path,
+            count: entry.count,
+            status:
+              entry.status === 'success'
+                ? t('bulkMembers.requestLog.statusSuccess')
+                : entry.status === 'aborted'
+                  ? t('bulkMembers.requestLog.statusAborted')
+                  : t('bulkMembers.requestLog.statusFailed'),
+            message: entry.message || '—',
+          }),
+        ),
+      )
+    }
+
     downloadTextFile(t('bulkMembers.uploadLog.fileName', { stamp }), lines.join('\r\n'))
   }
 
@@ -588,16 +667,28 @@ export default function BulkAddMembersView() {
     const members = analysis.result.members
     if (members.length === 0) return
 
+    const controller = new AbortController()
+    importAbortRef.current = controller
+    importLogsRef.current = []
+    setCancelling(false)
     setImporting(true)
-    setImportProgress({ done: 0, total: members.length })
+    // 进度按「请求数」推进：0 / 0 先占位，importMemberRows 启动时会立刻给出预估总数
+    setImportProgress({ done: 0, total: 0 })
     try {
       const outcomes = await importMemberRows({
         members,
         t,
+        signal: controller.signal,
         onProgress: (done, total) => setImportProgress({ done, total }),
+        onLog: (entry) => importLogsRef.current.push(entry),
       })
       setImportFileName(analysis.fileName)
       setImportOutcomes(outcomes)
+      // 保留未完全成功的行（含被取消的行），导入结束后分析结果虽被清空，仍可重新上传这些行
+      const failedRows = new Set(
+        outcomes.filter((item) => item.status !== 'success').map((item) => item.row),
+      )
+      setRetryMembers(members.filter((member) => failedRows.has(member.row)))
       setImportOpen(false)
       setResultOpen(true)
       // 导入后清空分析结果，避免同一批数据被重复提交（账号名重复会被后端拒绝，但仍应避免误操作）
@@ -606,7 +697,56 @@ export default function BulkAddMembersView() {
       // 整批异常（理论上不会，单行失败已在 importMemberRows 内部捕获）
       message.error(extractErrorReason(err, t))
     } finally {
+      importAbortRef.current = null
+      setCancelling(false)
       setImporting(false)
+    }
+  }
+
+  /** 取消导入：中断在途请求并停止发送后续请求，已完成的写入不会回滚 */
+  const cancelImport = () => {
+    if (!importAbortRef.current) return
+    setCancelling(true)
+    importAbortRef.current.abort()
+  }
+
+  /**
+   * 只重新上传本次导入中失败 / 部分成功 / 被取消的行。
+   * 复用的是导入后保留在内存里的行数据，因此即使分析结果已被清空也不需要重新选文件。
+   */
+  const retryFailed = async () => {
+    if (retrying || retryMembers.length === 0) return
+    const rows = retryMembers
+    const controller = new AbortController()
+    importAbortRef.current = controller
+    setCancelling(false)
+    setRetrying(true)
+    setImportProgress({ done: 0, total: 0 })
+    try {
+      const retried = await importMemberRows({
+        members: rows,
+        t,
+        signal: controller.signal,
+        onProgress: (done, total) => setImportProgress({ done, total }),
+        onLog: (entry) => importLogsRef.current.push(entry),
+      })
+      // 用本次重试的结果覆盖相同行号的旧结果，汇总数字自动更新
+      setImportOutcomes((prev) => {
+        const byRow = new Map((prev ?? []).map((item) => [item.row, item]))
+        for (const item of retried) byRow.set(item.row, item)
+        return Array.from(byRow.values()).sort((a, b) => a.row - b.row)
+      })
+      const still = rows.filter((member) =>
+        retried.some((item) => item.row === member.row && item.status !== 'success'),
+      )
+      setRetryMembers(still)
+      if (still.length === 0) message.success(t('bulkMembers.retryDone'))
+    } catch (err) {
+      message.error(extractErrorReason(err, t))
+    } finally {
+      importAbortRef.current = null
+      setCancelling(false)
+      setRetrying(false)
     }
   }
 
@@ -857,6 +997,14 @@ export default function BulkAddMembersView() {
                 total: importProgress.total,
               })}
             </p>
+            <Space style={{ marginTop: 16 }}>
+              <Button danger onClick={cancelImport} loading={cancelling} disabled={cancelling}>
+                {cancelling ? t('bulkMembers.cancelling') : t('bulkMembers.cancelImport')}
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={exportImportLog}>
+                {t('bulkMembers.exportRequestLog')}
+              </Button>
+            </Space>
           </div>
         ) : (
           <>
@@ -885,10 +1033,21 @@ export default function BulkAddMembersView() {
         width={720}
         onCancel={() => setResultOpen(false)}
         footer={[
+          retryMembers.length > 0 && (
+            <Button
+              key="retry"
+              icon={<ReloadOutlined />}
+              loading={retrying}
+              disabled={retrying}
+              onClick={() => void retryFailed()}
+            >
+              {t('bulkMembers.retryFailed', { n: retryMembers.length })}
+            </Button>
+          ),
           <Button
             key="export"
             icon={<DownloadOutlined />}
-            onClick={exportUploadLog}
+            onClick={exportImportLog}
             disabled={!importOutcomes}
           >
             {t('bulkMembers.exportUploadLog')}
@@ -900,6 +1059,35 @@ export default function BulkAddMembersView() {
       >
         {importOutcomes && (
           <>
+            {retrying && (
+              <div className="bulk-import-progress">
+                <Progress
+                  size="small"
+                  percent={
+                    importProgress.total
+                      ? Math.round((importProgress.done / importProgress.total) * 100)
+                      : 0
+                  }
+                  format={() =>
+                    t('bulkMembers.importRunning', {
+                      done: importProgress.done,
+                      total: importProgress.total,
+                    })
+                  }
+                />
+                <Space style={{ marginTop: 8 }}>
+                  <Button
+                    danger
+                    size="small"
+                    onClick={cancelImport}
+                    loading={cancelling}
+                    disabled={cancelling}
+                  >
+                    {cancelling ? t('bulkMembers.cancelling') : t('bulkMembers.cancelImport')}
+                  </Button>
+                </Space>
+              </div>
+            )}
             <Alert
               type={
                 importOutcomes.some((item) => item.status !== 'success') ? 'warning' : 'success'
@@ -907,10 +1095,12 @@ export default function BulkAddMembersView() {
               showIcon
               title={t('bulkMembers.resultSummary', summarizeOutcomes(importOutcomes))}
             />
-            {importOutcomes.some((item) => item.status !== 'success') && (
+            {importOutcomes.some(
+              (item) => item.status === 'failed' || item.status === 'partial',
+            ) && (
               <div className="bulk-issue-list">
                 {importOutcomes
-                  .filter((item) => item.status !== 'success')
+                  .filter((item) => item.status === 'failed' || item.status === 'partial')
                   .map((item) => (
                     <div className="bulk-issue-item" key={`${item.row}-${item.username}`}>
                       {t('bulkMembers.issueLine', {

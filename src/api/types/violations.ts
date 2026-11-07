@@ -33,6 +33,8 @@ export interface ViolationQuery extends PageQuery {
   keyword?: string
   /** 按学生 ID 筛选 */
   user_id?: number
+  /** 按学生 ID 批量筛选（逗号分隔，如 "1,2,3"） */
+  uids?: string
   /** 按类别筛选 */
   category?: string
   severity?: ViolationSeverity

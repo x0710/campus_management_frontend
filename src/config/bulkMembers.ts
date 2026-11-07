@@ -7,8 +7,65 @@
  * 页面本体见 pages/admin/BulkAddMembersView.tsx。
  */
 
+import type { PositionUsageScope } from '../api/types/positions'
+
 /** 对照表每页条数（代码要求 12：表格每页最多 100 行） */
 export const BULK_MAPPING_PAGE_SIZE = 100
+
+/**
+ * 回退分片流水线每片的行数（每片先建号，再立刻同步该片全部信息）。
+ * 实测 50 行建号约 500ms，但组织任职等批量写请求在并发/重复导入时容易触达 15 秒超时；
+ * 按 20 行分片可以缩短单个事务的持锁时间，降低超时与整批回滚的概率。
+ */
+export const BULK_ACCOUNT_CREATE_BATCH_SIZE = 20
+
+/**
+ * 批量查询类 GET 的 UID 分片大小。
+ * `uids=1,2,3…` 会拼进 URL（请求行），数据量大时可能触发 431 / 414；
+ * 100 个 UID 约 1KB，远低于常见的 8KB 代理限制。
+ */
+export const BULK_UID_QUERY_BATCH_SIZE = 100
+
+/**
+ * 批量写入请求的初始最大条数与降级阶梯：1000 → 100 → 10 → 1。
+ * 请求过大（413 / 414 / 431）或单项数据问题时自动缩小批量重试，避免整批失败。
+ */
+export const BULK_WRITE_BATCH_TIERS = [1000, 100, 10, 1] as const
+
+/**
+ * 批量导入阶段是否跳过读取（临时测试用）。
+ *
+ * 导入不是纯写入：角色要合并、组织任职要做差集、党员档案要区分创建/更新，
+ * 所以正常流程会先 GET 现状。这里按「前端只写不读」的思路临时关闭导入阶段的 4 个 GET，
+ * 方便验证影响；需要恢复某一类读取时，把对应值改成 false 即可，不用改业务代码。
+ *
+ * 风险（测试前请确认使用的是测试数据）：
+ * - roles：没有已有角色可合并，写入角色时会覆盖账号原有默认角色；
+ * - organizations：只新增表格里的任职，不删除系统里多出来的任职；
+ * - partyProfiles：已有党员档案的账号会再次创建档案，可能返回冲突；
+ * - existingUsers：所有行先按新账号创建，已存在账号靠 409 兜底，建号请求会明显变多。
+ */
+export const BULK_IMPORT_SKIP_READS: {
+  existingUsers: boolean
+  roles: boolean
+  organizations: boolean
+  partyProfiles: boolean
+} = {
+  existingUsers: true,
+  roles: true,
+  organizations: true,
+  partyProfiles: true,
+}
+
+/**
+ * 身份（职位）适用范围 → i18n 文案 key。
+ * 「组织:身份」只有在职位已向目标组织开放时才合法，模板与页面均需展示该范围。
+ */
+export const POSITION_USAGE_SCOPE_LABEL_KEYS: Record<PositionUsageScope, string> = {
+  self_only: 'bulkMembers.scopeSelfOnly',
+  self_and_children: 'bulkMembers.scopeSelfAndChildren',
+  self_and_descendants: 'bulkMembers.scopeSelfAndDescendants',
+}
 
 /** 批量添加新成员页的子路由路径（相对 /portal/:portalKey/） */
 export const BULK_ADD_MEMBERS_ROUTE = 'bulk-add-members'
@@ -62,7 +119,8 @@ export interface BulkTemplateColumn {
 /**
  * 样表十五列：与「添加新成员列表.xlsx」表头逐列对应。
  * 示例值取自样表本身，便于用户照抄格式；「系统角色」只写角色 ID 数字，不写角色名称。
- * 后四列（民族 / 籍贯 / 户口所在地 / 户口性质）为可选项，导入时写入该账号的个人档案。
+ * 登录账号名与初始密码相邻放在前两列，便于成对填写与核对账号凭证。
+ * 后四列（民族 / 籍贯 / 户口所在地 / 户口性质）为可选项，导入时写入该账号的个人档案（没有档案会自动创建）。
  */
 export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
   {
@@ -73,6 +131,15 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     sampleA: '1234567890',
     sampleB: '4567891230',
     excelWidth: 22,
+  },
+  {
+    key: 'password',
+    labelKey: 'adminUsers.fieldPassword',
+    descKey: 'bulkMembers.colDesc.password',
+    required: true,
+    sampleA: '123456',
+    sampleB: '123456',
+    excelWidth: 14,
   },
   {
     key: 'name',
@@ -154,15 +221,6 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     sampleA: '15/14',
     sampleB: '15',
     excelWidth: 18,
-  },
-  {
-    key: 'password',
-    labelKey: 'adminUsers.fieldPassword',
-    descKey: 'bulkMembers.colDesc.password',
-    required: true,
-    sampleA: '123456',
-    sampleB: '123456',
-    excelWidth: 14,
   },
   {
     key: 'ethnic',

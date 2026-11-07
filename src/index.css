@@ -3731,7 +3731,7 @@ h3 {
   color: var(--ink);
 }
 
-/* 学校端总览统计：8 项指标两行四列，窄屏自动降为两列 */
+/* 学校端总览统计：四列排布，窄屏自动降为两列 */
 .school-overview {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

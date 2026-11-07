@@ -58,6 +58,8 @@ export interface DailyRecordUpdateRequest {
 export interface DailyRecordQuery extends PageQuery {
   /** 按记录对象（学生）用户 ID 筛选 */
   user_id?: number
+  /** 按记录对象用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */
+  uids?: string
   nature?: RecordType
   /** 按内容模糊搜索 */
   keyword?: string

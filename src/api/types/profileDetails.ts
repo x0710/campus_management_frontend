@@ -8,14 +8,12 @@ import type { PageQuery } from './common'
 export interface ProfileDetail {
   id: number
   user_id: number
-  /** 身份证号 */
-  id_card: string
-  /** 民族 */
-  ethnic: string
+  /** 身份证号（可为空） */
+  id_card: string | null
+  /** 民族（可为空） */
+  ethnic: string | null
   /** 出生日期（后端 DateTime，可为空） */
   birth_date: string | null
-  /** 班级 ID */
-  class_id: number
   /** 籍贯 */
   native_place: string | null
   /** 户口所在地 */
@@ -41,16 +39,16 @@ export interface ProfileDetail {
 }
 
 /**
- * 创建档案请求（POST /api/profile-details）。
- * 仅 user_id 必填；其余字段可省略或传 null。
+ * 保存档案请求（POST /api/profile-details 创建、PUT /api/profile-details 新增或更新）。
+ * 必填：user_id；其余字段可省略或传 null。
  */
 export interface ProfileDetailCreateRequest {
   user_id: number
-  /** 身份证号（可选） */
+  /** 身份证号 */
   id_card?: string | null
-  /** 民族（可选） */
+  /** 民族 */
   ethnic?: string | null
-  /** 出生日期（YYYY-MM-DD，可选） */
+  /** 出生日期（YYYY-MM-DD） */
   birth_date?: string | null
   /** 籍贯 */
   native_place?: string | null
@@ -83,8 +81,6 @@ export interface ProfileDetailQuery extends PageQuery {
   keyword?: string
   /** 按用户 ID 精确筛选 */
   user_id?: number
-  /** 按班级 ID 精确筛选 */
-  class_id?: number
   /** 按用户 ID 批量筛选（逗号分隔，如 "1,2,3"；配合 page_size 使用） */
   uids?: string
 }

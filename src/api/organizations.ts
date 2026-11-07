@@ -1,9 +1,12 @@
 /** 组织模块, 提供组织、组织成员与用户任职相关 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import { ORGANIZATION_MEMBER_COUNT_BATCH_SIZE } from '../config/organization'
 import type { PaginatedResponse } from './types/common'
 import type {
+  MemberBatchCreate,
+  MemberBatchDelete,
   OrganizationInfo,
   OrganizationMember,
   OrganizationMemberCountInclude,
@@ -173,28 +176,76 @@ export async function countOrganizationMembers(
  * POST /api/organizations/{id}/members 添加成员，返回新成员记录
  * @param orgId 类型：number；默认值：无；是否必填：必填
  * @param member 类型：OrganizationMemberInput；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
  * @returns 类型：Promise<OrganizationMember>
  */
 export async function addOrgMember(
   orgId: number,
   member: OrganizationMemberInput,
+  signal?: AbortSignal,
 ): Promise<OrganizationMember> {
-  const res = await http.post<OrganizationMember>(`/organizations/${orgId}/members`, member)
+  const res = await http.post<OrganizationMember>(
+    `/organizations/${orgId}/members`,
+    member,
+    { signal },
+  )
   invalidate(`GET /organizations/${orgId}/members`)
   invalidate('GET /organization-members')
   return res.data
 }
 
 /**
+ * POST /api/organization-members 批量添加任职（非空数组，整批事务）。
+ * @param body 类型：MemberBatchCreate[]；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
+ * @returns 类型：Promise<void>
+ */
+export async function addOrgMembers(
+  body: MemberBatchCreate[],
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.post('/organization-members', body, {
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
+  invalidate('GET /organization-members')
+  invalidate('GET /organizations')
+}
+
+/**
  * DELETE /api/organizations/{id}/members/{member_id} 按成员记录 id 移除成员
  * @param orgId 类型：number；默认值：无；是否必填：必填
  * @param memberId 类型：number；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
  * @returns 类型：Promise<void>
  */
-export async function removeOrgMember(orgId: number, memberId: number): Promise<void> {
-  await http.delete(`/organizations/${orgId}/members/${memberId}`)
+export async function removeOrgMember(
+  orgId: number,
+  memberId: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.delete(`/organizations/${orgId}/members/${memberId}`, { signal })
   invalidate(`GET /organizations/${orgId}/members`)
   invalidate('GET /organization-members')
+}
+
+/**
+ * DELETE /api/organization-members 批量删除任职（非空数组，任一记录不存在整批回滚）。
+ * @param body 类型：MemberBatchDelete[]；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
+ * @returns 类型：Promise<void>
+ */
+export async function removeOrgMembers(
+  body: MemberBatchDelete[],
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.delete('/organization-members', {
+    data: body,
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
+  invalidate('GET /organization-members')
+  invalidate('GET /organizations')
 }
 
 /**

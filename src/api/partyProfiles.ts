@@ -1,8 +1,10 @@
 /** 党员档案（party-profile）模块 API：党员编号 / 入党时间查询与维护 */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import type {
   PartyProfile,
+  PartyProfileBatchUpdate,
   PartyProfileCreateRequest,
   PartyProfileUpdateRequest,
 } from './types/partyProfiles'
@@ -33,12 +35,32 @@ export async function queryPartyProfiles(
  * POST /api/party/profiles 创建党员档案。
  * 需要 `party_profile.create` 权限及目标用户的数据范围。
  * @param body 创建请求（user_id 必填）
+ * @param signal 取消信号（可选）
  * @returns Promise<PartyProfile> 新建的党员档案
  */
 export async function createPartyProfile(
   body: PartyProfileCreateRequest,
+  signal?: AbortSignal,
 ): Promise<PartyProfile> {
-  const res = await http.post<PartyProfile>('/party/profiles', body)
+  const res = await http.post<PartyProfile>('/party/profiles', body, { signal })
+  invalidate('GET /party/profiles')
+  return res.data
+}
+
+/**
+ * POST /api/party/profiles 批量创建党员档案（数组请求，不设条数上限）。
+ * @param body 创建请求数组（每项 user_id 必填）
+ * @param signal 取消信号（可选）
+ * @returns Promise<PartyProfile[]> 新建的党员档案数组
+ */
+export async function createPartyProfiles(
+  body: PartyProfileCreateRequest[],
+  signal?: AbortSignal,
+): Promise<PartyProfile[]> {
+  const res = await http.post<PartyProfile[]>('/party/profiles', body, {
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
   invalidate('GET /party/profiles')
   return res.data
 }
@@ -48,13 +70,33 @@ export async function createPartyProfile(
  * 缺省字段保持原值，显式传 null 表示清空；需要 `party_profile.update` 权限。
  * @param userId 用户 ID（必填）
  * @param body 更新请求
+ * @param signal 取消信号（可选）
  * @returns Promise<PartyProfile> 更新后的党员档案
  */
 export async function updatePartyProfile(
   userId: number,
   body: PartyProfileUpdateRequest,
+  signal?: AbortSignal,
 ): Promise<PartyProfile> {
-  const res = await http.patch<PartyProfile>(`/party/profiles/${userId}`, body)
+  const res = await http.patch<PartyProfile>(`/party/profiles/${userId}`, body, { signal })
+  invalidate('GET /party/profiles')
+  return res.data
+}
+
+/**
+ * PATCH /api/party/profiles 批量更新党员档案（缺省字段保留，null 清空，整批事务）。
+ * @param body 更新请求数组（每项 user_id 必填）
+ * @param signal 取消信号（可选）
+ * @returns Promise<PartyProfile[]> 更新后的党员档案数组
+ */
+export async function updatePartyProfiles(
+  body: PartyProfileBatchUpdate[],
+  signal?: AbortSignal,
+): Promise<PartyProfile[]> {
+  const res = await http.patch<PartyProfile[]>('/party/profiles', body, {
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
   invalidate('GET /party/profiles')
   return res.data
 }

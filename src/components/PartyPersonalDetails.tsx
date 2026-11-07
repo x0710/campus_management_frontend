@@ -21,7 +21,7 @@ type Values = Record<(typeof fields)[number][0], string>
 /**
  * 党员「我的」页 / 成员详情中的个人资料卡片（民族、籍贯、户口所在地、户口性质）。
  * @param userId 目标用户 ID（必填）
- * @param readOnly 只读展示（成员详情中由支部书记 / 学院党委 / 学校党委查看时为 true）
+ * @param readOnly 只读展示（成员详情中支部 / 学院 / 学校等上级组织可编辑，默认 false）
  */
 export default function PartyPersonalDetails({
   userId,
@@ -80,6 +80,7 @@ export default function PartyPersonalDetails({
     }
     setSaving(true)
     try {
+      // PUT 按 user_id 保存：无档案时后端创建，有档案时更新。
       const saved = await saveProfileDetail({ user_id: userId, ...changes })
       setProfile(saved)
       setOpen(false)

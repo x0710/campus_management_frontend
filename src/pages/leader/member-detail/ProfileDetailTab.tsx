@@ -10,7 +10,6 @@ import {
   Descriptions,
   Form,
   Input,
-  InputNumber,
   Modal,
   Popconfirm,
   Skeleton,
@@ -38,7 +37,6 @@ interface ProfileFormValues {
   id_card: string
   ethnic: string
   birth_date: Dayjs
-  class_id: number
   native_place?: string
   household_location?: string
   household_type?: string
@@ -123,10 +121,9 @@ export default function ProfileDetailTab({
       setEditing(record)
       form.setFieldsValue({
         user_id: record.user_id,
-        id_card: record.id_card,
-        ethnic: record.ethnic,
+        id_card: record.id_card ?? '',
+        ethnic: record.ethnic ?? '',
         birth_date: dayjs(record.birth_date),
-        class_id: record.class_id,
         native_place: record.native_place ?? undefined,
         household_location: record.household_location ?? undefined,
         household_type: record.household_type ?? undefined,
@@ -149,7 +146,6 @@ export default function ProfileDetailTab({
     id_card: values.id_card.trim(),
     ethnic: values.ethnic.trim(),
     birth_date: values.birth_date.format('YYYY-MM-DD'),
-    class_id: values.class_id,
     native_place: values.native_place?.trim() || null,
     household_location: values.household_location?.trim() || null,
     household_type: values.household_type?.trim() || null,
@@ -254,19 +250,14 @@ export default function ProfileDetailTab({
           size="small"
           column={2}
           items={[
-            { key: 'id_card', label: t('memberDetail.fieldIdCard'), children: profile.id_card },
-            { key: 'ethnic', label: t('memberDetail.fieldEthnic'), children: profile.ethnic },
+            { key: 'id_card', label: t('memberDetail.fieldIdCard'), children: profile.id_card ?? t('profile.noData') },
+            { key: 'ethnic', label: t('memberDetail.fieldEthnic'), children: profile.ethnic ?? t('profile.noData') },
             {
               key: 'birth_date',
               label: t('memberDetail.fieldBirthDate'),
               children: profile.birth_date
                 ? formatDateOnly(profile.birth_date)
                 : t('profile.noData'),
-            },
-            {
-              key: 'class_id',
-              label: t('memberDetail.fieldClassId'),
-              children: profile.class_id,
             },
             {
               key: 'native_place',
@@ -382,13 +373,6 @@ export default function ProfileDetailTab({
               rules={[{ required: true, message: t('memberDetail.fieldRequired') }]}
             >
               <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              name="class_id"
-              label={t('memberDetail.fieldClassId')}
-              rules={[{ required: true, message: t('memberDetail.fieldRequired') }]}
-            >
-              <InputNumber style={{ width: '100%' }} precision={0} min={0} />
             </Form.Item>
             <Form.Item name="native_place" label={t('memberDetail.fieldNativePlace')}>
               <Input />

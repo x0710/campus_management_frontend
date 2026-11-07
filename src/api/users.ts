@@ -1,8 +1,10 @@
 /** 用户模块, 提供用户查询、创建、更新、删除与密码重置 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import type { PaginatedResponse } from './types/common'
 import type {
+  UserBatchUpdate,
   UserCreateRequest,
   UserDetail,
   UserInfo,
@@ -53,10 +55,17 @@ export function getMyProfile(): Promise<UserDetail> {
  * POST /api/users 批量创建用户。
  * 接口已要求前端在每一项中指定 `uid`（正整数，不自动生成；已存在会返回 409）。
  * @param body 类型：UserCreateRequest[]；默认值：无；是否必填：必填（每项须含 uid 与 username）
+ * @param signal 取消信号（可选，批量导入取消时中断在途请求）
  * @returns 类型：Promise<number>
  */
-export async function createUsers(body: UserCreateRequest[]): Promise<number> {
-  const res = await http.post<number>('/users', body)
+export async function createUsers(
+  body: UserCreateRequest[],
+  signal?: AbortSignal,
+): Promise<number> {
+  const res = await http.post<number>('/users', body, {
+    signal,
+    timeout: BATCH_REQUEST_TIMEOUT_MS,
+  })
   invalidate('GET /users')
   return res.data
 }
@@ -65,13 +74,34 @@ export async function createUsers(body: UserCreateRequest[]): Promise<number> {
  * PATCH /api/users/{id} 更新用户资料
  * @param id 类型：number；默认值：无；是否必填：必填
  * @param body 类型：UserUpdateRequest；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
  * @returns 类型：Promise<void>
  */
-export async function updateUser(id: number, body: UserUpdateRequest): Promise<void> {
-  await http.patch(`/users/${id}`, body)
+export async function updateUser(
+  id: number,
+  body: UserUpdateRequest,
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.patch(`/users/${id}`, body, { signal })
   invalidate('GET /users')
   invalidate(`GET /users/${id}`)
   // 本人资料可能通过 /users/me 缓存，更新后一并失效，避免“我的”页继续展示旧手机号/邮箱
+  invalidate('GET /users/me')
+}
+
+/**
+ * PATCH /api/users 批量更新用户资料（非空数组，任一项失败整批回滚）。
+ * @param body 类型：UserBatchUpdate[]；默认值：无；是否必填：必填
+ * @param signal 取消信号（可选）
+ * @returns 类型：Promise<void>
+ */
+export async function batchUpdateUsers(
+  body: UserBatchUpdate[],
+  signal?: AbortSignal,
+): Promise<void> {
+  await http.patch('/users', body, { signal, timeout: BATCH_REQUEST_TIMEOUT_MS })
+  invalidate('GET /users')
+  // 本人资料可能通过 /users/me 缓存，更新后一并失效
   invalidate('GET /users/me')
 }
 

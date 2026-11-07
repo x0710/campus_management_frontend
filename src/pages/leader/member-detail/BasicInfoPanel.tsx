@@ -302,8 +302,8 @@ export default function BasicInfoPanel({
         </Card>
       </div>
 
-      {/* 个人资料（支部端 / 学院端 / 学校端）：与党员端「我的」页的个人资料卡片一致，仅展示 */}
-      {showPartyInfo && <PartyPersonalDetails userId={user.id} readOnly />}
+      {/* 个人资料（支部端 / 学院端 / 学校端）：与党员端「我的」页的个人资料卡片一致，上级组织可编辑 */}
+      {showPartyInfo && <PartyPersonalDetails userId={user.id} />}
 
       {/* 党员信息（支部端 / 学院端 / 学校端）：与党员端「我的」页展示一致的党员端扩展信息 */}
       {showPartyInfo && (

@@ -23,6 +23,8 @@ export interface RewardingDto {
 export interface RewardingQuery extends PageQuery {
   /** 按学生/用户 ID 精确筛选 */
   uid?: number
+  /** 按学生/用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */
+  uids?: string
   /** 按奖学金项目名称精确筛选 */
   project?: string
   /** 按项目名称等字段模糊搜索 */
