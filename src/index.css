@@ -3543,20 +3543,6 @@ h3 {
   text-decoration: none;
 }
 
-/* 概况卡片可点击态（支部总人数卡片跳转支部管理） */
-.branch-overview-link {
-  display: block;
-  border-radius: 6px;
-  color: inherit;
-  text-decoration: none;
-}
-
-/* 概况卡片 hover / 键盘聚焦反馈：给红色统计区内的可点击项加浅色底提示可点击 */
-.branch-overview-link:hover,
-.branch-overview-link:focus-visible {
-  background: rgba(207, 19, 34, 0.06);
-}
-
 /* 待办项 hover / 键盘聚焦反馈：提亮边框并加投影，提示可点击 */
 .branch-todo-item:hover,
 .branch-todo-item:focus-within {
@@ -3608,9 +3594,9 @@ h3 {
 }
 
 .academy-overview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px 56px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 24px 40px;
   padding: 18px 24px;
   margin-bottom: 26px;
   border-radius: 10px;
@@ -3621,7 +3607,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 120px;
+  min-width: 0;
 }
 
 .academy-overview-label {

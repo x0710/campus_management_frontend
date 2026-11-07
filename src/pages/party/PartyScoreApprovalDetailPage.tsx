@@ -64,6 +64,7 @@ import {
   PARTY_SCORE_APPROVAL_STATUS_COLOR,
   PARTY_SCORE_TRANSFER_USER_PAGE_SIZE,
 } from '../../config/partyScoreApproval'
+import { PARTY_SCORE_REASON_MAX_LENGTH } from '../../config/partyDeclaration'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
 import { useUserNames } from '../../composables/useUserNames'
 import { useT } from '../../i18n'
@@ -777,7 +778,11 @@ function PartyScoreApprovalDetail() {
                       },
                     ]}
                   >
-                    <Input.TextArea rows={8} maxLength={200} showCount />
+                    <Input.TextArea
+                      rows={8}
+                      maxLength={PARTY_SCORE_REASON_MAX_LENGTH}
+                      showCount
+                    />
                   </Form.Item>
                   <div className="party-approval-form-actions">
                     <Button onClick={cancelAction} disabled={busy}>

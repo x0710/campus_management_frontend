@@ -191,6 +191,8 @@ export async function addOrgMember(
   )
   invalidate(`GET /organizations/${orgId}/members`)
   invalidate('GET /organization-members')
+  // 成员变化会影响组织平均分与先锋指数统计，清掉 /party/scores 缓存（含 organization-average）
+  invalidate('GET /party/scores')
   return res.data
 }
 
@@ -210,6 +212,8 @@ export async function addOrgMembers(
   })
   invalidate('GET /organization-members')
   invalidate('GET /organizations')
+  // 成员变化会影响组织平均分与先锋指数统计，清掉 /party/scores 缓存（含 organization-average）
+  invalidate('GET /party/scores')
 }
 
 /**
@@ -227,6 +231,8 @@ export async function removeOrgMember(
   await http.delete(`/organizations/${orgId}/members/${memberId}`, { signal })
   invalidate(`GET /organizations/${orgId}/members`)
   invalidate('GET /organization-members')
+  // 成员变化会影响组织平均分与先锋指数统计，清掉 /party/scores 缓存（含 organization-average）
+  invalidate('GET /party/scores')
 }
 
 /**
@@ -246,6 +252,8 @@ export async function removeOrgMembers(
   })
   invalidate('GET /organization-members')
   invalidate('GET /organizations')
+  // 成员变化会影响组织平均分与先锋指数统计，清掉 /party/scores 缓存（含 organization-average）
+  invalidate('GET /party/scores')
 }
 
 /**

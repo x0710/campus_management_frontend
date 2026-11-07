@@ -8,18 +8,22 @@
  *   党员人数（人）  按职位名称「中共党员」经 GET /api/positions 解析职位编码后，
  *                   调用 POST /api/organizations/member-counts（position + recursive=true）
  *   预备党员人数（人） 同上，按职位名称「中共预备党员」统计
+ *   党员 / 预备党员的男女分布  同上统计加 ?include=gender，返回 male / female 人数
+ *   少数民族人数（人） 支部总人数同一次统计加 ?include=ethnic，
+ *                   从 ethnic_counts 中排除「汉族 / unknown」后求和
  *   待审核申报（条） 前端用 GET /api/party-scores + /api/approvals 合成党建加分审批步骤，
  *                   按 status=waiting / pending 各取一页后合计条数；
  *                   底层接口不返回分页 total，故以返回条数计（默认过滤「我的待办」= 当前审批人的待处理申报）
  *   平均分          GET /api/party/scores/organization-average?organization_id=…&recursive=true
  *   等级分布        前端拉取支部成员 uid，再经 GET /api/party/scores 批量查询分数后按等级统计
  *
- * 卡片跳转：支部总人数 → 支部管理（branch_m5），待审核申报 → 审核管理（branch_m3）。
+ * 卡片跳转：待审核申报 → 审核管理（branch_m3）；支部总人数只做展示，不可点击。
  */
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { queryOrgMembers } from '../../api/organizations'
+import { queryOrgMembers, queryOrganizationMemberCounts } from '../../api/organizations'
+import type { OrganizationMemberCountItem } from '../../api/types/organizations'
 import {
   getPartyScoreOrganizationAverage,
   getPartyScoreTotals,
@@ -27,10 +31,10 @@ import {
 } from '../../api/partyScores'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
-import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
 import {
-  countOrgMembersByPositionNames,
+  countOrgMembersByPositionNamesWithGender,
   listOrgSelfAndDescendantIds,
+  type PositionGenderCount,
 } from '../../composables/useOrgPositionMemberCounts'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
@@ -40,6 +44,7 @@ import {
 } from '../../config/partyProfile'
 import { PARTY_SCORE_TODO_PAGE_SIZE } from '../../config/partyScoreApproval'
 import { useT } from '../../i18n'
+import { countEthnicMinority } from '../../utils/ethnic'
 import {
   formatPartyScoreTotalDecimal,
   getPartyScoreGrade,
@@ -116,6 +121,16 @@ export default function BranchWorkbenchView() {
   const [partyMembers, setPartyMembers] = useState<number | null>(null)
   /** 本支部预备党员人数（职位为「中共预备党员」）；null 表示未取到或职位未配置 */
   const [probationaryMembers, setProbationaryMembers] = useState<number | null>(null)
+  /** 中共党员中的男性人数；null 表示未取到或职位未配置 */
+  const [malePartyMembers, setMalePartyMembers] = useState<number | null>(null)
+  /** 中共党员中的女性人数；null 表示未取到或职位未配置 */
+  const [femalePartyMembers, setFemalePartyMembers] = useState<number | null>(null)
+  /** 预备党员中的男性人数；null 表示未取到或职位未配置 */
+  const [maleProbationaryMembers, setMaleProbationaryMembers] = useState<number | null>(null)
+  /** 预备党员中的女性人数；null 表示未取到或职位未配置 */
+  const [femaleProbationaryMembers, setFemaleProbationaryMembers] = useState<number | null>(null)
+  /** 本支部少数民族人数（民族分布中排除汉族与 unknown 后的人数） */
+  const [minorityMembers, setMinorityMembers] = useState<number | null>(null)
   /** 待审核申报条数（waiting + pending） */
   const [todoApprove, setTodoApprove] = useState<number | null>(null)
   /** 本支部党建活动加分平均分（后端为字符串；null 表示无数据或加载失败） */
@@ -130,16 +145,17 @@ export default function BranchWorkbenchView() {
     try {
       const { orgId } = await resolvePortalOrg(BRANCH_ANCESTOR_DEPTHS)
       const [
-        memberTotal,
+        memberCounts,
         waitingSteps,
         pendingSteps,
         average,
         gradeDistribution,
         partyCounts,
       ] = await Promise.all([
+        // 支部总人数与少数民族人数同一次统计：include=ethnic 返回 ethnic_counts
         orgId === null
-          ? Promise.resolve(0)
-          : countOrgMemberTotal(orgId),
+          ? Promise.resolve<OrganizationMemberCountItem[]>([])
+          : queryOrganizationMemberCounts([{ org_id: orgId, recursive: true }], ['ethnic']),
         queryPartyScoreApprovals({ status: 'waiting', page: 1, page_size: PARTY_SCORE_TODO_PAGE_SIZE }),
         queryPartyScoreApprovals({ status: 'pending', page: 1, page_size: PARTY_SCORE_TODO_PAGE_SIZE }),
         orgId === null
@@ -148,17 +164,22 @@ export default function BranchWorkbenchView() {
         orgId === null
           ? Promise.resolve([])
           : buildGradeDistribution(orgId),
-        // 党员 / 预备党员人数：按职位名称经成员列表接口统计（含全部下级组织）
+        // 党员 / 预备党员人数及男女分布：按职位名称（身份）解析编码后递归统计
         orgId === null
-          ? Promise.resolve<Record<string, number | null>>({})
-          : countOrgMembersByPositionNames(orgId, [
+          ? Promise.resolve({} as Record<string, PositionGenderCount>)
+          : countOrgMembersByPositionNamesWithGender(orgId, [
               PARTY_FULL_MEMBER_STATUS_NAME,
               PARTY_PROBATIONARY_STATUS_NAME,
             ]),
       ])
-      setMembers(memberTotal)
-      setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME] ?? null)
-      setProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME] ?? null)
+      setMembers(memberCounts[0]?.member_count ?? 0)
+      setMinorityMembers(countEthnicMinority(memberCounts[0]?.ethnic_counts))
+      setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.total ?? null)
+      setMalePartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.male ?? null)
+      setFemalePartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.female ?? null)
+      setProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.total ?? null)
+      setMaleProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.male ?? null)
+      setFemaleProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.female ?? null)
       setTodoApprove(waitingSteps.length + pendingSteps.length)
       setAverageScore(average.average_score)
       setDistribution(gradeDistribution)
@@ -209,17 +230,22 @@ export default function BranchWorkbenchView() {
         </header>
         <div className="panel-card-body">
           <div className="branch-overview">
-            {/* 支部总人数 → 支部管理（查看本支部及下级组织成员） */}
-            <Link
-              className="branch-overview-item branch-overview-link"
-              to={`/portal/${portalKey}/branch_m5`}
-            >
+            {/* 支部总人数：仅展示人数，不可点击 */}
+            <div className="branch-overview-item">
               <div className="branch-overview-label">{t('branch.statMembers')}</div>
               <div className="branch-overview-value">
                 {statText(members)}
                 <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
               </div>
-            </Link>
+            </div>
+            {/* 少数民族人数：民族分布中排除汉族与 unknown */}
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('partyStats.minorityMembers')}</div>
+              <div className="branch-overview-value">
+                {statText(minorityMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
             {/* 党员人数：按职位「中共党员」统计（含全部下级组织） */}
             <div className="branch-overview-item">
               <div className="branch-overview-label">{t('branch.statPartyMembers')}</div>
@@ -228,11 +254,41 @@ export default function BranchWorkbenchView() {
                 <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
               </div>
             </div>
+            {/* 男 / 女中共党员人数 */}
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('partyStats.maleFullMembers')}</div>
+              <div className="branch-overview-value">
+                {positionCountText(malePartyMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('partyStats.femaleFullMembers')}</div>
+              <div className="branch-overview-value">
+                {positionCountText(femalePartyMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
             {/* 预备党员人数：按职位「中共预备党员」统计（含全部下级组织） */}
             <div className="branch-overview-item">
               <div className="branch-overview-label">{t('branch.statProbationaryMembers')}</div>
               <div className="branch-overview-value">
                 {positionCountText(probationaryMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
+            {/* 男 / 女预备党员人数 */}
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('partyStats.maleProbationaryMembers')}</div>
+              <div className="branch-overview-value">
+                {positionCountText(maleProbationaryMembers)}
+                <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
+              </div>
+            </div>
+            <div className="branch-overview-item">
+              <div className="branch-overview-label">{t('partyStats.femaleProbationaryMembers')}</div>
+              <div className="branch-overview-value">
+                {positionCountText(femaleProbationaryMembers)}
                 <span className="branch-overview-unit">{t('branch.membersUnit')}</span>
               </div>
             </div>

@@ -8,6 +8,9 @@
  *   党员人数（人）  按职位名称「中共党员」经 GET /api/positions 解析职位编码后，
  *                   调用 POST /api/organizations/member-counts（position + recursive=true）
  *   预备党员人数（人） 同上，按职位名称「中共预备党员」统计
+ *   党员 / 预备党员的男女分布  同上统计加 ?include=gender，返回 male / female 人数
+ *   少数民族人数（人） 学院总人数同一次统计加 ?include=ethnic，
+ *                   从 ethnic_counts 中排除「汉族 / unknown」后求和
  *   平均分          GET /api/party/scores/organization-average?organization_id=…&recursive=true
  *   各支部排名       GET /api/organizations/{id}/subsidiaries 获取直接下级支部，
  *                   再逐个调用 GET /api/party/scores/organization-average 后按平均分排序
@@ -24,11 +27,10 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../../api/common'
-import { listSubsidiaries } from '../../api/organizations'
+import { listSubsidiaries, queryOrganizationMemberCounts } from '../../api/organizations'
 import { getPartyScoreOrganizationAverage, queryPartyScoreApprovals } from '../../api/partyScores'
 import ErrorState from '../../components/ErrorState'
-import { countOrgMemberTotal } from '../../composables/useOrgMemberTotal'
-import { countOrgMembersByPositionNames } from '../../composables/useOrgPositionMemberCounts'
+import { countOrgMembersByPositionNamesWithGender } from '../../composables/useOrgPositionMemberCounts'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
 import { ACADEMY_ANCESTOR_DEPTHS, ACADEMY_BRANCH_MODULE_KEY } from '../../config/organization'
 import {
@@ -37,6 +39,7 @@ import {
 } from '../../config/partyProfile'
 import { PARTY_SCORE_TODO_PAGE_SIZE } from '../../config/partyScoreApproval'
 import { useT } from '../../i18n'
+import { countEthnicMinority } from '../../utils/ethnic'
 import { useUiStateStore } from '../../store/uiState'
 import { formatPartyScoreTotalDecimal, formatScoreDecimal, toPartyScoreTotal } from '../../utils/partyScore'
 
@@ -68,6 +71,16 @@ export default function AcademyWorkbenchView() {
   const [partyMembers, setPartyMembers] = useState<number | null>(null)
   /** 本院预备党员人数（职位为「中共预备党员」）；null 表示未取到或职位未配置 */
   const [probationaryMembers, setProbationaryMembers] = useState<number | null>(null)
+  /** 中共党员中的男性人数；null 表示未取到或职位未配置 */
+  const [malePartyMembers, setMalePartyMembers] = useState<number | null>(null)
+  /** 中共党员中的女性人数；null 表示未取到或职位未配置 */
+  const [femalePartyMembers, setFemalePartyMembers] = useState<number | null>(null)
+  /** 预备党员中的男性人数；null 表示未取到或职位未配置 */
+  const [maleProbationaryMembers, setMaleProbationaryMembers] = useState<number | null>(null)
+  /** 预备党员中的女性人数；null 表示未取到或职位未配置 */
+  const [femaleProbationaryMembers, setFemaleProbationaryMembers] = useState<number | null>(null)
+  /** 本院少数民族人数（民族分布中排除汉族与 unknown 后的人数） */
+  const [minorityMembers, setMinorityMembers] = useState<number | null>(null)
   /** 本院党建活动加分平均分（后端为字符串；null 表示无数据或加载失败） */
   const [averageScore, setAverageScore] = useState<string | null>(null)
   /** 待审核申报条数（waiting + pending，与支部端工作台同一口径） */
@@ -98,18 +111,24 @@ export default function AcademyWorkbenchView() {
       setTodoApprove(waitingSteps.length + pendingSteps.length)
       if (orgId === null) {
         setMembers(0)
+        setMinorityMembers(null)
         setPartyMembers(null)
+        setMalePartyMembers(null)
+        setFemalePartyMembers(null)
         setProbationaryMembers(null)
+        setMaleProbationaryMembers(null)
+        setFemaleProbationaryMembers(null)
         setAverageScore(null)
         setBranchRankings([])
         return
       }
-      const [memberTotal, average, subsidiaries, partyCounts] = await Promise.all([
-        countOrgMemberTotal(orgId),
+      const [memberCounts, average, subsidiaries, partyCounts] = await Promise.all([
+        // 学院总人数与少数民族人数同一次统计：include=ethnic 返回 ethnic_counts
+        queryOrganizationMemberCounts([{ org_id: orgId, recursive: true }], ['ethnic']),
         getPartyScoreOrganizationAverage({ organization_id: orgId, recursive: true }),
         listSubsidiaries(orgId),
-        // 党员 / 预备党员人数：按职位名称经成员列表接口统计（含全部下级组织）
-        countOrgMembersByPositionNames(orgId, [
+        // 党员 / 预备党员人数及男女分布：按职位名称（身份）解析编码后递归统计
+        countOrgMembersByPositionNamesWithGender(orgId, [
           PARTY_FULL_MEMBER_STATUS_NAME,
           PARTY_PROBATIONARY_STATUS_NAME,
         ]),
@@ -129,9 +148,14 @@ export default function AcademyWorkbenchView() {
           (a, b) =>
             (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY),
         )
-      setMembers(memberTotal)
-      setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME] ?? null)
-      setProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME] ?? null)
+      setMembers(memberCounts[0]?.member_count ?? 0)
+      setMinorityMembers(countEthnicMinority(memberCounts[0]?.ethnic_counts))
+      setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.total ?? null)
+      setMalePartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.male ?? null)
+      setFemalePartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.female ?? null)
+      setProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.total ?? null)
+      setMaleProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.male ?? null)
+      setFemaleProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.female ?? null)
       setAverageScore(average.average_score)
       setBranchRankings(rankedBranches)
     } catch (err) {
@@ -227,11 +251,34 @@ export default function AcademyWorkbenchView() {
                 <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
               </span>
             </div>
+            {/* 少数民族人数：民族分布中排除汉族与 unknown */}
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">{t('partyStats.minorityMembers')}</span>
+              <span className="academy-overview-value">
+                {statText(minorityMembers)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
             {/* 党员人数：按职位「中共党员」统计（含全部下级组织） */}
             <div className="academy-overview-item">
               <span className="academy-overview-label">{t('academy.statPartyMembers')}</span>
               <span className="academy-overview-value">
                 {positionCountText(partyMembers)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
+            {/* 男 / 女中共党员人数 */}
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">{t('partyStats.maleFullMembers')}</span>
+              <span className="academy-overview-value">
+                {positionCountText(malePartyMembers)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">{t('partyStats.femaleFullMembers')}</span>
+              <span className="academy-overview-value">
+                {positionCountText(femalePartyMembers)}
                 <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
               </span>
             </div>
@@ -242,6 +289,21 @@ export default function AcademyWorkbenchView() {
               </span>
               <span className="academy-overview-value">
                 {positionCountText(probationaryMembers)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
+            {/* 男 / 女预备党员人数 */}
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">{t('partyStats.maleProbationaryMembers')}</span>
+              <span className="academy-overview-value">
+                {positionCountText(maleProbationaryMembers)}
+                <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
+              </span>
+            </div>
+            <div className="academy-overview-item">
+              <span className="academy-overview-label">{t('partyStats.femaleProbationaryMembers')}</span>
+              <span className="academy-overview-value">
+                {positionCountText(femaleProbationaryMembers)}
                 <em className="academy-overview-unit">{t('academy.membersUnit')}</em>
               </span>
             </div>

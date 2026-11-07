@@ -785,7 +785,9 @@ const messages = {
       colPosition: '职位',
       colIdentity: '身份',
       colWorkplace: '工作地点',
-      userIdPlaceholder: '输入用户 UID',
+      userSearchPlaceholder: '输入学号/工号或姓名搜索',
+      userSearchHint: '停止输入 1 秒后自动搜索；下拉最多显示 5 条，可滚动查看更多',
+      userSearchEmpty: '未找到匹配人员',
       positionPlaceholder: '请选择该组织可用的职位',
       selectOrganizationFirst: '请先选择组织',
       noUsablePositions: '无匹配的可用职位，请检查组织的职位配置及适用范围',
@@ -1764,6 +1766,14 @@ const messages = {
       todoApprove: '待审核加分申报',
       todoUnitItems: '条',
     },
+    // 支部端 / 二级党委端共用的党员结构统计项
+    partyStats: {
+      minorityMembers: '少数民族人数',
+      maleFullMembers: '男中共党员人数',
+      femaleFullMembers: '女中共党员人数',
+      maleProbationaryMembers: '男中共预备党员人数',
+      femaleProbationaryMembers: '女中共预备党员人数',
+    },
     school: {
       cockpitTitle: '全校党建考评概览',
       statOrgMembers: '组织人数',
@@ -2609,7 +2619,9 @@ const messages = {
       colPosition: 'Position',
       colIdentity: 'Identity',
       colWorkplace: 'Workplace',
-      userIdPlaceholder: 'Enter user UID',
+      userSearchPlaceholder: 'Search by student/staff ID or name',
+      userSearchHint: 'Searches automatically 1 second after you stop typing; shows up to 5 matches, scroll for more',
+      userSearchEmpty: 'No matching member',
       positionPlaceholder: 'Select a position available in this organization',
       selectOrganizationFirst: 'Select an organization first',
       noUsablePositions: 'No matching available positions. Check the organization’s position configuration and scope.',
@@ -3612,6 +3624,14 @@ const messages = {
       todoTitle: 'To-do',
       todoApprove: 'Score declarations to review',
       todoUnitItems: 'items',
+    },
+    // Shared party-membership metrics for the branch / second-level committee workbenches
+    partyStats: {
+      minorityMembers: 'Ethnic minority members',
+      maleFullMembers: 'Male full members',
+      femaleFullMembers: 'Female full members',
+      maleProbationaryMembers: 'Male probationary members',
+      femaleProbationaryMembers: 'Female probationary members',
     },
     school: {
       cockpitTitle: 'School Party Building Assessment Overview',

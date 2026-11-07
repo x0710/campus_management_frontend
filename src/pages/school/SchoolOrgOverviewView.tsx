@@ -630,13 +630,19 @@ export default function SchoolOrgOverviewView() {
   /**
    * 选中组织：右侧展示其直接下级组织；同时展开该节点，
    * 左侧组织树立即显示下级组织，与右侧列表保持一致。
+   * 若该组织没有下级组织，则直接跳到「组织成员管理」查看该组织成员，不再展开空节点。
    * @param keys antd Tree 选中的节点 key（点击已选中节点会被清空，此时保持原选中组织）
    */
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
     setPage(1)
     const nextId = keys.length ? Number(keys[0]) : activeOrgId
-    setSelectedId(uiKey, nextId)
     if (nextId === null) return
+    // 叶子组织：直接跳转组织成员管理查看成员（openOrgMembers 会选中该组织并重置页码）
+    if (!orgsInTree.some((org) => org.parent_id === nextId)) {
+      openOrgMembers(nextId)
+      return
+    }
+    setSelectedId(uiKey, nextId)
     const current = expandedKeys.map((key) => Number(key))
     if (!current.includes(nextId)) setOrgTreeExpanded(uiKey, [...current, nextId])
   }

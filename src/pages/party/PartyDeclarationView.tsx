@@ -38,6 +38,7 @@ import {
   PARTY_DECLARATION_MAX_FILES,
   PARTY_DECLARATION_PAGE_SIZE,
   PARTY_SCORE_APPLICATION_STATUS_COLOR,
+  PARTY_SCORE_REASON_MAX_LENGTH,
   PARTY_TEMPLATE_BUSINESS_TYPE,
   PARTY_TEMPLATE_SEARCH_DEBOUNCE_MS,
 } from '../../config/partyDeclaration'
@@ -485,7 +486,7 @@ export default function PartyDeclarationView() {
                 >
                   <Input.TextArea
                     rows={8}
-                    maxLength={200}
+                    maxLength={PARTY_SCORE_REASON_MAX_LENGTH}
                     showCount
                     placeholder={t('partyDeclaration.reasonPlaceholder')}
                   />

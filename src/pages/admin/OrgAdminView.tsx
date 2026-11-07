@@ -22,9 +22,9 @@ import {
   Dropdown,
   Form,
   Input,
-  InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Spin,
   Table,
@@ -58,10 +58,11 @@ import type {
   OrganizationInfo,
   OrganizationMember,
 } from '../../api/types/organizations'
+import type { UserInfo } from '../../api/types/users'
 import UsablePositionSelect from '../../components/UsablePositionSelect'
 import { getPartyScoreOrganizationAverage, getPartyScoreTotals } from '../../api/partyScores'
 import { invalidate } from '../../api/cache'
-import { resetUserPassword } from '../../api/users'
+import { queryUsers, resetUserPassword } from '../../api/users'
 import { extractErrorReason } from '../../api/common'
 import {
   exportMemberInfoXlsx,
@@ -97,6 +98,15 @@ import {
 
 /** 组织成员表每页条数（代码要求 12：表格每页最多 100 行） */
 const MEMBER_PAGE_SIZE = 100
+
+/** 添加成员弹窗：停止输入后延迟 1 秒再搜索，避免每敲一个字符就发一次请求 */
+const MEMBER_SEARCH_DEBOUNCE_MS = 1000
+
+/** 添加成员弹窗一次搜索最多取 20 人：下拉首屏展示 5 条，其余可通过滚动查看 */
+const MEMBER_SEARCH_PAGE_SIZE = 20
+
+/** 搜索下拉高度：约展示 5 条（每条 32px），超出后下拉内部滚动 */
+const MEMBER_SEARCH_LIST_HEIGHT = 5 * 32
 
 interface OrgFormValues {
   code: string
@@ -313,6 +323,14 @@ export default function OrgAdminView({
   const [addingMember, setAddingMember] = useState(false)
   /** 新增成员弹窗开关（成员操作收进弹窗，避免与表头上方的搜索框混在一起） */
   const [addModalOpen, setAddModalOpen] = useState(false)
+  /** 添加成员弹窗中按学号/工号或姓名搜索到的人员（最多 MEMBER_SEARCH_PAGE_SIZE 条） */
+  const [memberOptions, setMemberOptions] = useState<UserInfo[]>([])
+  /** 人员搜索请求是否在途（用于下拉加载态） */
+  const [memberSearching, setMemberSearching] = useState(false)
+  /** 最近一次搜索关键词：异步结果返回时用于丢弃过期请求，避免慢请求覆盖新结果 */
+  const memberSearchKeywordRef = useRef('')
+  /** 人员搜索防抖计时器：停止输入 MEMBER_SEARCH_DEBOUNCE_MS 后才真正请求 */
+  const memberSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /** 重置密码弹窗：可指定新密码（留空则由后端生成随机密码） */
   const [resetUid, setResetUid] = useState<number | null>(null)
@@ -477,7 +495,11 @@ export default function OrgAdminView({
     }
     let cancelled = false
     setOrgAverageLoading(true)
-    getPartyScoreOrganizationAverage({ organization_id: selectedId, recursive: true })
+    // 手动刷新（或成员增删后）必须绕过会话缓存，否则平均分会一直沿用旧的 null
+    getPartyScoreOrganizationAverage(
+      { organization_id: selectedId, recursive: true },
+      refreshVersion > 0,
+    )
       .then((res) => {
         if (!cancelled) setOrgAverageScore(res.average_score)
       })
@@ -736,6 +758,67 @@ export default function OrgAdminView({
     }
   }
 
+  /**
+   * 添加成员弹窗的人员搜索请求：输入为纯数字时按学号/工号精确查（ids），
+   * 否则按姓名模糊查（keyword）；返回结果过期的请求会被丢弃。
+   * @param keyword 已去空格的搜索关键词
+   */
+  const searchMembers = useCallback(
+    async (keyword: string) => {
+      setMemberSearching(true)
+      try {
+        const numeric = /^\d+$/.test(keyword)
+        const res = await queryUsers(
+          {
+            page: 1,
+            page_size: MEMBER_SEARCH_PAGE_SIZE,
+            ...(numeric ? { ids: keyword } : { keyword }),
+          },
+          true,
+        )
+        // 关键词已变化说明用户又输入了内容，丢弃这次结果
+        if (memberSearchKeywordRef.current !== keyword) return
+        setMemberOptions(res.data ?? [])
+      } catch (err) {
+        if (memberSearchKeywordRef.current !== keyword) return
+        setMemberOptions([])
+        reportError(err)
+      } finally {
+        if (memberSearchKeywordRef.current === keyword) setMemberSearching(false)
+      }
+    },
+    [reportError],
+  )
+
+  /**
+   * 添加成员弹窗的搜索输入：重置防抖计时器，停止输入 1 秒后才发请求。
+   * @param value 输入框当前文本
+   */
+  const handleMemberSearch = useCallback(
+    (value: string) => {
+      const keyword = value.trim()
+      memberSearchKeywordRef.current = keyword
+      if (memberSearchTimerRef.current) clearTimeout(memberSearchTimerRef.current)
+      if (!keyword) {
+        setMemberOptions([])
+        setMemberSearching(false)
+        return
+      }
+      memberSearchTimerRef.current = setTimeout(() => {
+        void searchMembers(keyword)
+      }, MEMBER_SEARCH_DEBOUNCE_MS)
+    },
+    [searchMembers],
+  )
+
+  // 弹窗关闭或页面卸载时清掉尚未触发的防抖计时器，避免卸载后仍发请求
+  useEffect(
+    () => () => {
+      if (memberSearchTimerRef.current) clearTimeout(memberSearchTimerRef.current)
+    },
+    [],
+  )
+
   const addMember = async () => {
     if (selectedId === null || newMember.user_id === null || !newMember.position.trim()) return
     setAddingMember(true)
@@ -747,7 +830,11 @@ export default function OrgAdminView({
       })
       message.success(t('adminOrg.memberAddSuccess'))
       setNewMember({ user_id: null, position: '', workplace: '' })
+      setMemberOptions([])
+      memberSearchKeywordRef.current = ''
       setAddModalOpen(false)
+      // 成员数变化会改变组织平均分，触发一次强制刷新
+      setRefreshVersion((value) => value + 1)
       await loadMembers(selectedId, memberPage)
     } catch (err) {
       reportError(err)
@@ -770,6 +857,8 @@ export default function OrgAdminView({
           await removeOrgMember(selectedId, id)
         }
         message.success(t('adminOrg.memberRemoveSuccess'))
+        // 成员数变化会改变组织平均分，触发一次强制刷新
+        setRefreshVersion((value) => value + 1)
         await loadMembers(selectedId, memberPage)
       } catch (err) {
         reportError(err)
@@ -1349,21 +1438,40 @@ export default function OrgAdminView({
         okButtonProps={{
           disabled: newMember.user_id === null || !newMember.position.trim(),
         }}
-        onCancel={() => setAddModalOpen(false)}
+        onCancel={() => {
+          // 关闭弹窗时取消尚未触发的防抖搜索
+          if (memberSearchTimerRef.current) clearTimeout(memberSearchTimerRef.current)
+          setAddModalOpen(false)
+        }}
         onOk={() => void addMember()}
         destroyOnHidden
       >
         <Form layout="vertical" style={{ marginTop: 12 }}>
-          <Form.Item label={t('adminOrg.colUserId')}>
-            <InputNumber
+          {/* 输入学号/工号或姓名，停止输入 1 秒后自动搜索；下拉首屏 5 条，可滚动查看更多 */}
+          <Form.Item
+            label={t('adminOrg.colUserId')}
+            extra={t('adminOrg.userSearchHint')}
+          >
+            <Select
+              showSearch
+              allowClear
               style={{ width: '100%' }}
-              placeholder={t('adminOrg.userIdPlaceholder')}
-              min={1}
-              precision={0}
-              value={newMember.user_id}
-              onChange={(v: number | null) =>
-                setNewMember((s) => ({ ...s, user_id: v === null ? null : Number(v) }))
+              placeholder={t('adminOrg.userSearchPlaceholder')}
+              loading={memberSearching}
+              value={newMember.user_id ?? undefined}
+              filterOption={false}
+              onSearch={handleMemberSearch}
+              onChange={(v: number | undefined) =>
+                setNewMember((s) => ({ ...s, user_id: v ?? null }))
               }
+              notFoundContent={
+                memberSearching ? <Spin size="small" /> : t('adminOrg.userSearchEmpty')
+              }
+              listHeight={MEMBER_SEARCH_LIST_HEIGHT}
+              options={memberOptions.map((u) => ({
+                value: u.uid,
+                label: u.name ? `${u.name}（${u.uid}）` : String(u.uid),
+              }))}
             />
           </Form.Item>
           <Form.Item label={t('adminOrg.colPosition')}>

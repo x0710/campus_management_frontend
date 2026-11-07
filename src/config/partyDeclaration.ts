@@ -15,6 +15,9 @@ export const PARTY_DECLARATION_PAGE_SIZE = 100
 /** 单次申报最多可上传的附件数量 */
 export const PARTY_DECLARATION_MAX_FILES = 10
 
+/** 成绩申报申请理由 / 审核意见的最大字数（后端未限制，前端放宽到 1 万） */
+export const PARTY_SCORE_REASON_MAX_LENGTH = 10_000
+
 /**
  * 申报类型输入搜索的防抖时长（毫秒）：停止输入 1 秒后才按关键字请求模糊匹配，
  * 避免连续输入过程中每敲一个字就发一次请求。
