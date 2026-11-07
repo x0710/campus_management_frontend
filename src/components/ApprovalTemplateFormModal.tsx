@@ -458,7 +458,7 @@ export default function ApprovalTemplateFormModal({
         onOk={() => void submit()}
         onCancel={() => { if (!submitting.current) onCancel() }}
         closable={!saving}
-        maskClosable={!saving}
+        mask={{ closable: !saving }}
         destroyOnHidden
       >
         {loadError ? (

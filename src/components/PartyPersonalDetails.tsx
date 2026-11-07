@@ -114,7 +114,7 @@ export default function PartyPersonalDetails({
       {!readOnly && (
         <Modal open={open} title={t('partyProfile.personalDetailsTitle')} okText={t('common.save')}
           cancelText={t('common.cancel')} confirmLoading={saving} onOk={() => void save()}
-          onCancel={() => { if (!saving) setOpen(false) }} closable={!saving} maskClosable={!saving} destroyOnHidden>
+          onCancel={() => { if (!saving) setOpen(false) }} closable={!saving} mask={{ closable: !saving }} destroyOnHidden forceRender>
           <Form form={form} layout="vertical" autoComplete="off" disabled={saving}>
             {fields.map(([key, label]) => <Form.Item key={key} name={key} label={t(`memberDetail.${label}`)}>
               <Input />

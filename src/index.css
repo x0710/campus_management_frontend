@@ -4089,3 +4089,8 @@ h3 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 附件上传：上传完成后的文件名可点击在线预览 */
+.ant-upload-list-item-name[role='button'] {
+  cursor: pointer;
+}

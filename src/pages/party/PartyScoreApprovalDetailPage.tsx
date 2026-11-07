@@ -503,7 +503,7 @@ function PartyScoreApprovalDetail() {
                   type="warning"
                   showIcon
                   className="party-approval-detail-alert"
-                  message={t('partyScoreApproval.detailLoadFailed')}
+                  title={t('partyScoreApproval.detailLoadFailed')}
                   description={detailError}
                   action={
                     <Button size="small" onClick={() => void load(true)}>

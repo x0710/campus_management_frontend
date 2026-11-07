@@ -1,12 +1,14 @@
 /**
  * 附件展示（可复用）。
- * 详情接口返回的附件地址优先按图片缩略图展示（点击可放大预览），
- * 图片加载失败（如 PDF 等非图片文件）时自动回退为下载链接；
+ * 图片优先展示缩略图（点击可放大）；其他文件显示「附件 N」，
+ * 点击后按类型在线预览图片 / PDF / xlsx / docx / 文本，无法预览时提示下载。
  * 样式沿用 antd 主题 token，自动适配亮色与夜间模式。
  */
 import { Image, Space, Typography, theme } from 'antd'
 import { useState } from 'react'
 import { useT } from '../i18n'
+import { fileExtension, parseFileUrl } from '../utils/filePreview'
+import FilePreviewModal, { type PreviewFile } from './FilePreviewModal'
 
 const { Link: TypographyLink, Text } = Typography
 
@@ -18,8 +20,16 @@ interface Props {
   emptyText: string
 }
 
-/** 单个附件：优先展示图片缩略图，非图片回退为下载链接 */
-function AttachmentItem({ url, index }: { url: string; index: number }) {
+/** 单个附件：优先展示图片缩略图，非图片回退为可点击预览的链接 */
+function AttachmentItem({
+  url,
+  index,
+  onPreview,
+}: {
+  url: string
+  index: number
+  onPreview: (url: string, index: number) => void
+}) {
   const t = useT()
   const { token } = theme.useToken()
   const [imageFailed, setImageFailed] = useState(false)
@@ -27,13 +37,11 @@ function AttachmentItem({ url, index }: { url: string; index: number }) {
   if (imageFailed) {
     return (
       <TypographyLink
-        href={url}
-        target="_blank"
-        rel="noreferrer"
+        onClick={() => onPreview(url, index)}
         title={url}
-        style={{ wordBreak: 'break-all' }}
+        style={{ wordBreak: 'break-all', cursor: 'pointer' }}
       >
-        {url}
+        {`${t('common.attachment')} ${index + 1}`}
       </TypographyLink>
     )
   }
@@ -53,7 +61,11 @@ function AttachmentItem({ url, index }: { url: string; index: number }) {
         }}
         onError={() => setImageFailed(true)}
       />
-      <TypographyLink href={url} target="_blank" rel="noreferrer" title={url}>
+      <TypographyLink
+        onClick={() => onPreview(url, index)}
+        title={url}
+        style={{ cursor: 'pointer' }}
+      >
         {`${t('common.attachment')} ${index + 1}`}
       </TypographyLink>
     </Space>
@@ -66,17 +78,46 @@ function AttachmentItem({ url, index }: { url: string; index: number }) {
  * @returns 类型：Element
  */
 export default function AttachmentLinks({ urls, emptyText }: Props) {
+  const t = useT()
+  const [preview, setPreview] = useState<PreviewFile | null>(null)
   const list = (urls ?? []).filter((url) => url.trim())
 
   if (list.length === 0) {
     return <Text type="secondary">{emptyText}</Text>
   }
 
+  /**
+   * 打开附件预览：优先解析 /api/files/{id} 与 token；
+   * 解析不到 ID 时仍把 URL 交给弹窗尝试读取。
+   */
+  const openPreview = (url: string, index: number) => {
+    const { id, token } = parseFileUrl(url)
+    // 非 /api/files/{id} 的静态地址无法走带 JWT 的 Blob 读取，直接新窗口打开
+    if (id === undefined && !url.startsWith('/api/')) {
+      window.open(url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    const ext = fileExtension(url)
+    setPreview({
+      id,
+      token,
+      url,
+      name: `${t('common.attachment')} ${index + 1}${ext ? `.${ext}` : ''}`,
+    })
+  }
+
   return (
-    <Space wrap size={12} align="start">
-      {list.map((url, index) => (
-        <AttachmentItem key={url} url={url} index={index} />
-      ))}
-    </Space>
+    <>
+      <Space wrap size={12} align="start">
+        {list.map((url, index) => (
+          <AttachmentItem key={url} url={url} index={index} onPreview={openPreview} />
+        ))}
+      </Space>
+      <FilePreviewModal
+        file={preview}
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+      />
+    </>
   )
 }

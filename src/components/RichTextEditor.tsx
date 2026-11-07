@@ -75,6 +75,8 @@ interface ToolItem {
 }
 
 interface Props {
+  /** Form.Item 注入的字段 id，需透传给正文可编辑区域，否则 label 的 for 会指向不存在的元素 */
+  id?: string
   value?: string
   onChange?: (value: string) => void
   placeholder?: string
@@ -87,6 +89,7 @@ interface Props {
  * @returns 类型：Element
  */
 export default function RichTextEditor({
+  id,
   value = '',
   onChange,
   placeholder,
@@ -97,6 +100,8 @@ export default function RichTextEditor({
   const lastValue = useRef(value)
 
   const editor = useEditor({
+    // 把 Form.Item 注入的 id 挂到可编辑区域，表单 label 才能正确关联
+    editorProps: id ? { attributes: { id } } : {},
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3, 4, 5, 6] } }),
       Link.configure({ openOnClick: false, autolink: true }),

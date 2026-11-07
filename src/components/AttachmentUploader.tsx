@@ -10,10 +10,14 @@ import type { UploadFile, UploadProps } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { extractErrorReason } from '../api/common'
 import { uploadFiles } from '../api/file'
+import type { UploadedFileResponse } from '../api/types/file'
 import { useT } from '../i18n'
+import FilePreviewModal, { type PreviewFile } from './FilePreviewModal'
 
 /** 组件属性 */
 interface Props {
+  /** Form.Item 注入的字段 id，需透传给文件输入框，否则 label 的 for 会指向不存在的元素 */
+  id?: string
   /** 已上传文件的 ID 列表（由 Form.Item 注入；默认 undefined，视为空列表） */
   value?: number[]
   /** 文件 ID 列表变化回调（由 Form.Item 注入；默认 undefined，不回调） */
@@ -27,7 +31,7 @@ interface Props {
  * @param { value, onChange, maxCount = 10 } 类型：Props；默认值：无；是否必填：必填
  * @returns 类型：Element
  */
-export default function AttachmentUploader({ value, onChange, maxCount = 10 }: Props) {
+export default function AttachmentUploader({ id, value, onChange, maxCount = 10 }: Props) {
   const t = useT()
   const { message } = AntdApp.useApp()
   /** 正在上传的文件列表（上传结束后移除，仅用于展示上传中状态） */
@@ -36,6 +40,8 @@ export default function AttachmentUploader({ value, onChange, maxCount = 10 }: P
   const [uploadedMap, setUploadedMap] = useState<Map<number, UploadFile>>(() => new Map())
   /** 用户在上传过程中移除的文件 uid，用于忽略稍后返回的上传结果 */
   const cancelledRef = useRef(new Set<string>())
+  /** 当前在线预览的文件；null 表示预览弹窗关闭 */
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
   /** 始终指向最新的 value，避免异步回调里拿到过期闭包 */
   const valueRef = useRef(value)
   useEffect(() => {
@@ -98,15 +104,38 @@ export default function AttachmentUploader({ value, onChange, maxCount = 10 }: P
     return true
   }
 
+  /** 点击已上传文件名 / 预览图标时打开在线预览 */
+  const handlePreview: UploadProps['onPreview'] = (file) => {
+    const uploaded =
+      (file.response as UploadedFileResponse | undefined) ??
+      (uploadedMap.get(Number(file.uid))?.response as UploadedFileResponse | undefined)
+    if (!uploaded) return
+    setPreviewFile({
+      id: uploaded.id,
+      name: uploaded.original_name,
+      contentType: uploaded.content_type,
+      url: uploaded.url,
+    })
+  }
+
   return (
-    <Upload
-      multiple
-      maxCount={maxCount}
-      fileList={fileList}
-      customRequest={customRequest}
-      onRemove={handleRemove}
-    >
-      <Button icon={<UploadOutlined />}>{t('common.uploadAttachment')}</Button>
-    </Upload>
+    <>
+      <Upload
+        id={id}
+        multiple
+        maxCount={maxCount}
+        fileList={fileList}
+        customRequest={customRequest}
+        onRemove={handleRemove}
+        onPreview={handlePreview}
+      >
+        <Button icon={<UploadOutlined />}>{t('common.uploadAttachment')}</Button>
+      </Upload>
+      <FilePreviewModal
+        file={previewFile}
+        open={previewFile !== null}
+        onClose={() => setPreviewFile(null)}
+      />
+    </>
   )
 }

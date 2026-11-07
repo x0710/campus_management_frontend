@@ -385,7 +385,7 @@ function ProfileDescriptions() {
       <Modal open={partyEditOpen} title={t('partyProfile.editTitle')} width={420}
         okText={t('common.save')} cancelText={t('common.cancel')} confirmLoading={partySaving}
         onCancel={() => { if (!partySaving) setPartyEditOpen(false) }}
-        closable={!partySaving} maskClosable={!partySaving}
+        closable={!partySaving} mask={{ closable: !partySaving }}
         onOk={() => void savePartyInfo()} destroyOnHidden>
         <Form form={partyForm} layout="vertical" autoComplete="off" disabled={partySaving}>
           <Form.Item name="party_no" label={t('partyProfile.fieldMemberNo')}>
@@ -599,7 +599,7 @@ function ApprovalGuide() {
     return (
       <>
         <Steps
-          direction="vertical"
+          orientation="vertical"
           size="small"
           items={steps.map((step) => {
             const role = step.position
@@ -630,7 +630,7 @@ function ApprovalGuide() {
               // 避免 antd 默认仅把第 1 步高亮为蓝色、后续步骤置灰造成颜色不统一。
               status: 'process' as const,
               title: t('partyProfile.guideStepTitle', { no: step.step_no, role }),
-              description: parts.length > 0 ? <>{parts}</> : undefined,
+              content: parts.length > 0 ? <>{parts}</> : undefined,
             }
           })}
         />
@@ -639,7 +639,7 @@ function ApprovalGuide() {
             type="warning"
             showIcon
             style={{ marginTop: 8 }}
-            message={t('partyProfile.guideApproverError', { reason: approverError })}
+            title={t('partyProfile.guideApproverError', { reason: approverError })}
             action={
               <Button size="small" type="link" onClick={() => void loadSteps(template.id)}>
                 {t('common.retry')}

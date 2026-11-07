@@ -5,7 +5,9 @@ import { queryUsers } from '../api/users'
 import { useT } from '../i18n'
 
 /** 指定审批人使用用户工号（uid），提交接口要求的字符串。 */
-export default function ApproverSelect({ value, onChange }: {
+export default function ApproverSelect({ id, value, onChange }: {
+  /** Form.Item 注入的字段 id，需透传给 Select，否则 label 的 for 会指向不存在的元素 */
+  id?: string
   value?: string
   onChange?: (value: string | undefined) => void
 }) {
@@ -52,6 +54,7 @@ export default function ApproverSelect({ value, onChange }: {
   }, [retry, t])
 
   return <Select
+    id={id}
     value={value}
     onChange={onChange}
     allowClear

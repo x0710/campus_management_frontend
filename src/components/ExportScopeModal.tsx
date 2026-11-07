@@ -46,7 +46,7 @@ export default function ExportScopeModal({
       onOk={() => onExport(includeChildren)}
       onCancel={handleCancel}
       closable={!loading}
-      maskClosable={!loading}
+      mask={{ closable: !loading }}
       destroyOnHidden
       afterClose={() => setIncludeChildren(false)}
     >

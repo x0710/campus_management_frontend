@@ -79,6 +79,34 @@ export async function downloadFile(
 }
 
 /**
+ * GET /api/files/{id} 以 Blob 形式读取文件内容（用于在线预览，不触发下载）。
+ * 与 downloadFile 一样通过 axios 附带 JWT；业务接口签发的短时令牌可通过 token 传入。
+ * @param id 文件 ID（必填）
+ * @param token 业务接口签发的短时下载令牌（可选）
+ * @returns Promise<Blob> 文件内容
+ */
+export async function fetchFileBlob(id: number, token?: string): Promise<Blob> {
+  const res = await http.get<Blob>(`/files/${id}`, {
+    responseType: 'blob',
+    params: token ? { token } : undefined,
+  })
+  return res.data
+}
+
+/**
+ * 按详情接口返回的完整 / 相对 URL 读取文件 Blob（用于在线预览）。
+ * 浏览器直接打开 /api/files/{id} 不会带 JWT，因此统一走 axios。
+ * @param url 文件地址（必填，可带 ?token=…）
+ * @returns Promise<Blob> 文件内容
+ */
+export async function fetchFileBlobByUrl(url: string): Promise<Blob> {
+  // axios 实例的 baseURL 是 /api，避免把 /api/files/... 拼成 /api/api/files/...
+  const target = url.replace(/^\/?api(?=\/)/, '')
+  const res = await http.get<Blob>(target, { responseType: 'blob' })
+  return res.data
+}
+
+/**
  * DELETE /api/files/{id} 软删除指定文件。
  * 仅上传者本人可删除，非上传者需要 file.delete 权限；
  * 软删除后文件元数据与磁盘文件保留，下载接口会返回 404。

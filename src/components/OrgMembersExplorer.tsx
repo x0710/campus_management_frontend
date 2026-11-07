@@ -47,7 +47,7 @@ import { Alert, Button, Input, Space, Spin, Table, Tag, Tooltip, Tree, message }
 import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
 import axios from 'axios'
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
@@ -137,6 +137,77 @@ interface OrgMembersExplorerProps {
    */
   focusOrgId?: number | null
 }
+
+/**
+ * 成员搜索输入框。
+ * 输入状态留在本组件内部，避免每次按键都让 OrgMembersExplorer 重渲染整张成员表；
+ * 只在回车 / 点击搜索时把关键词交给宿主执行查询。
+ */
+const MemberSearchBar = memo(function MemberSearchBar({
+  query,
+  loading,
+  onSearch,
+}: {
+  query: string
+  loading: boolean
+  onSearch: (value: string) => void
+}) {
+  const [value, setValue] = useState(query)
+
+  // 外部清空 / 恢复搜索状态（如「结束匹配」、跨路由返回）时同步输入框
+  useEffect(() => {
+    setValue(query)
+  }, [query])
+
+  return (
+    <PersonSearchBox
+      width={300}
+      value={value}
+      onChange={setValue}
+      onSearch={onSearch}
+      loading={loading}
+    />
+  )
+})
+
+/**
+ * 组织树搜索框。
+ * 输入态留在子组件内部并做 250ms 防抖，避免每敲一个字都让整页（尤其是成员表）重渲染。
+ */
+const OrgTreeSearchBox = memo(function OrgTreeSearchBox({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const t = useT()
+  const [text, setText] = useState(value)
+
+  // 外部清空（如成员搜索命中后展开目标组织）时同步输入框
+  useEffect(() => {
+    setText(value)
+  }, [value])
+
+  useEffect(() => {
+    if (text === value) return
+    const timer = window.setTimeout(() => onChange(text), 250)
+    return () => window.clearTimeout(timer)
+  }, [text, value, onChange])
+
+  return (
+    <Input.Search
+      allowClear
+      size="small"
+      style={{ marginBottom: 8 }}
+      prefix={<SearchOutlined />}
+      placeholder={t('adminOrg.searchPlaceholder')}
+      value={text}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => setText(e.target.value)}
+      onSearch={(next: string) => onChange(next)}
+    />
+  )
+})
 
 /** OrgMembersExplorer 组件。
  * @param { orgs, orgsLoading, orgsError, onReloadOrgs, fromModuleKey, memberPageSize = LEADER_ORG_MEMBER_PAGE_SIZE, autoSelectFirst = false, autoSelectFirstWithMembers = false, showOrgTree = true, partyScoreColumns = false, focusOrgId = null, } 类型：OrgMembersExplorerProps；默认值：无；是否必填：必填
@@ -400,8 +471,12 @@ export default function OrgMembersExplorer({
     onSelectOrg: (orgId: number) => setSelectedId(fromModuleKey, orgId),
     onClearFilter: () => setOrgSearch(''),
     onLoadPage: (orgId: number, page: number) => {
-      setMemberPage(fromModuleKey, page)
-      void loadMembers(orgId, page)
+      const pageChanged = page !== memberPage
+      if (pageChanged) setMemberPage(fromModuleKey, page)
+      // 支部 / 学院模式已一次加载当前组织全量成员，搜索同组织时只需切页，
+      // 不再重新请求全部分页，避免搜索时整张表进入 loading 重渲染。
+      if (partyScoreColumns && members.length > 0) return
+      if (pageChanged) void loadMembers(orgId, page)
     },
     memberRows: visibleRows,
     // 支部管理在前端过滤 / 排序 / 分页，搜索命中后按当前行序计算目标页
@@ -447,6 +522,9 @@ export default function OrgMembersExplorer({
     setMemberPage,
   ])
 
+  // 组织 ID 索引：搜索时沿祖先链回溯不必反复 find，避免大组织树每敲一个字都 O(n²)
+  const orgById = useMemo(() => new Map(orgs.map((o) => [o.id, o])), [orgs])
+
   // parent_id -> children 建树；搜索关键词仅前端过滤名称/编码，并保留匹配节点的祖先链
   const treeData = useMemo<TreeProps['treeData']>(() => {
     const kw = orgSearch.trim().toLowerCase()
@@ -462,7 +540,7 @@ export default function OrgMembersExplorer({
       let cur: OrgNode | undefined = o
       while (cur) {
         visible.add(cur.id)
-        cur = cur.parent_id != null ? orgs.find((x) => x.id === cur!.parent_id) : undefined
+        cur = cur.parent_id != null ? orgById.get(cur.parent_id) : undefined
       }
     }
     const byParent = new Map<number | null, OrgNode[]>()
@@ -481,7 +559,7 @@ export default function OrgMembersExplorer({
         children: build(byParent.get(o.id)),
       }))
     return build(byParent.get(null))
-  }, [orgs, orgSearch])
+  }, [orgs, orgById, orgSearch])
 
   // 搜索定位到成员 / 从工作台跳转定位到组织后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
   useEffect(() => {
@@ -760,15 +838,7 @@ export default function OrgMembersExplorer({
             <ErrorState message={orgsError} onRetry={() => onReloadOrgs(true)} />
           ) : (
             <>
-              <Input.Search
-                allowClear
-                size="small"
-                style={{ marginBottom: 8 }}
-                prefix={<SearchOutlined />}
-                placeholder={t('adminOrg.searchPlaceholder')}
-                value={orgSearch}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setOrgSearch(e.target.value)}
-              />
+              <OrgTreeSearchBox value={orgSearch} onChange={setOrgSearch} />
               <Spin spinning={orgsLoading}>
                 {!orgsLoading && orgs.length === 0 ? (
                   <Alert type="info" showIcon title={t('orgExplorer.emptyOrgs')} />
@@ -843,19 +913,19 @@ export default function OrgMembersExplorer({
             )}
           </div>
           <div className="org-members-actions">
-            <PersonSearchBox
-              width={300}
-              value={search.query}
-              onChange={search.setQuery}
+            <MemberSearchBar
+              query={search.query}
+              loading={search.searching}
               onSearch={(value: string) => {
                 // 搜索面向全组织成员：先清空职位筛选与排序，避免目标人员被过滤掉
                 if (partyScoreColumns) {
                   setPositionFilter([])
                   setScoreSort(null)
                 }
+                // 只有真正触发搜索时才同步 query，输入过程中不重渲染成员表
+                search.setQuery(value)
                 search.run(value)
               }}
-              loading={search.searching}
             />
             {/* 姓名模糊匹配到多人时：紧邻搜索框展示匹配总数 + 上一个 / 下一个，不遮挡成员表 */}
             <MemberSearchNav

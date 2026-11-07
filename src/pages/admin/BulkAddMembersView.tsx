@@ -963,7 +963,7 @@ export default function BulkAddMembersView() {
         open={importOpen}
         title={t('bulkMembers.importTitle')}
         width={560}
-        maskClosable={!importing}
+        mask={{ closable: !importing }}
         closable={!importing}
         onCancel={() => {
           if (!importing) setImportOpen(false)
