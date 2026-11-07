@@ -262,6 +262,9 @@ function ProfileDescriptions() {
         >
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label={t('profile.name')}>{displayName}</Descriptions.Item>
+            <Descriptions.Item label={t('profile.accountName')}>
+              {username?.trim() || t('profile.noData')}
+            </Descriptions.Item>
             <Descriptions.Item label={t('profile.gender')}>{genderLabel}</Descriptions.Item>
             <Descriptions.Item label={t('profile.email')}>
               {user.email?.trim() || t('profile.noData')}

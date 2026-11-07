@@ -20,6 +20,7 @@
  * OrgMembersExplorer（showOrgTree=false 时隐藏组织树、以 orgs[0] 为唯一组织）；
  * 成员列表列头统一启用 partyScoreColumns（支部端 / 学院端均以「先锋等级」列代替「工作地点」列，
  * 数据口径为党建加分总分，与支部端「支部管理」一致）；
+ * 「导出表格」在支部端（branch_m5）与二级党委端（academy_m5）开启，导出「党员信息」与「成绩信息」两个工作表；
  * 成员详情页经 ?from={fromModuleKey} 让侧栏高亮本模块，并在该来源下隐藏编辑入口。
  * 所有组织/成员查询均走会话缓存（cachedGet），退出登录由 invalidate() 统一清空。
  *
@@ -149,6 +150,7 @@ export default function BranchManageView({
       autoSelectFirst={showOrgTree}
       autoSelectFirstWithMembers
       partyScoreColumns
+      exportMemberInfo={fromModuleKey === 'branch_m5' || fromModuleKey === 'academy_m5'}
       focusOrgId={focusOrgId}
     />
   )

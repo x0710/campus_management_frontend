@@ -8,7 +8,7 @@
  *   1. 组织与 ID 对应表：填写「组织:身份」列时，冒号前填这里的组织 ID；
  *   2. 身份（职位）与编码对应表：冒号后填这里的身份编码；
  *   3. 系统角色与 ID 对应表：填写「系统角色」列时使用这里的角色 ID（只填数字）；
- *   4. 样表说明：样表十一列的含义、是否必填与两行示例。
+ *   4. 样表说明：样表十五列的含义、是否必填与两行示例。
  *
  * 下载的样表是一份 Excel：第 1 张工作表是「新成员」填写模板（第 5 行起填数据），
  * 之后是「填写说明」与组织 / 身份 / 系统角色三张对照表，可直接在 Excel 里查编码。
@@ -65,6 +65,20 @@ import { readXlsx } from '../../utils/xlsxReader'
 
 /** 页内可切换的表格：三张对照表 + 样表说明 */
 type BulkTableKey = BulkLookupKey | 'template'
+
+/**
+ * 汇总导入结果：新增 / 更新 / 部分成功 / 失败的数量。
+ * @param outcomes 逐行导入结果（必填）
+ * @returns 各状态的数量统计
+ */
+function summarizeOutcomes(outcomes: MemberImportOutcome[]) {
+  return {
+    created: outcomes.filter((item) => item.action === 'create' && item.status !== 'failed').length,
+    updated: outcomes.filter((item) => item.action === 'update' && item.status !== 'failed').length,
+    partial: outcomes.filter((item) => item.status === 'partial').length,
+    failed: outcomes.filter((item) => item.status === 'failed').length,
+  }
+}
 
 /** 样表说明表的行数据（由 config/bulkMembers 的列定义派生） */
 interface TemplateColumnRow {
@@ -124,6 +138,8 @@ export default function BulkAddMembersView() {
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 })
   const [importOutcomes, setImportOutcomes] = useState<MemberImportOutcome[] | null>(null)
   const [resultOpen, setResultOpen] = useState(false)
+  /** 本次导入的文件名：导入结束后分析结果会被清空，导出上传日志时仍需要它 */
+  const [importFileName, setImportFileName] = useState('')
 
   /**
    * 加载组织对照表。
@@ -524,8 +540,47 @@ export default function BulkAddMembersView() {
     downloadTextFile(t('bulkMembers.log.fileName', { stamp }), lines.join('\r\n'))
   }
 
+  /** 导出本次上传日志：逐行记录新增 / 更新 / 失败及原因，便于排查问题 */
+  const exportUploadLog = () => {
+    if (!importOutcomes) return
+    const now = new Date()
+    const pad = (value: number) => String(value).padStart(2, '0')
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+    const stats = summarizeOutcomes(importOutcomes)
+    const lines = [
+      t('bulkMembers.uploadLog.title'),
+      t('bulkMembers.uploadLog.file', { name: importFileName || '—' }),
+      t('bulkMembers.uploadLog.time', { time: now.toLocaleString() }),
+      t('bulkMembers.uploadLog.summaryCreated', { n: stats.created }),
+      t('bulkMembers.uploadLog.summaryUpdated', { n: stats.updated }),
+      t('bulkMembers.uploadLog.summaryPartial', { n: stats.partial }),
+      t('bulkMembers.uploadLog.summaryFailed', { n: stats.failed }),
+      '',
+      t('bulkMembers.uploadLog.header'),
+      ...importOutcomes.map((item) =>
+        t('bulkMembers.uploadLog.line', {
+          row: item.row,
+          uid: item.uid ?? '—',
+          name: item.name || t('bulkMembers.check.unnamed'),
+          action:
+            item.action === 'create'
+              ? t('bulkMembers.uploadLog.actionCreate')
+              : t('bulkMembers.uploadLog.actionUpdate'),
+          status:
+            item.status === 'success'
+              ? t('bulkMembers.uploadLog.statusSuccess')
+              : item.status === 'partial'
+                ? t('bulkMembers.uploadLog.statusPartial')
+                : t('bulkMembers.uploadLog.statusFailed'),
+          message: item.message || '—',
+        }),
+      ),
+    ]
+    downloadTextFile(t('bulkMembers.uploadLog.fileName', { stamp }), lines.join('\r\n'))
+  }
+
   /**
-   * 真正执行导入：逐行创建账号并补齐党员档案 / 角色 / 联系方式。
+   * 真正执行导入：新账号创建、已存在账号更新，并补齐党员档案 / 角色 / 联系方式。
    * 只有校验通过（analysis 存在且无问题）时才会走到这里，且必须由用户在弹窗里二次确认。
    */
   const runImport = async () => {
@@ -541,6 +596,7 @@ export default function BulkAddMembersView() {
         t,
         onProgress: (done, total) => setImportProgress({ done, total }),
       })
+      setImportFileName(analysis.fileName)
       setImportOutcomes(outcomes)
       setImportOpen(false)
       setResultOpen(true)
@@ -815,6 +871,7 @@ export default function BulkAddMembersView() {
               <li>{t('bulkMembers.importStep2')}</li>
               <li>{t('bulkMembers.importStep3')}</li>
               <li>{t('bulkMembers.importStep4')}</li>
+              <li>{t('bulkMembers.importStep5')}</li>
             </ol>
             <p className="bulk-import-note">{t('bulkMembers.importNote')}</p>
           </>
@@ -827,11 +884,19 @@ export default function BulkAddMembersView() {
         title={t('bulkMembers.resultTitle')}
         width={720}
         onCancel={() => setResultOpen(false)}
-        footer={
-          <Button type="primary" onClick={() => setResultOpen(false)}>
+        footer={[
+          <Button
+            key="export"
+            icon={<DownloadOutlined />}
+            onClick={exportUploadLog}
+            disabled={!importOutcomes}
+          >
+            {t('bulkMembers.exportUploadLog')}
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setResultOpen(false)}>
             {t('bulkMembers.close')}
-          </Button>
-        }
+          </Button>,
+        ]}
       >
         {importOutcomes && (
           <>
@@ -840,11 +905,7 @@ export default function BulkAddMembersView() {
                 importOutcomes.some((item) => item.status !== 'success') ? 'warning' : 'success'
               }
               showIcon
-              title={t('bulkMembers.resultSummary', {
-                ok: importOutcomes.filter((item) => item.status === 'success').length,
-                partial: importOutcomes.filter((item) => item.status === 'partial').length,
-                failed: importOutcomes.filter((item) => item.status === 'failed').length,
-              })}
+              title={t('bulkMembers.resultSummary', summarizeOutcomes(importOutcomes))}
             />
             {importOutcomes.some((item) => item.status !== 'success') && (
               <div className="bulk-issue-list">

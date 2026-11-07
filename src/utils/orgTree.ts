@@ -124,7 +124,7 @@ export function buildOrgTreeData(
  * @param orgId 目标组织 ID（必填）
  * @returns 全部下级组织 ID（顺序为深度优先前序；不存在下级时为空数组）
  */
-export function listOrgDescendantIds(orgs: OrganizationInfo[], orgId: number): number[] {
+export function listOrgDescendantIds(orgs: OrgChainNode[], orgId: number): number[] {
   const byParent = new Map<number, number[]>()
   for (const org of orgs) {
     if (org.parent_id == null) continue

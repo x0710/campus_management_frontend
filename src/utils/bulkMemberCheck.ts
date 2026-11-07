@@ -32,6 +32,8 @@ export interface MemberCheckIssue {
 export interface ParsedMember {
   /** Excel 行号（1 基，必填） */
   row: number
+  /** 用户 ID：创建接口要求前端指定，这里直接取登录账号名（须为纯数字） */
+  uid: number
   username: string
   name: string
   /** 男 / 女 / 空 */
@@ -46,6 +48,14 @@ export interface ParsedMember {
   /** 系统角色 ID 列表 */
   roleIds: number[]
   password: string
+  /** 民族（可空，写入个人档案） */
+  ethnic: string
+  /** 籍贯（可空，写入个人档案） */
+  nativePlace: string
+  /** 户口所在地（可空，写入个人档案） */
+  householdLocation: string
+  /** 户口性质（可空，写入个人档案） */
+  householdType: string
 }
 
 /** 校验结果 */
@@ -195,22 +205,40 @@ export function analyzeMemberRows(params: {
 
   for (let rowNumber = startRow; rowNumber <= rows.length; rowNumber += 1) {
     const row = rows[rowNumber - 1] ?? []
-    const cells = Array.from({ length: 11 }, (_, index) => normalizeCellText(row[index] ?? null))
+    // 前 11 列是账号 / 任职 / 角色信息，后 4 列是个人档案信息（均可空）
+    const cells = Array.from({ length: 15 }, (_, index) => normalizeCellText(row[index] ?? null))
     // 整行为空（含只有格式没有内容）时跳过，不参与统计也不报错
     if (cells.every((cell) => cell === '')) continue
     total += 1
 
-    const [username, name, gender, orgIdentity, partyNo, joinTime, phone, email, birthday, roleText, password] =
-      cells
+    const [
+      username,
+      name,
+      gender,
+      orgIdentity,
+      partyNo,
+      joinTime,
+      phone,
+      email,
+      birthday,
+      roleText,
+      password,
+      ethnic,
+      nativePlace,
+      householdLocation,
+      householdType,
+    ] = cells
 
     const rowIssues: MemberCheckIssue[] = []
     const addIssue = (field: string, message: string) => {
       rowIssues.push({ row: rowNumber, name: name || t('bulkMembers.check.unnamed'), field, message })
     }
 
-    // 登录账号名
+    // 登录账号名（同时作为用户 UID：创建接口已要求前端指定 uid，故必须为纯数字）
     if (!username) {
       addIssue(t('bulkMembers.col.username'), t('bulkMembers.check.usernameEmpty'))
+    } else if (!/^[1-9]\d*$/.test(username)) {
+      addIssue(t('bulkMembers.col.username'), t('bulkMembers.check.usernameNotNumeric'))
     } else if (seenUsernames.has(username)) {
       addIssue(
         t('bulkMembers.col.username'),
@@ -340,6 +368,7 @@ export function analyzeMemberRows(params: {
     if (rowIssues.length === 0) {
       members.push({
         row: rowNumber,
+        uid: Number(username),
         username,
         name,
         gender: normalizedGender,
@@ -351,6 +380,10 @@ export function analyzeMemberRows(params: {
         birthday: birthdayValue || '',
         roleIds,
         password,
+        ethnic,
+        nativePlace,
+        householdLocation,
+        householdType,
       })
     }
   }

@@ -41,6 +41,8 @@ export interface UserQuery extends PageQuery {
 
 /** POST /api/users 请求元素（body 为数组，支持批量创建） */
 export interface UserCreateRequest {
+  /** 用户 ID（学号/工号），前端指定、必填且为正整数；后端不再自动生成，已存在返回 409 */
+  uid: number
   username: string
   /** 不填后端自动生成随机密码 */
   password?: string

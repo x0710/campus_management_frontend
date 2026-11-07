@@ -37,12 +37,13 @@ import { firstMatchingInBatches } from '../utils/firstMatchingInBatches'
  */
 import {
   CloseOutlined,
+  DownloadOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Input, Space, Spin, Table, Tag, Tooltip, Tree } from 'antd'
+import { Alert, Button, Input, Space, Spin, Table, Tag, Tooltip, Tree, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
 import axios from 'axios'
@@ -64,6 +65,9 @@ import { formatPaginationTotal } from '../utils/pagination'
 import { useAuthStore } from '../store/auth'
 import { useUiStateStore } from '../store/uiState'
 import { formatPartyScoreTotal, formatPartyScoreTotalDecimal } from '../utils/partyScore'
+import { exportMemberInfoXlsx, fetchMemberInfoExportRows } from '../utils/memberInfoExport'
+import { listOrgDescendantIds } from '../utils/orgTree'
+import ExportScopeModal from './ExportScopeModal'
 import { groupOrganizationMembers, type UserMemberRow } from '../utils/userOrganization'
 import ErrorState from './ErrorState'
 import MatchedMembersTable from './MatchedMembersTable'
@@ -120,6 +124,13 @@ interface OrgMembersExplorerProps {
    */
   partyScoreColumns?: boolean
   /**
+   * 是否显示「导出表格」按钮（可选，默认 false）。
+   * 导出一张工作簿两个表：「党员信息」（基本信息 + 个人资料 + 党员信息）
+   * 与「成绩信息」（姓名 + 成绩 + 加分和减分事项）。
+   * 目前只在支部端「支部管理」开启，后续二级党委端 / 学校党委端复用。
+   */
+  exportMemberInfo?: boolean
+  /**
    * 跨页跳转定位的目标组织 ID（可选，默认 null）。
    * 从工作台点击组织成绩排名后跳转本页时传入：组织树挂载后滚动到该节点
    * （与成员搜索命中的滚动定位一致）；用户再点选其他组织后不再滚动。
@@ -142,6 +153,7 @@ export default function OrgMembersExplorer({
   autoSelectFirstWithMembers = false,
   showOrgTree = true,
   partyScoreColumns = false,
+  exportMemberInfo = false,
   focusOrgId = null,
 }: OrgMembersExplorerProps) {
   const t = useT()
@@ -177,6 +189,10 @@ export default function OrgMembersExplorer({
   /** 当前组织平均成绩（后端 DecimalText；仅支部管理模式展示） */
   const [orgAverageScore, setOrgAverageScore] = useState<string | null>(null)
   const [orgAverageLoading, setOrgAverageLoading] = useState(false)
+  // 导出党员信息 + 成绩信息时的按钮加载态（导出期间禁用避免重复点击）
+  const [exporting, setExporting] = useState(false)
+  // 导出范围弹窗（选择是否包含下级组织）
+  const [exportScopeOpen, setExportScopeOpen] = useState(false)
 
   /** 加载指定组织的成员（force=true 绕过会话缓存） */
   const memberRequests = useRequestSequence()
@@ -495,6 +511,61 @@ export default function OrgMembersExplorer({
     () => orgs.find((o) => o.id === activeOrgId) ?? null,
     [orgs, activeOrgId],
   )
+
+  /** 当前组织是否有下级组织：没有下级时导出范围弹窗禁用「包含下级组织」 */
+  const hasChildOrgs = useMemo(
+    () => (selectedOrg ? listOrgDescendantIds(orgs, selectedOrg.id).length > 0 : false),
+    [orgs, selectedOrg],
+  )
+
+  /**
+   * 导出成员信息与成绩信息。
+   * - 仅当前组织：沿用列表当前筛选结果（与页面所见一致）；
+   * - 包含下级组织：按组织树逐级拉取全部成员，并按用户合并职位、拼接实际所属组织。
+   * @param includeChildren 是否包含下级组织（必填）
+   */
+  const runExport = useCallback(async (includeChildren: boolean) => {
+    if (!selectedOrg || exporting || membersLoading) return
+    setExporting(true)
+    try {
+      const rows = includeChildren
+        ? await fetchMemberInfoExportRows({
+            orgs,
+            orgId: selectedOrg.id,
+            includeChildren: true,
+          })
+        : partyScoreColumns
+          ? filteredRows
+          : memberRows
+      if (rows.length === 0) {
+        message.warning(t('branchExport.empty'))
+        setExportScopeOpen(false)
+        return
+      }
+      await exportMemberInfoXlsx({
+        orgName: selectedOrg.name,
+        members: rows,
+        positionLabel,
+        t,
+      })
+      message.success(t('branchExport.success'))
+      setExportScopeOpen(false)
+    } catch (err) {
+      message.error(t('branchExport.failed', { reason: extractErrorReason(err, t) }))
+    } finally {
+      setExporting(false)
+    }
+  }, [
+    selectedOrg,
+    orgs,
+    exporting,
+    membersLoading,
+    partyScoreColumns,
+    filteredRows,
+    memberRows,
+    positionLabel,
+    t,
+  ])
 
   // 姓名（真实姓名，GET /users/{id}）解析
   const memberNames = useUserNames(visibleMemberIds)
@@ -815,6 +886,19 @@ export default function OrgMembersExplorer({
               visible={search.matches.length > 0}
               onToggle={search.toggleMatchOnly}
             />
+            {/* 支部管理：导出当前支部成员的党员信息与成绩信息（二级党委端 / 学校党委端后续复用） */}
+            {exportMemberInfo && partyScoreColumns && selectedOrg && !search.matchOnly && (
+              <Tooltip title={t('branchExport.hint')}>
+                <Button
+                  icon={<DownloadOutlined />}
+                  loading={exporting}
+                  disabled={membersLoading || filteredRows.length === 0}
+                  onClick={() => setExportScopeOpen(true)}
+                >
+                  {t('branchExport.button')}
+                </Button>
+              </Tooltip>
+            )}
             {selectedOrg && !search.matchOnly && (
               <Tooltip title={t('memberDetail.refreshMembersHint')}>
                 <Button
@@ -903,6 +987,16 @@ export default function OrgMembersExplorer({
           )}
         </div>
       </section>
+      {/* 导出范围：仅当前组织 / 包含下级组织 */}
+      {exportMemberInfo && (
+        <ExportScopeModal
+          open={exportScopeOpen}
+          loading={exporting}
+          hasChildren={hasChildOrgs}
+          onCancel={() => setExportScopeOpen(false)}
+          onExport={(includeChildren) => void runExport(includeChildren)}
+        />
+      )}
     </div>
   )
 }

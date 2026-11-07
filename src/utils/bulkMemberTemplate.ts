@@ -5,7 +5,7 @@
  * 工作表结构（哪几张表、每张表的列与数据）全部收敛在这里。
  *
  * 输出结构：
- *   1. 新成员：十一列表头 + 第 2 行填写说明 + 两行示例（从第 5 行起填真实数据）；
+ *   1. 新成员：十五列表头 + 第 2 行填写说明 + 两行示例（从第 5 行起填真实数据）；
  *   2. 填写说明：数据起始行、密码必填等通用规则；
  *   3. 组织与ID对应表；
  *   4. 身份与编码对应表；
@@ -34,6 +34,7 @@ const GUIDE_ROWS: { labelKey: string; descKey: string }[] = [
   { labelKey: 'bulkMembers.guide.passwordItem', descKey: 'bulkMembers.guide.password' },
   { labelKey: 'bulkMembers.guide.orgIdentityItem', descKey: 'bulkMembers.guide.orgIdentity' },
   { labelKey: 'bulkMembers.guide.rolesItem', descKey: 'bulkMembers.guide.roles' },
+  { labelKey: 'bulkMembers.guide.profileItem', descKey: 'bulkMembers.guide.profile' },
   { labelKey: 'bulkMembers.guide.importItem', descKey: 'bulkMembers.guide.import' },
 ]
 

@@ -1,6 +1,6 @@
 /**
  * 用户详细信息（profile_detail）API：
- * - GET    /api/profile-details        分页查询档案（支持 user_id/class_id/keyword 筛选）
+ * - GET    /api/profile-details        分页查询档案（支持 user_id/class_id/keyword/uids 筛选）
  * - GET    /api/profile-details/{id}   获取档案详情
  * - PUT    /api/profile-details        按 user_id 保存档案（不存在则创建，存在则更新）
  * - POST   /api/profile-details        创建档案（成功 201 返回创建出的完整档案）

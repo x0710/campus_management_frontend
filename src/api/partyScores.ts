@@ -72,7 +72,7 @@ async function isPartyScoreInstance(instanceId: number, force?: boolean): Promis
 
 /**
  * GET /api/party-scores 分页查询党建活动加分申请（会话缓存）。
- * @param params 查询参数（page/page_size/template_id/user_id/approval_instance_id，均可选，默认 {}）
+ * @param params 查询参数（page/page_size/template_id/user_id/approval_instance_id/uids，均可选，默认 {}）
  * @param force 是否强制绕过缓存重新请求（用于手动刷新），默认 false
  * @returns Promise<PaginatedResponse<PartyScore>> 分页结果（data 为加分申请数组）
  */

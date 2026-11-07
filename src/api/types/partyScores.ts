@@ -66,6 +66,8 @@ export interface PartyScoreQuery extends PageQuery {
   user_id?: number
   /** 按关联审批实例 ID 精确筛选 */
   approval_instance_id?: number
+  /** 按申请用户 ID 批量筛选（逗号分隔，如 "1,2,3"；配合 page_size 使用） */
+  uids?: string
 }
 
 /** 上级直接扣分，score 为正数字符串，服务端以负数计入积分。 */

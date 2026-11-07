@@ -4,6 +4,7 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
 import {
   CloseOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -62,6 +63,12 @@ import { getPartyScoreOrganizationAverage, getPartyScoreTotals } from '../../api
 import { invalidate } from '../../api/cache'
 import { resetUserPassword } from '../../api/users'
 import { extractErrorReason } from '../../api/common'
+import {
+  exportMemberInfoXlsx,
+  fetchMemberInfoExportRows,
+} from '../../utils/memberInfoExport'
+import ExportScopeModal from '../../components/ExportScopeModal'
+import { listOrgDescendantIds } from '../../utils/orgTree'
 import ErrorState from '../../components/ErrorState'
 import MatchedMembersTable from '../../components/MatchedMembersTable'
 import OrganizationName from '../../components/OrganizationName'
@@ -119,6 +126,11 @@ interface OrgAdminViewProps {
    * 仅党委学校端「组织管理」开启。
    */
   showResetPassword?: boolean
+  /**
+   * 是否显示「导出表格」按钮（可选，默认 false）。
+   * 导出当前组织全部成员的「党员信息」与「成绩信息」两个工作表；仅党委学校端开启。
+   */
+  exportMemberInfo?: boolean
   /**
    * 左侧组织树「新建组织」旁展示「批量添加新成员」按钮，点击进入填报辅助页
    * （组织 / 身份 / 系统角色对照表 + 样表说明）。仅党委学校端开启。
@@ -223,7 +235,7 @@ function MemberSearchInput({
  * 党委学校端复用本页时开启 partyScoreColumns（先锋等级列）与 showResetPassword（重置密码操作）。
  * 成员列表按 user_id 合并：同一成员在同一组织有多个职位时只展示一行（职位栏并列展示全部职位），
  * 「所属组织」标签按组织去重；移除成员时会一并删除该成员在该组织的全部职位记录。
- * @param { uiKey = 'admin_m3', rootOrgId, partyScoreColumns = false, showResetPassword = false, showBulkAdd = false, } 类型：OrgAdminViewProps；默认值：无；是否必填：必填
+ * @param { uiKey = 'admin_m3', rootOrgId, partyScoreColumns = false, showResetPassword = false, showBulkAdd = false, exportMemberInfo = false, } 类型：OrgAdminViewProps；默认值：无；是否必填：必填
  * @returns 类型：Element
  */
 export default function OrgAdminView({
@@ -232,6 +244,7 @@ export default function OrgAdminView({
   partyScoreColumns = false,
   showResetPassword = false,
   showBulkAdd = false,
+  exportMemberInfo = false,
 }: OrgAdminViewProps) {
   const t = useT()
   const { message, modal } = AntdApp.useApp()
@@ -257,6 +270,10 @@ export default function OrgAdminView({
 
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
+  // 导出党员信息 + 成绩信息时的按钮加载态（导出期间禁用避免重复点击）
+  const [exportingMembers, setExportingMembers] = useState(false)
+  // 导出范围弹窗（选择是否包含下级组织）
+  const [exportScopeOpen, setExportScopeOpen] = useState(false)
   const memberRequestRef = useRef(0)
   const [membersOrgId, setMembersOrgId] = useState<number | null>(null)
   // 成员表页码按模块 key 记忆：进入成员详情再返回时仍停留在搜索命中的那一页
@@ -569,6 +586,46 @@ export default function OrgAdminView({
     () => orgsInTree.find((o) => o.id === selectedId) ?? null,
     [orgsInTree, selectedId],
   )
+
+  /** 当前组织是否有下级组织：没有下级时导出范围弹窗禁用「包含下级组织」 */
+  const hasChildOrgs = useMemo(
+    () => (selectedOrg ? listOrgDescendantIds(orgsInTree, selectedOrg.id).length > 0 : false),
+    [orgsInTree, selectedOrg],
+  )
+
+  /**
+   * 学校党委端「组织成员管理」导出：当前组织（可选择是否含下级）全部成员的党员信息与成绩信息。
+   * 导出时按组织范围重新拉取全部成员（不局限于当前页），与支部端导出同一份表格结构。
+   * @param includeChildren 是否包含下级组织（必填）
+   */
+  const runExportMembers = useCallback(async (includeChildren: boolean) => {
+    if (!selectedOrg || exportingMembers) return
+    setExportingMembers(true)
+    try {
+      const rows = await fetchMemberInfoExportRows({
+        orgs: orgsInTree,
+        orgId: selectedOrg.id,
+        includeChildren,
+      })
+      if (rows.length === 0) {
+        message.warning(t('branchExport.empty'))
+        setExportScopeOpen(false)
+        return
+      }
+      await exportMemberInfoXlsx({
+        orgName: selectedOrg.name,
+        members: rows,
+        positionLabel,
+        t,
+      })
+      message.success(t('branchExport.success'))
+      setExportScopeOpen(false)
+    } catch (err) {
+      message.error(t('branchExport.failed', { reason: extractErrorReason(err, t) }))
+    } finally {
+      setExportingMembers(false)
+    }
+  }, [selectedOrg, orgsInTree, exportingMembers, positionLabel, t, message])
 
   const displayedMemberIds = useMemo(() => search.matchOnly ? [] : visibleMemberIds, [search.matchOnly, visibleMemberIds])
   const scoreMemberIds = useMemo(() => search.matchOnly ? [] : scoreSort !== null ? allMemberIds : visibleMemberIds, [search.matchOnly, scoreSort, allMemberIds, visibleMemberIds])
@@ -1148,6 +1205,19 @@ export default function OrgAdminView({
                 </Button>
               </Tooltip>
             )}
+            {/* 学校党委端：导出当前组织全部成员的党员信息与成绩信息（两个工作表） */}
+            {exportMemberInfo && selectedOrg && !search.matchOnly && (
+              <Tooltip title={t('branchExport.hint')}>
+                <Button
+                  icon={<DownloadOutlined />}
+                  loading={exportingMembers}
+                  disabled={membersLoading}
+                  onClick={() => setExportScopeOpen(true)}
+                >
+                  {t('branchExport.button')}
+                </Button>
+              </Tooltip>
+            )}
             {/* 右对齐：切换「单独查看匹配人员 / 在组织里面查看匹配人员」 */}
             <MemberSearchModeToggle
               matchOnly={search.matchOnly}
@@ -1363,6 +1433,16 @@ export default function OrgAdminView({
             />
           </Modal>
         </>
+      )}
+      {/* 导出范围：仅当前组织 / 包含下级组织 */}
+      {exportMemberInfo && (
+        <ExportScopeModal
+          open={exportScopeOpen}
+          loading={exportingMembers}
+          hasChildren={hasChildOrgs}
+          onCancel={() => setExportScopeOpen(false)}
+          onExport={(includeChildren) => void runExportMembers(includeChildren)}
+        />
       )}
     </div>
   )

@@ -50,8 +50,9 @@ export function getMyProfile(): Promise<UserDetail> {
 }
 
 /**
- * POST /api/users 批量创建用户
- * @param body 类型：UserCreateRequest[]；默认值：无；是否必填：必填
+ * POST /api/users 批量创建用户。
+ * 接口已要求前端在每一项中指定 `uid`（正整数，不自动生成；已存在会返回 409）。
+ * @param body 类型：UserCreateRequest[]；默认值：无；是否必填：必填（每项须含 uid 与 username）
  * @returns 类型：Promise<number>
  */
 export async function createUsers(body: UserCreateRequest[]): Promise<number> {
