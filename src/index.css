@@ -1311,6 +1311,20 @@ h3 {
   margin-bottom: 16px;
 }
 
+/* 常用申报理由：小标签式快捷按钮，点击直接填入申请理由 */
+.party-declaration-quick-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.party-declaration-quick-reasons-label {
+  color: var(--text-secondary, #8c8c8c);
+  font-size: 12px;
+}
+
 /* 行内两项取消表单默认下间距，改由行容器统一控制 */
 .party-declaration-row .ant-form-item {
   margin-bottom: 0;

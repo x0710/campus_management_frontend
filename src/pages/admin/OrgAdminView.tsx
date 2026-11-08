@@ -64,6 +64,7 @@ import { getPartyScoreOrganizationAverage, getPartyScoreTotals } from '../../api
 import { invalidate } from '../../api/cache'
 import { queryUsers, resetUserPassword } from '../../api/users'
 import { extractErrorReason } from '../../api/common'
+import { getCurrentUser } from '../../api/auth'
 import {
   exportMemberInfoXlsx,
   fetchMemberInfoExportRows,
@@ -78,6 +79,9 @@ import MemberSearchNav from '../../components/MemberSearchNav'
 import MultiSelectHeaderFilter from '../../components/MultiSelectHeaderFilter'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { useAccountSwitch } from '../../composables/useAccountSwitch'
+import { useSharedResource } from '../../composables/useSharedResource'
+import { myRolesResource } from '../../store/referenceData'
 import { findMemberPage, useMemberSearch } from '../../composables/useMemberSearch'
 import { usePositionLabel } from '../../composables/usePositionLabel'
 import { useUserNames } from '../../composables/useUserNames'
@@ -331,6 +335,27 @@ export default function OrgAdminView({
   const memberSearchKeywordRef = useRef('')
   /** 人员搜索防抖计时器：停止输入 MEMBER_SEARCH_DEBOUNCE_MS 后才真正请求 */
   const memberSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** 当前登录用户 uid：切换账号入口需要排除自己 */
+  const [myUid, setMyUid] = useState<number | null>(null)
+  const { data: myRoles } = useSharedResource(myRolesResource)
+  /** 超级管理员才允许切换到成员账号（与「用户与账户」页规则一致） */
+  const isSuperAdmin = myRoles.some((role) => role.code === 'super_admin')
+  /** 是否展示「切换账号」：仅管理端（党委学校端会开启 showResetPassword）的超级管理员可用 */
+  const showSwitchAccount = isSuperAdmin && !showResetPassword
+  const { switchAccount, switchingUid } = useAccountSwitch()
+
+  // 取当前登录用户 uid（缓存接口，重复进入页面不会重复请求）
+  useEffect(() => {
+    let cancelled = false
+    void getCurrentUser()
+      .then((me) => {
+        if (!cancelled) setMyUid(me.uid)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   /** 重置密码弹窗：可指定新密码（留空则由后端生成随机密码） */
   const [resetUid, setResetUid] = useState<number | null>(null)
@@ -1032,7 +1057,7 @@ export default function OrgAdminView({
       {
         title: t('approval.colAction'),
         key: 'action',
-        width: showResetPassword ? 170 : 140,
+        width: (showResetPassword ? 170 : 140) + (showSwitchAccount ? 90 : 0),
         render: (_, record) => (
           <div className="approval-actions">
             <Tooltip title={t('adminOrg.viewUser')}>
@@ -1063,6 +1088,23 @@ export default function OrgAdminView({
               >
                 <Button type="text" size="small" icon={<MoreOutlined />} aria-label={t('adminUsers.moreActions')} />
               </Dropdown>
+            )}
+            {showSwitchAccount && myUid !== null && myUid !== record.user_id && (
+              <Popconfirm
+                title={t('adminUsers.switchConfirm', {
+                  name: memberNames.get(record.user_id)
+                    ? `${memberNames.get(record.user_id)}（${record.user_id}）`
+                    : `#${record.user_id}`,
+                })}
+                okText={t('adminUsers.switchAccount')}
+                cancelText={t('approval.cancel')}
+                okButtonProps={{ loading: switchingUid === record.user_id }}
+                onConfirm={() => void switchAccount(record.user_id, memberNames.get(record.user_id))}
+              >
+                <Button type="link" size="small" disabled={switchingUid !== null}>
+                  {t('adminUsers.switchAccount')}
+                </Button>
+              </Popconfirm>
             )}
             <Popconfirm
               title={t('adminOrg.memberRemoveConfirm')}
@@ -1101,6 +1143,10 @@ export default function OrgAdminView({
       positionFilter,
       setMemberPage,
       uiKey,
+      showSwitchAccount,
+      myUid,
+      switchAccount,
+      switchingUid,
     ],
   )
 

@@ -21,7 +21,7 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
  */
 import { isPartyScoreDeduction } from '../../utils/partyScore'
 import { ReloadOutlined } from '@ant-design/icons'
-import { App as AntdApp, Button, Form, Input, InputNumber, Select, Spin, Table, Tag } from 'antd'
+import { App as AntdApp, Button, Form, Input, InputNumber, Select, Space, Spin, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router'
@@ -61,6 +61,15 @@ interface DeclarationFormValues {
   /** 附件文件 ID 列表（由 AttachmentUploader 上传 /api/files 后回填） */
   files?: number[]
 }
+
+/** 常用申报理由的 i18n key：点击后直接填入「申请理由」，省去每次手打 */
+const QUICK_REASON_KEYS = [
+  'partyDeclaration.quickReasonThemeDay',
+  'partyDeclaration.quickReasonVolunteer',
+  'partyDeclaration.quickReasonLecture',
+  'partyDeclaration.quickReasonLifeMeeting',
+  'partyDeclaration.quickReasonHelp',
+] as const
 
 /** 已选模板的加分细则状态 */
 interface TemplateRulesState {
@@ -483,6 +492,26 @@ export default function PartyDeclarationView() {
                   name="reason"
                   label={t('partyDeclaration.fieldReason')}
                   rules={[{ required: true, message: t('partyDeclaration.reasonRequired') }]}
+                  extra={
+                    // 常用申报理由：点击直接填入输入框（覆盖当前内容）
+                    <div className="party-declaration-quick-reasons">
+                      <span className="party-declaration-quick-reasons-label">
+                        {t('partyDeclaration.quickReasonsLabel')}
+                      </span>
+                      <Space wrap size={[8, 8]}>
+                        {QUICK_REASON_KEYS.map((key) => (
+                          <Button
+                            key={key}
+                            size="small"
+                            disabled={myUid === null}
+                            onClick={() => form.setFieldValue('reason', t(key))}
+                          >
+                            {t(key)}
+                          </Button>
+                        ))}
+                      </Space>
+                    </div>
+                  }
                 >
                   <Input.TextArea
                     rows={8}
