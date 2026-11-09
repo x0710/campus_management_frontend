@@ -44,10 +44,10 @@ export class GetRequestCache {
     this.capacity = capacity
     this.storage = storage
     try {
-      const entries = JSON.parse(storage?.read() ?? '[]') as [string, { data: unknown; expiresAt: number | null }][]
+      const entries = JSON.parse(storage?.read() ?? '[]') as [string, { data: unknown; expiresAt: number }][]
       for (const [key, entry] of entries) {
-        if (entry.expiresAt === null || entry.expiresAt > now()) {
-          this.resolved.set(key, { ...entry, expiresAt: entry.expiresAt ?? Infinity })
+        if (Number.isFinite(entry.expiresAt) && entry.expiresAt > now()) {
+          this.resolved.set(key, entry)
         }
       }
     } catch { /* 本地缓存不可用时仍正常请求。 */ }
@@ -69,7 +69,9 @@ export class GetRequestCache {
     const pending = this.pending.get(key)
     if (pending && !options?.force) return pending as Promise<T>
 
-    const maxAge = options?.maxAgeMs ?? (/^\/(positions|rbac\/permissions)(\/|$)/.test(url) ? 300_000 : 30_000)
+    const defaultAge = /^\/(positions|rbac\/permissions)(\/|$)/.test(url) ? 300_000 : 30_000
+    const requestedAge = options?.maxAgeMs ?? defaultAge
+    const maxAge = Number.isFinite(requestedAge) ? Math.min(requestedAge, 300_000) : defaultAge
     const request = this.fetch(url, params).then((data) => {
       // Promise 本身就是请求凭据，不需要永久保存每个查询的代次。
       if (this.pending.get(key) === request && maxAge > 0) {

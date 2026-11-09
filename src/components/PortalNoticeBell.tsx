@@ -1,18 +1,18 @@
 /**
  * 界面壳顶栏「消息通知」按钮：
  * - 挂载与弹层关闭时查询未读数量 GET /api/notices/unread-count（直连不缓存，展示最新值）；
- * - 点击展开 Popover 时强制刷新最近通知 GET /api/notices（单页 20 条）；
+ * - 点击展开 Popover 时标记全部未读通知已读，再刷新最近通知（单页 20 条）；
  * - 点击未读通知调用 PUT /api/notices/{id}/read 标记已读，并本地同步未读徽标；
- * - 已读通知可「设为未读」（DELETE /api/notices/{id}/read），每条通知均可「删除」
- *   （DELETE /api/notices/{id}），操作后本地同步列表与未读数；
+ * - 已读通知可「设为未读」（DELETE /api/notices/{id}/read），不展示删除入口；
  * - 失败静默降级（保留原值 / 展示加载失败文案），401 由全局拦截器统一处理登录态。
  */
 import { BellOutlined } from '@ant-design/icons'
-import { App as AntdApp, Badge, Button, Empty, List, Popconfirm, Popover, Spin, Tag, Tooltip } from 'antd'
+import { App as AntdApp, Badge, Button, Empty, List, Popover, Spin, Tag, Tooltip } from 'antd'
 import axios from 'axios'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { extractErrorReason } from '../api/common'
-import { deleteNotice, getUnreadNoticeCount, markNoticeRead, markNoticeUnread, queryNotices } from '../api/notices'
+import { getUnreadNoticeCount, markAllNoticesRead, markNoticeRead, markNoticeUnread, queryNotices } from '../api/notices'
+import { useAuthStore } from '../store/auth'
 import type { Notice } from '../api/types/notices'
 import { NOTICE_CATEGORY_LABEL_KEYS } from '../config/notices'
 import { useT } from '../i18n'
@@ -38,43 +38,50 @@ export default function PortalNoticeBell() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  const unreadSequence = useRef(0)
 
   /** 查询未读数量；失败静默保留原值，不打断顶栏使用 */
   const refreshUnread = useCallback(async () => {
+    const sequence = ++unreadSequence.current
     try {
-      setUnread(await getUnreadNoticeCount())
+      const count = await getUnreadNoticeCount()
+      if (sequence === unreadSequence.current) setUnread(count)
     } catch {
       // 未读数获取失败保留原值（401 由全局拦截器处理登录态）
     }
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const count = await getUnreadNoticeCount()
-        if (!cancelled) setUnread(count)
-      } catch {
-        // 未读数获取失败保留原值（401 由全局拦截器处理登录态）
-      }
-    })()
+    void refreshUnread()
     return () => {
-      cancelled = true
+      unreadSequence.current++
     }
-  }, [])
+  }, [refreshUnread])
 
-  /** 展开弹层：强制刷新最近通知列表 */
+  /** 展开弹层时标记全部通知已读，再获取列表与真实未读数。 */
   const openPanel = async () => {
+    const token = useAuthStore.getState().token
+    unreadSequence.current++
     setOpen(true)
     setLoading(true)
     setLoadFailed(false)
     try {
+      await markAllNoticesRead()
+    } catch (err) {
+      if (!axios.isCancel(err) && !(axios.isAxiosError(err) && err.response?.status === 401)) {
+        message.error(extractErrorReason(err, t))
+      }
+    }
+    if (token !== useAuthStore.getState().token) return
+    try {
       const res = await queryNotices({ page: 1, page_size: NOTICE_POPOVER_PAGE_SIZE }, true)
+      if (token !== useAuthStore.getState().token) return
       setNotices(res.data)
     } catch {
       setLoadFailed(true)
     } finally {
       setLoading(false)
+      void refreshUnread()
     }
   }
 
@@ -107,21 +114,6 @@ export default function PortalNoticeBell() {
         prev.map((item) => (item.id === notice.id ? { ...item, is_read: false } : item)),
       )
       setUnread((prev) => prev + 1)
-    } catch (err) {
-      // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        message.error(extractErrorReason(err, t))
-      }
-    }
-  }
-
-  /** 删除通知，并同步列表与未读数 */
-  const handleDelete = async (notice: Notice) => {
-    try {
-      await deleteNotice(notice.id)
-      setNotices((prev) => prev.filter((item) => item.id !== notice.id))
-      if (!notice.is_read) setUnread((prev) => Math.max(0, prev - 1))
-      message.success(t('notice.deleteSuccess'))
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
@@ -183,21 +175,6 @@ export default function PortalNoticeBell() {
                       {t('notice.markUnread')}
                     </Button>
                   ) : null}
-                  <Popconfirm
-                    title={t('notice.deleteConfirm')}
-                    okText={t('common.confirm')}
-                    cancelText={t('common.cancel')}
-                    onConfirm={() => void handleDelete(item)}
-                  >
-                    <Button
-                      type="link"
-                      size="small"
-                      danger
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {t('notice.delete')}
-                    </Button>
-                  </Popconfirm>
                 </div>
               </div>
               {!item.is_read ? <span className="notice-item-dot" /> : null}

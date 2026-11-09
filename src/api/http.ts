@@ -3,6 +3,8 @@
 import axios from 'axios'
 import { invalidate } from './cache'
 import { useAuthStore } from '../store/auth'
+import { activeImportPreview } from '../store/importPreview'
+import { useSettingsStore } from '../store/settings'
 
 /**
  * 全局 axios 实例：
@@ -16,6 +18,16 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
+  const readOnlyPost = config.url === '/organizations/member-counts'
+  const accountAction = config.url === '/login' || /^\/credentials\/\d+\/impersonate$/.test(config.url ?? '')
+  if (activeImportPreview() && config.method !== 'get' && !readOnlyPost && !accountAction) {
+    const reason = useSettingsStore.getState().locale === 'zh'
+      ? '模拟导入为只读预览，请先退出模拟再修改真实数据。'
+      : 'Import preview is read-only. Exit the preview before changing real data.'
+    throw new axios.AxiosError(reason, 'ERR_PREVIEW_READ_ONLY', config, undefined, {
+      config, status: 409, statusText: 'Preview is read-only', headers: {}, data: reason,
+    })
+  }
   const token = useAuthStore.getState().token
   if (token && !config.headers.has('Authorization')) {
     config.headers.Authorization = `Bearer ${token}`

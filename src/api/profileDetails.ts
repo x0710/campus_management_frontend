@@ -62,7 +62,7 @@ export async function createProfileDetail(
 }
 
 /**
- * PUT /api/profile-details 新增或更新档案（以 user_id 为键，缺失或 null 的字段保留原值）
+ * PATCH /api/profile-details 新增或更新档案（以 user_id 为键，缺失或 null 的字段保留原值）
  * @param body 类型：ProfileDetailCreateRequest；默认值：无；是否必填：必填
  * @param signal 取消信号（可选）
  * @returns 类型：Promise<ProfileDetail>
@@ -71,13 +71,13 @@ export async function saveProfileDetail(
   body: ProfileDetailCreateRequest,
   signal?: AbortSignal,
 ): Promise<ProfileDetail> {
-  const res = await http.put<ProfileDetail>('/profile-details', body, { signal })
+  const res = await http.patch<ProfileDetail>('/profile-details', body, { signal })
   invalidate('GET /profile-details')
   return res.data
 }
 
 /**
- * PUT /api/profile-details 批量新增或更新档案（数组请求，按输入顺序返回，任一项失败整批回滚）。
+ * PATCH /api/profile-details 批量新增或更新档案（数组请求，按输入顺序返回，任一项失败整批回滚）。
  * 更新时缺省或 null 的字段保留原值。
  * @param body 类型：ProfileDetailCreateRequest[]；默认值：无；是否必填：必填
  * @param signal 取消信号（可选）
@@ -87,7 +87,7 @@ export async function saveProfileDetails(
   body: ProfileDetailCreateRequest[],
   signal?: AbortSignal,
 ): Promise<ProfileDetail[]> {
-  const res = await http.put<ProfileDetail[]>('/profile-details', body, {
+  const res = await http.patch<ProfileDetail[]>('/profile-details', body, {
     signal,
     timeout: BATCH_REQUEST_TIMEOUT_MS,
   })

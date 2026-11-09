@@ -73,6 +73,7 @@ import ErrorState from './ErrorState'
 import MatchedMembersTable from './MatchedMembersTable'
 import MemberSearchModeToggle from './MemberSearchModeToggle'
 import MemberSearchNav from './MemberSearchNav'
+import { BULK_ADD_MEMBERS_ROUTE } from '../config/bulkMembers'
 import MultiSelectHeaderFilter from './MultiSelectHeaderFilter'
 import PersonSearchBox from './PersonSearchBox'
 
@@ -130,6 +131,8 @@ interface OrgMembersExplorerProps {
    * 目前只在支部端「支部管理」开启，后续二级党委端 / 学校党委端复用。
    */
   exportMemberInfo?: boolean
+  /** 显示批量导入入口，目标页面自行解析当前门户的组织范围。 */
+  showBulkAdd?: boolean
   /**
    * 跨页跳转定位的目标组织 ID（可选，默认 null）。
    * 从工作台点击组织成绩排名后跳转本页时传入：组织树挂载后滚动到该节点
@@ -225,6 +228,7 @@ export default function OrgMembersExplorer({
   showOrgTree = true,
   partyScoreColumns = false,
   exportMemberInfo = false,
+  showBulkAdd = false,
   focusOrgId = null,
 }: OrgMembersExplorerProps) {
   const t = useT()
@@ -956,6 +960,16 @@ export default function OrgMembersExplorer({
               visible={search.matches.length > 0}
               onToggle={search.toggleMatchOnly}
             />
+            {showBulkAdd && (
+              <Tooltip title={t('adminOrg.bulkAddHint')}>
+                <Button
+                  disabled={orgsLoading || !!orgsError || orgs.length === 0}
+                  onClick={() => navigate(`/portal/${portalKey}/${BULK_ADD_MEMBERS_ROUTE}?from=${fromModuleKey}`)}
+                >
+                  {t('adminOrg.bulkAddMembers')}
+                </Button>
+              </Tooltip>
+            )}
             {/* 支部管理：导出当前支部成员的党员信息与成绩信息（二级党委端 / 学校党委端后续复用） */}
             {exportMemberInfo && partyScoreColumns && selectedOrg && !search.matchOnly && (
               <Tooltip title={t('branchExport.hint')}>

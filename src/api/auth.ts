@@ -1,7 +1,6 @@
 /** 认证模块, 提供登录、凭据查询/管理与当前登录用户信息查询 API */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import { queryUserRoles } from './rbac'
 import { listUserOrganizations } from './organizations'
 import { CanceledError } from 'axios'
 import { useAuthStore } from '../store/auth'
@@ -77,7 +76,7 @@ export async function getMyRoles(force?: boolean): Promise<UserRoleInfo[]> {
   const token = useAuthStore.getState().token
   const me = await getCurrentUser()
   if (token !== useAuthStore.getState().token) throw new CanceledError('Session changed')
-  const roles = await queryUserRoles([me.uid], force)
+  const roles = await cachedGet<UserRoleInfo[]>('/rbac/users/roles', { uids: String(me.uid) }, { force, preview: false })
   return roles.filter((role) => role.uid === me.uid)
 }
 
@@ -89,7 +88,7 @@ export async function getMyPortalPositions(force?: boolean): Promise<{ code: str
   }
   const me = await getCurrentUser()
   assertCurrent()
-  const memberships = await listUserOrganizations(me.uid, force)
+  const memberships = await listUserOrganizations(me.uid, force, true)
   assertCurrent()
   return [...new Set(memberships.map((item) => item.position))].map((code) => ({ code }))
 }

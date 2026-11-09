@@ -12,6 +12,8 @@ import type {
   UserUpdateRequest,
 } from './types/users'
 
+export type UserInsertMode = 'insert' | 'ignore' | 'replace'
+
 /**
  * GET /api/users 分页查询（权限 user.read，会话内缓存）。
  * force=true 可绕过缓存（手动刷新按钮）；创建/更新/删除会自动失效列表缓存。
@@ -53,7 +55,7 @@ export function getMyProfile(): Promise<UserDetail> {
 
 /**
  * POST /api/users 批量创建用户。
- * 接口已要求前端在每一项中指定 `uid`（正整数，不自动生成；已存在会返回 409）。
+ * insert 重复报错，ignore 跳过重复，replace 按 UID 原地更新。
  * @param body 类型：UserCreateRequest[]；默认值：无；是否必填：必填（每项须含 uid 与 username）
  * @param signal 取消信号（可选，批量导入取消时中断在途请求）
  * @returns 类型：Promise<number>
@@ -61,12 +63,15 @@ export function getMyProfile(): Promise<UserDetail> {
 export async function createUsers(
   body: UserCreateRequest[],
   signal?: AbortSignal,
+  mode: UserInsertMode = 'insert',
 ): Promise<number> {
   const res = await http.post<number>('/users', body, {
     signal,
+    params: { mode },
     timeout: BATCH_REQUEST_TIMEOUT_MS,
   })
   invalidate('GET /users')
+  if (mode === 'replace') invalidate('GET /credentials')
   return res.data
 }
 

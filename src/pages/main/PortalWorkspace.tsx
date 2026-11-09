@@ -22,6 +22,8 @@ import { Suspense, useEffect, useMemo } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import PortalHeader from '../../components/PortalHeader'
 import PageLoading from '../../components/PageLoading'
+import ImportPreviewBanner from '../../components/ImportPreviewBanner'
+import { useImportPreview } from '../../store/importPreview'
 import { BULK_ADD_MEMBERS_ROUTE } from '../../config/bulkMembers'
 import {
   DEFAULT_PORTAL_KEY,
@@ -47,6 +49,7 @@ export default function PortalWorkspace() {
 }
 
 function PortalWorkspaceContent() {
+  const previewRevision = useImportPreview((state) => state.revision)
   const t = useT()
   const navigate = useNavigate()
   const location = useLocation()
@@ -254,7 +257,8 @@ function PortalWorkspaceContent() {
         </Layout.Sider>
 
         <main className="workspace-content">
-          <Suspense fallback={<PageLoading />}>
+          <ImportPreviewBanner />
+          <Suspense key={previewRevision} fallback={<PageLoading />}>
             <Outlet />
           </Suspense>
         </main>

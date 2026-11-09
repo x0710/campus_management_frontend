@@ -23,6 +23,8 @@ export interface MemberImportOutcome {
   status: 'success' | 'partial' | 'failed' | 'cancelled'
   /** 失败 / 部分成功的原因（已翻译，可空） */
   message?: string
+  /** 仅本次成功新建账号返回；只保留在页面内存，供用户下载。 */
+  newPassword?: string
 }
 
 /** 一次导入请求的日志（供页面导出「本次都做了哪些请求」） */

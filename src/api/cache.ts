@@ -3,27 +3,14 @@
 import { http } from './http'
 import { useAuthStore } from '../store/auth'
 import { GetRequestCache, type CachedGetOptions } from '../utils/getRequestCache'
+import { readPreviewData } from './previewDataService'
 
 export { makeCacheKey } from '../utils/getRequestCache'
 export type { CachedGetOptions } from '../utils/getRequestCache'
 
 const cache = new GetRequestCache((url, params) => http.get(url, { params }).then((res) => res.data))
-// 组织成员管理相关数据保存在浏览器本地，不按时间自动过期。
-const storageKey = 'campus-organization-data-v1'
-const localCache = new GetRequestCache(
-  (url, params) => http.get(url, { params }).then((res) => res.data), Date.now, Infinity,
-  {
-    read: () => {
-      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
-      return saved?.owner === useAuthStore.getState().username ? JSON.stringify(saved.entries) : null
-    },
-    write: (entries) => localStorage.setItem(storageKey, JSON.stringify({
-      owner: useAuthStore.getState().username, entries: JSON.parse(entries),
-    })),
-  },
-)
-const isOrganizationData = (url: string) => /^\/(organizations|organization-members|users|positions)(\/|$)/.test(url) ||
-  /^\/party\/scores(\/|$)/.test(url)
+// 升级时删除旧的永久业务缓存；不再将接口数据写入 localStorage。
+try { localStorage.removeItem('campus-organization-data-v1') } catch { /* 本地存储不可用时不影响请求。 */ }
 const listeners = new Set<(prefix?: string) => void>()
 
 /**
@@ -33,10 +20,9 @@ const listeners = new Set<(prefix?: string) => void>()
  * @param opts 类型：CachedGetOptions；默认值：无；是否必填：可选
  * @returns 类型：Promise<T>
  */
-export function cachedGet<T>(url: string, params?: Record<string, unknown>, opts?: CachedGetOptions): Promise<T> {
-  return isOrganizationData(url)
-    ? localCache.get<T>(url, params, { ...opts, maxAgeMs: Infinity })
-    : cache.get<T>(url, params, opts)
+export function cachedGet<T>(url: string, params?: Record<string, unknown>, opts?: CachedGetOptions & { preview?: boolean }): Promise<T> {
+  const load = (path: string, query?: Record<string, unknown>) => cache.get<unknown>(path, query, opts)
+  return opts?.preview === false ? load(url, params) as Promise<T> : readPreviewData<T>(url, params, load)
 }
 
 /**
@@ -46,7 +32,6 @@ export function cachedGet<T>(url: string, params?: Record<string, unknown>, opts
  */
 export function invalidate(prefix?: string): void {
   cache.invalidate(prefix)
-  localCache.invalidate(prefix)
   for (const listener of listeners) listener(prefix)
 }
 
@@ -65,9 +50,7 @@ export function subscribeCacheInvalidation(listener: (prefix?: string) => void):
  * @returns 类型：{ resolved: number; inFlight: number; }
  */
 export function cacheSize() {
-  const main = cache.size()
-  const local = localCache.size()
-  return { resolved: main.resolved + local.resolved, inFlight: main.inFlight + local.inFlight }
+  return cache.size()
 }
 
 useAuthStore.subscribe((state, previous) => {

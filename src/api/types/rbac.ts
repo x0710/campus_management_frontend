@@ -79,7 +79,7 @@ export interface UserRoleRelation {
   role_id: number
 }
 
-/** POST /api/rbac/users 批量覆盖角色元素（role_ids 不能为空） */
+/** PATCH /api/user-role-assignments 批量覆盖角色元素（role_ids 不能为空） */
 export interface UserRolesBatchItem {
   user_id: number
   role_ids: number[]

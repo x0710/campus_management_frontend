@@ -236,7 +236,7 @@ export async function removeOrgMember(
 }
 
 /**
- * DELETE /api/organization-members 批量删除任职（非空数组，任一记录不存在整批回滚）。
+ * PATCH /api/organization-members 批量删除任职（非空数组，任一记录不存在整批回滚）。
  * @param body 类型：MemberBatchDelete[]；默认值：无；是否必填：必填
  * @param signal 取消信号（可选）
  * @returns 类型：Promise<void>
@@ -245,8 +245,7 @@ export async function removeOrgMembers(
   body: MemberBatchDelete[],
   signal?: AbortSignal,
 ): Promise<void> {
-  await http.delete('/organization-members', {
-    data: body,
+  await http.patch('/organization-members', { remove: body }, {
     signal,
     timeout: BATCH_REQUEST_TIMEOUT_MS,
   })
@@ -286,12 +285,13 @@ export async function getOrganizationTree(orgId: number): Promise<OrganizationTr
 export async function listUserOrganizationsBatch(
   uids: number[],
   force?: boolean,
+  realOnly = false,
 ): Promise<UserOrganization[]> {
   if (uids.length === 0) return []
   return cachedGet<UserOrganization[]>(
     '/organization-members',
     { uids: uids.join(',') },
-    { force },
+    { force, preview: !realOnly },
   )
 }
 
@@ -301,8 +301,8 @@ export async function listUserOrganizationsBatch(
  * @param force 是否绕过会话缓存强制重新请求（默认 false；任职变更后刷新展示时传 true）
  * @returns Promise<UserOrganization[]> 任职记录数组
  */
-export function listUserOrganizations(uid: number, force?: boolean): Promise<UserOrganization[]> {
-  return listUserOrganizationsBatch([uid], force)
+export function listUserOrganizations(uid: number, force?: boolean, realOnly = false): Promise<UserOrganization[]> {
+  return listUserOrganizationsBatch([uid], force, realOnly)
 }
 
 /**

@@ -117,7 +117,7 @@ export interface BulkTemplateColumn {
 }
 
 /**
- * 样表十五列：与「添加新成员列表.xlsx」表头逐列对应。
+ * 样表十四列：与「添加新成员列表.xlsx」表头逐列对应。
  * 示例值取自样表本身，便于用户照抄格式；「系统角色」只写角色 ID 数字，不写角色名称。
  * 登录账号名与初始密码相邻放在前两列，便于成对填写与核对账号凭证。
  * 后四列（民族 / 籍贯 / 户口所在地 / 户口性质）为可选项，导入时写入该账号的个人档案（没有档案会自动创建）。
@@ -132,15 +132,7 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     sampleB: '4567891230',
     excelWidth: 22,
   },
-  {
-    key: 'password',
-    labelKey: 'adminUsers.fieldPassword',
-    descKey: 'bulkMembers.colDesc.password',
-    required: true,
-    sampleA: '123456',
-    sampleB: '123456',
-    excelWidth: 14,
-  },
+
   {
     key: 'name',
     labelKey: 'adminUsers.fieldName',

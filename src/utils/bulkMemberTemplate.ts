@@ -5,8 +5,8 @@
  * 工作表结构（哪几张表、每张表的列与数据）全部收敛在这里。
  *
  * 输出结构：
- *   1. 新成员：十五列表头 + 第 2 行填写说明 + 两行示例（从第 5 行起填真实数据）；
- *   2. 填写说明：数据起始行、密码必填等通用规则；
+ *   1. 新成员：十四列表头 + 第 2 行填写说明 + 两行示例（从第 5 行起填真实数据）；
+ *   2. 填写说明：数据起始行、密码由后端生成等通用规则；
  *   3. 组织与ID对应表；
  *   4. 身份与编码对应表；
  *   5. 系统角色与ID对应表。
@@ -89,7 +89,7 @@ export function buildMemberTemplateSheets(input: MemberTemplateInput): MemberTem
       rowHeights: { 2: 96 },
     },
     {
-      // 通用填写规则（第 5 行起填、密码必填等），放在第 2 张表便于用户先看到
+      // 通用填写规则（第 5 行起填、密码由后端生成等），放在第 2 张表便于用户先看到
       name: BULK_TEMPLATE_GUIDE_SHEET_NAME,
       columns: [
         { header: t('bulkMembers.guide.colItem'), width: 18 },
@@ -108,13 +108,15 @@ export function buildMemberTemplateSheets(input: MemberTemplateInput): MemberTem
         { header: t('bulkMembers.col.orgId'), width: 10 },
         { header: t('bulkMembers.col.orgCode'), width: 22 },
         { header: t('bulkMembers.col.orgName'), width: 34 },
-        { header: t('bulkMembers.col.orgParent'), width: 30 },
+        { header: t('bulkMembers.col.orgParentId'), width: 16 },
+        { header: t('bulkMembers.col.orgParentName'), width: 30 },
       ],
       rows: orgs.map((org) => [
         org.id,
         org.code,
         org.name,
-        org.parent_id === null ? '' : (orgNameById.get(org.parent_id) ?? org.parent_id),
+        org.parent_id ?? '',
+        org.parent_id == null ? '' : (orgNameById.get(org.parent_id) ?? ''),
       ]),
     })
   } else {

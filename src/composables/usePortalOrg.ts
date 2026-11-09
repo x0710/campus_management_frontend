@@ -51,7 +51,7 @@ export interface ResolvedPortalOrg {
  */
 export async function resolvePortalOrg(depths: readonly number[]): Promise<ResolvedPortalOrg> {
   const me = await getCurrentUser()
-  const mine = await listUserOrganizations(me.uid)
+  const mine = await listUserOrganizations(me.uid, undefined, true)
   if (mine.length === 0) return { orgId: null, orgName: '', mine }
 
   const orgId =

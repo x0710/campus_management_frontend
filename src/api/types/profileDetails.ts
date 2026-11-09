@@ -39,7 +39,7 @@ export interface ProfileDetail {
 }
 
 /**
- * 保存档案请求（POST /api/profile-details 创建、PUT /api/profile-details 新增或更新）。
+ * 保存档案请求（POST /api/profile-details 创建、PATCH /api/profile-details 新增或更新）。
  * 必填：user_id；其余字段可省略或传 null。
  */
 export interface ProfileDetailCreateRequest {

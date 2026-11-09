@@ -41,6 +41,7 @@ import {
   queryUsers,
   resetUserPassword,
 } from '../../api/users'
+import type { UserInsertMode } from '../../api/users'
 import type {
   Gender,
   UserCreateRequest,
@@ -185,26 +186,23 @@ export default function UsersAdminView() {
 
   // 批量新增用户（基于 POST /api/users，CSV 解析为数组后一次性提交）
   const [batchOpen, setBatchOpen] = useState(false)
+  const [batchMode, setBatchMode] = useState<UserInsertMode>('insert')
   const [batchText, setBatchText] = useState('')
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchPreview, setBatchPreview] = useState<ParsedUser[] | null>(null)
 
   const reportError = useErrorFeedback()
 
-  // 基础数据：组织、职位（新建弹窗下拉用）与当前 uid
+  // 当前用户与组织独立加载，组织分页不能延迟本人操作保护。
   useEffect(() => {
-    void (async () => {
-      try {
-        const [me, orgList] = await Promise.all([
-          getCurrentUser(),
-          listAllOrganizations(),
-        ])
-        setMyUid(me.uid)
-        setOrganizations(orgList)
-      } catch {
-        // 各下拉为空时表单仍可手填/提交，错误在列表区体现
-      }
-    })()
+    let cancelled = false
+    void getCurrentUser().then((me) => {
+      if (!cancelled) setMyUid(me.uid)
+    }).catch(() => {})
+    void listAllOrganizations().then((orgList) => {
+      if (!cancelled) setOrganizations(orgList)
+    }).catch(() => {})
+    return () => { cancelled = true }
   }, [])
 
   const load = useCallback(async () => {
@@ -227,6 +225,8 @@ export default function UsersAdminView() {
       if (!isCurrent()) return
       setRows(res.data)
       setTotal(res.total)
+      // 列表已可用；角色在后台补齐，不延长整张表的加载状态。
+      setLoading(false)
 
       // 按当前页查询；查询他人需 admin，不能通过调整本人位置绕过权限检查。
       const uids = res.data.map((u) => u.uid)
@@ -234,7 +234,7 @@ export default function UsersAdminView() {
         try {
           const userRoles = await queryUserRoles(uids, reload.force)
           if (!isCurrent()) return
-          const map = new Map<number, RoleInfo[]>()
+          const map = new Map<number, RoleInfo[]>(uids.map((uid) => [uid, []]))
           for (const role of userRoles) {
             const arr = map.get(role.uid)
             if (arr) arr.push(role)
@@ -337,6 +337,7 @@ export default function UsersAdminView() {
 
   /** 打开批量新增弹窗，重置表单与预览 */
   const openBatch = () => {
+    setBatchMode('insert')
     setBatchPreview(null)
     setBatchText('')
     setBatchOpen(true)
@@ -439,8 +440,10 @@ export default function UsersAdminView() {
     }
     setBatchRunning(true)
     try {
-      const count = await createUsers(rows.map(toCreateRequest))
-      message.success(t('adminUsers.batchAllDone', { count }))
+      const count = await createUsers(rows.map(toCreateRequest), undefined, batchMode)
+      message.success(t(batchMode === 'ignore' ? 'adminUsers.batchIgnoreDone' : 'adminUsers.batchWritten', {
+        count, skipped: rows.length - count,
+      }))
       setBatchOpen(false)
       setBatchText('')
       setBatchPreview(null)
@@ -521,6 +524,7 @@ export default function UsersAdminView() {
         key: 'roles',
         render: (_, record) => {
           if (rolesError) return <span className="cell-sub">{t('common.loadFailed')}</span>
+          if (!roleMap.has(record.uid)) return <span className="cell-sub">{t('common.loading')}</span>
           const list = roleMap.get(record.uid)?.filter(isVisibleUserRole)
           if (!list || list.length === 0) return <span className="cell-sub">—</span>
           return list.map((r) => (
@@ -878,6 +882,25 @@ export default function UsersAdminView() {
           showIcon
           title={t('adminUsers.batchHint')}
           description={t('adminUsers.batchHintDesc')}
+          style={{ marginBottom: 12 }}
+        />
+        <div style={{ marginBottom: 12 }}>
+          <label htmlFor="batch-user-mode">{t('adminUsers.batchMode')} </label>
+          <Select<UserInsertMode>
+            id="batch-user-mode"
+            value={batchMode}
+            disabled={batchRunning}
+            style={{ minWidth: 240 }}
+            onChange={setBatchMode}
+            options={(['insert', 'ignore', 'replace'] as const).map((value) => ({
+              value, label: t(`adminUsers.batchMode_${value}`),
+            }))}
+          />
+        </div>
+        <Alert
+          type={batchMode === 'replace' ? 'warning' : 'info'}
+          showIcon
+          title={t(`adminUsers.batchModeHint_${batchMode}`)}
           style={{ marginBottom: 12 }}
         />
         <Form layout="vertical">

@@ -193,20 +193,30 @@ test('共享数据强制刷新绕过在途请求，并将刷新标记传给接�
 })
 
 
-test('本地缓存重新创建后仍复用，时间经过不自动请求，刷新和失效才更新', async () => {
-  let saved = null, calls = 0, now = 0
-  const storage = { read: () => saved, write: (value) => { saved = value } }
-  const create = () => new GetRequestCache(async () => ++calls, () => now, Infinity, storage)
-  const first = create()
-  assert.equal(calls, 0)
-  assert.equal(await first.get('/organizations', undefined, { maxAgeMs: Infinity }), 1)
-  now = 10 ** 12
-  const restored = create()
-  assert.equal(await restored.get('/organizations'), 1)
-  assert.equal(calls, 1)
-  assert.equal(await restored.get('/organizations', undefined, { force: true, maxAgeMs: Infinity }), 2)
-  restored.invalidate('GET /organizations')
-  assert.equal(await create().get('/organizations'), 3)
+test('所有业务缓存均有期限，Infinity 不能创建永久缓存', async () => {
+  let calls = 0, now = 0
+  const cache = new GetRequestCache(async () => ++calls, () => now)
+  assert.equal(await cache.get('/organizations', undefined, { maxAgeMs: Infinity }), 1)
+  now = 29_999
+  assert.equal(await cache.get('/organizations'), 1)
+  now = 30_000
+  assert.equal(await cache.get('/organizations'), 2)
+  // 页面重载相当于创建新的内存缓存，必须重新请求。
+  const reloaded = new GetRequestCache(async () => ++calls, () => now)
+  assert.equal(await reloaded.get('/organizations'), 3)
+})
+
+test('旧的永久缓存条目不会恢复，有限缓存也必须检查过期时间', async () => {
+  let calls = 0
+  const entries = [
+    [makeCacheKey('GET', '/organizations'), { data: 'stale', expiresAt: null }],
+    [makeCacheKey('GET', '/users'), { data: 'expired', expiresAt: 999 }],
+  ]
+  const cache = new GetRequestCache(async () => ++calls, () => 1000, 500, {
+    read: () => JSON.stringify(entries), write: () => {},
+  })
+  assert.equal(await cache.get('/organizations'), 1)
+  assert.equal(await cache.get('/users'), 2)
 })
 
 test('本地存储不可用或内容损坏时仍可正常请求和复用内存缓存', async () => {

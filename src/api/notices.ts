@@ -14,6 +14,8 @@
  */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { CanceledError } from 'axios'
+import { useAuthStore } from '../store/auth'
 import type { PaginatedResponse } from './types/common'
 import type {
   Notice,
@@ -24,6 +26,35 @@ import type {
 
 /** 缓存失效前缀：命中通知列表与全部详情缓存 */
 const NOTICE_CACHE_PREFIX = 'GET /notices'
+
+/** 先收集全部未读 ID，再标记，避免已读后分页位置变化导致漏项。 */
+export async function markAllNoticesRead(): Promise<void> {
+  const token = useAuthStore.getState().token
+  const assertSession = () => {
+    if (token !== useAuthStore.getState().token) throw new CanceledError('Session changed')
+  }
+  const ids = new Set<number>()
+  for (let page = 1; ; page++) {
+    assertSession()
+    const result = await queryNotices({ page, page_size: 100, is_read: false }, true)
+    assertSession()
+    result.data.forEach((notice) => ids.add(notice.id))
+    if (!result.data.length || page >= result.total_pages) break
+  }
+  const pending = [...ids]
+  try {
+    for (let offset = 0; offset < pending.length; offset += 10) {
+      assertSession()
+      const results = await Promise.allSettled(pending.slice(offset, offset + 10).map((id) =>
+        http.put(`/notices/${id}/read`, undefined, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)))
+      assertSession()
+      const failed = results.find((result) => result.status === 'rejected')
+      if (failed?.status === 'rejected') throw failed.reason
+    }
+  } finally {
+    invalidate(NOTICE_CACHE_PREFIX)
+  }
+}
 
 /**
  * GET /api/notices 分页查询当前用户的站内通知。

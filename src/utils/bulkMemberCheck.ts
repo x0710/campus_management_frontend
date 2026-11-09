@@ -7,7 +7,7 @@
  * 约定：
  * - 从样表第 5 行开始读数据（第 1 行表头、第 2 行说明、第 3–4 行示例）；
  * - 分隔符同时兼容中英文：全角「：」「；」「／」「，」「（）」会先归一化成半角；
- * - 「组织:身份」写作「组织ID：身份编码」，多身份用「/」、多组织用「；」分隔；
+ * - 「组织:身份」写作「组织ID：身份编码」或「组织code：身份编码」，按第一条数据确定整表格式；多身份用「/」、多组织用「；」分隔；
  * - 组织 ID / 身份编码 / 系统角色 ID 必须在系统里存在；身份还必须已向该组织开放
  *   （按职位的 usage_scope 判断），否则记录为错误，避免提交后才被后端 412 拦截。
  */
@@ -142,12 +142,12 @@ export function isPositionUsableInOrganization(
  * @param text 已归一化的单元格文本（必填）
  * @returns 解析出的组织与身份，以及无法解析的片段
  */
-function parseOrgIdentities(text: string): {
+function parseOrgIdentities(text: string, mode: 'id' | 'code', orgIdByCode: Map<string, number>): {
   entries: { orgId: number; codes: string[] }[]
-  problems: { kind: 'segment' | 'org' | 'identity'; value: string }[]
+  problems: { kind: 'segment' | 'org' | 'identity' | 'mode'; value: string }[]
 } {
   const entries: { orgId: number; codes: string[] }[] = []
-  const problems: { kind: 'segment' | 'org' | 'identity'; value: string }[] = []
+  const problems: { kind: 'segment' | 'org' | 'identity' | 'mode'; value: string }[] = []
 
   for (const rawSegment of text.split(';')) {
     const segment = rawSegment.trim()
@@ -160,9 +160,10 @@ function parseOrgIdentities(text: string): {
     const orgPart = stripParenthetical(segment.slice(0, colonIndex).trim())
     const identityPart = segment.slice(colonIndex + 1).trim()
 
-    const orgMatch = /^\d+/.exec(orgPart)
-    if (!orgMatch) {
-      problems.push({ kind: 'org', value: segment.slice(0, colonIndex).trim() })
+    const isId = /^[1-9]\d*$/.test(orgPart) && Number.isSafeInteger(Number(orgPart))
+    const orgId = mode === 'id' ? (isId ? Number(orgPart) : undefined) : orgIdByCode.get(orgPart)
+    if (orgId === undefined) {
+      problems.push({ kind: mode === 'id' || isId ? 'mode' : 'org', value: orgPart })
       continue
     }
     const codes = identityPart
@@ -173,7 +174,7 @@ function parseOrgIdentities(text: string): {
       problems.push({ kind: 'identity', value: identityPart })
       continue
     }
-    entries.push({ orgId: Number(orgMatch[0]), codes })
+    entries.push({ orgId, codes })
   }
 
   return { entries, problems }
@@ -233,12 +234,26 @@ export function analyzeMemberRows(params: {
   orgs: OrganizationInfo[]
   positions: PositionDetail[]
   roles: RoleInfo[]
+  /** 可写入的组织范围；保留 orgs 的祖先链用于判断上级职位的使用范围。 */
+  allowedOrgIds?: ReadonlySet<number>
   t: TranslateFn
 }): MemberCheckResult {
   const { rows, startRow, orgs, positions, roles, t } = params
 
   const orgIdSet = new Set(orgs.map((org) => org.id))
   const orgById = new Map(orgs.map((org) => [org.id, org]))
+  const orgIdByCode = new Map(orgs.map((org) => [org.code, org.id]))
+  // 旧版模板 B 列为初始密码；新版删除该列，组织身份移至 D 列。
+  const legacyPasswordColumn = /密码|password/i.test(normalizeCellText(rows[0]?.[1] ?? null))
+  const columnCount = legacyPasswordColumn ? 15 : 14
+  const orgColumn = legacyPasswordColumn ? 4 : 3
+  // 从第一条非空实际数据判断整表格式，跳过模板说明、示例及空行。
+  const firstRow = rows.slice(startRow - 1).find((row) => row.slice(0, columnCount).some((cell) => normalizeCellText(cell) !== ''))
+  const firstSegment = normalizeCellText(firstRow?.[orgColumn] ?? null).split(';')[0] ?? ''
+  const firstOrg = stripParenthetical(firstSegment.split(':')[0] ?? '').trim()
+  // 纯数字同时命中 ID 和 code 时优先 ID；仅命中 code 时支持纯数字组织编码。
+  const orgMode: 'id' | 'code' = /^[1-9]\d*$/.test(firstOrg) &&
+    (orgIdSet.has(Number(firstOrg)) || !orgIdByCode.has(firstOrg)) ? 'id' : 'code'
   const positionByCode = new Map(positions.map((pos) => [pos.code.toUpperCase(), pos]))
   const roleIdSet = new Set(roles.map((role) => role.id))
 
@@ -249,15 +264,15 @@ export function analyzeMemberRows(params: {
 
   for (let rowNumber = startRow; rowNumber <= rows.length; rowNumber += 1) {
     const row = rows[rowNumber - 1] ?? []
-    // 前 11 列是账号 / 任职 / 角色信息，后 4 列是个人档案信息（均可空）
-    const cells = Array.from({ length: 15 }, (_, index) => normalizeCellText(row[index] ?? null))
+    // 前 10 列是账号 / 任职 / 角色信息（旧模板为 11 列），后 4 列是个人档案信息（均可空）
+    const cells = Array.from({ length: columnCount }, (_, index) => normalizeCellText(row[index] ?? null))
     // 整行为空（含只有格式没有内容）时跳过，不参与统计也不报错
     if (cells.every((cell) => cell === '')) continue
     total += 1
 
+    if (legacyPasswordColumn) cells.splice(1, 1)
     const [
       username,
-      password,
       name,
       gender,
       orgIdentity,
@@ -314,13 +329,15 @@ export function analyzeMemberRows(params: {
     if (!orgIdentity) {
       addIssue(t('bulkMembers.col.orgIdentity'), t('bulkMembers.check.orgIdentityEmpty'))
     } else {
-      const parsed = parseOrgIdentities(orgIdentity)
+      const parsed = parseOrgIdentities(orgIdentity, orgMode, orgIdByCode)
       for (const problem of parsed.problems) {
         if (problem.kind === 'segment') {
           addIssue(
             t('bulkMembers.col.orgIdentity'),
             t('bulkMembers.check.orgSegment', { value: problem.value }),
           )
+        } else if (problem.kind === 'mode') {
+          addIssue(t('bulkMembers.col.orgIdentity'), t('bulkMembers.check.orgFormatMismatch', { value: problem.value }))
         } else if (problem.kind === 'org') {
           addIssue(t('bulkMembers.col.orgIdentity'), t('bulkMembers.check.orgInvalid', { value: problem.value }))
         } else {
@@ -331,6 +348,10 @@ export function analyzeMemberRows(params: {
         }
       }
       for (const entry of parsed.entries) {
+        if (orgIdSet.has(entry.orgId) && params.allowedOrgIds && !params.allowedOrgIds.has(entry.orgId)) {
+          addIssue(t('bulkMembers.col.orgIdentity'), t('bulkMembers.check.orgOutOfScope', { value: String(entry.orgId) }))
+          continue
+        }
         if (!orgIdSet.has(entry.orgId)) {
           addIssue(
             t('bulkMembers.col.orgIdentity'),
@@ -412,9 +433,7 @@ export function analyzeMemberRows(params: {
     }
 
     // 初始密码（必填）
-    if (!password) {
-      addIssue(t('adminUsers.fieldPassword'), t('bulkMembers.check.password'))
-    }
+
 
     issues.push(...rowIssues)
     if (rowIssues.length === 0) {
@@ -431,7 +450,7 @@ export function analyzeMemberRows(params: {
         email,
         birthday: birthdayValue || '',
         roleIds,
-        password,
+        password: '',
         ethnic,
         nativePlace,
         householdLocation,

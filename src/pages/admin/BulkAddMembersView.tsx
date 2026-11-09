@@ -1,5 +1,5 @@
 /**
- * 党委学校端：批量添加新成员（填报辅助 + 表格校验）。
+ * 人员管理：批量添加新成员（填报辅助、表格校验及导入），支部与二级党委按本级组织限定范围。
  *
  * 入口：组织成员管理左侧组织树「新建组织」旁的「批量添加新成员」按钮
  *       → /portal/:portalKey/bulk-add-members?from=<moduleKey>
@@ -8,13 +8,13 @@
  *   1. 组织与 ID 对应表：填写「组织:身份」列时，冒号前填这里的组织 ID；
  *   2. 身份（职位）与编码对应表：冒号后填这里的身份编码；
  *   3. 系统角色与 ID 对应表：填写「系统角色」列时使用这里的角色 ID（只填数字）；
- *   4. 样表说明：样表十五列的含义、是否必填与两行示例。
+ *   4. 样表说明：样表十四列的含义、是否必填与两行示例。
  *
  * 下载的样表是一份 Excel：第 1 张工作表是「新成员」填写模板（第 5 行起填数据），
  * 之后是「填写说明」与组织 / 身份 / 系统角色三张对照表，可直接在 Excel 里查编码。
  *
  * 「导入表格并分析」只接受 .xlsx：读取后从第 5 行开始逐行校验组织、身份、角色、
- * 手机号、生日、入党时间与必填密码；有问题弹窗逐条列出并可导出报错日志，全部通过后
+ * 手机号、生日与入党时间；有问题弹窗逐条列出并可导出报错日志，全部通过后
  * 才展示「开始导入」。
  *
  * 数据来源（均走 api 层的会话内缓存，重复进入页面不重复请求，代码要求 5）：
@@ -24,6 +24,7 @@ import {
   ArrowLeftOutlined,
   DownloadOutlined,
   FileSearchOutlined,
+  EyeOutlined,
   ImportOutlined,
   InfoCircleOutlined,
   ReloadOutlined,
@@ -52,8 +53,16 @@ import {
   POSITION_USAGE_SCOPE_LABEL_KEYS,
   type BulkLookupKey,
 } from '../../config/bulkMembers'
-import { SCHOOL_ORG_ADMIN_MODULE_KEY } from '../../config/organization'
+import { ACADEMY_ANCESTOR_DEPTHS, BRANCH_ANCESTOR_DEPTHS, SCHOOL_ORG_ADMIN_MODULE_KEY } from '../../config/organization'
+import { resolvePortalOrg } from '../../composables/usePortalOrg'
+import { collectOrgSubtree } from '../../utils/orgTree'
 import { useT } from '../../i18n'
+import { cachedGet } from '../../api/cache'
+import { useImportPreview } from '../../store/importPreview'
+import { useAuthStore } from '../../store/auth'
+import { useUiStateStore } from '../../store/uiState'
+import type { PaginatedResponse } from '../../api/types/common'
+import type { UserInfo } from '../../api/types/users'
 import {
   analyzeMemberRows,
   type MemberCheckIssue,
@@ -118,16 +127,20 @@ export default function BulkAddMembersView() {
   const location = useLocation()
   const { portalKey } = useParams<{ portalKey: string }>()
   const { message } = AntdApp.useApp()
+  const previewActive = useImportPreview((state) => state.preview !== null)
+  const [preparingPreview, setPreparingPreview] = useState(false)
 
   // 返回时回到来源模块（默认党委学校端「组织成员管理」）
   const fromModuleKey =
-    new URLSearchParams(location.search).get('from') ?? SCHOOL_ORG_ADMIN_MODULE_KEY
+    new URLSearchParams(location.search).get('from') ??
+    (portalKey === 'branch' ? 'branch_m5' : portalKey === 'academy' ? 'academy_m5' : SCHOOL_ORG_ADMIN_MODULE_KEY)
 
   // ---- 当前查看的表格 ----
   const [activeTable, setActiveTable] = useState<BulkTableKey>('orgs')
 
   // ---- 三张对照表的数据与状态（各自独立，单表失败不影响其他表） ----
   const [orgs, setOrgs] = useState<OrganizationInfo[]>([])
+  const [allOrgs, setAllOrgs] = useState<OrganizationInfo[]>([])
   const [orgsLoading, setOrgsLoading] = useState(true)
   const [orgsError, setOrgsError] = useState<string | null>(null)
 
@@ -170,8 +183,20 @@ export default function BulkAddMembersView() {
     async (force = false) => {
       setOrgsLoading(true)
       setOrgsError(null)
+      setAnalysis(null)
+      setRetryMembers([])
       try {
-        setOrgs(await listAllOrganizations(force))
+        const all = await listAllOrganizations(force)
+        const depths = portalKey === 'branch' ? BRANCH_ANCESTOR_DEPTHS
+          : portalKey === 'academy' ? ACADEMY_ANCESTOR_DEPTHS : null
+        if (depths) {
+          // 范围来自当前会话，不能依赖 URL 或上个页面传入的组织 ID。
+          const { orgId } = await resolvePortalOrg(depths)
+          setOrgs(orgId === null ? [] : collectOrgSubtree(all, orgId))
+        } else {
+          setOrgs(all)
+        }
+        setAllOrgs(all)
       } catch (err) {
         // 401 由 http 拦截器统一处理登录态，页面不再重复提示
         if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
@@ -181,7 +206,7 @@ export default function BulkAddMembersView() {
         setOrgsLoading(false)
       }
     },
-    [t],
+    [t, portalKey],
   )
 
   /**
@@ -234,7 +259,7 @@ export default function BulkAddMembersView() {
   }, [loadOrgs, loadPositions, loadRoles])
 
   /** 组织 ID → 名称，用于展示「上级组织」与职位的「所属组织」 */
-  const orgNameById = useMemo(() => new Map(orgs.map((o) => [o.id, o.name])), [orgs])
+  const orgNameById = useMemo(() => new Map(allOrgs.map((o) => [o.id, o.name])), [allOrgs])
 
   // ============ 组织与 ID 对应表 ============
   const orgColumns = useMemo<ColumnsType<OrganizationInfo>>(
@@ -523,7 +548,8 @@ export default function BulkAddMembersView() {
       const result = analyzeMemberRows({
         rows,
         startRow: BULK_DATA_START_ROW,
-        orgs,
+        orgs: allOrgs,
+        allowedOrgIds: new Set(orgs.map((org) => org.id)),
         positions,
         roles,
         t,
@@ -767,6 +793,39 @@ export default function BulkAddMembersView() {
 
   const analysisPassed = analysis !== null && analysis.result.issues.length === 0
 
+  const startPreview = async () => {
+    if (!analysisPassed || !lookupReady || !analysis.result.members.length || previewActive || importing) return
+    const token = useAuthStore.getState().token
+    setPreparingPreview(true)
+    try {
+      const members = analysis.result.members
+      const existingUids = new Set<number>()
+      for (let offset = 0; offset < members.length; offset += 100) {
+        const batch = members.slice(offset, offset + 100)
+        for (let page = 1; ; page++) {
+          const result = await cachedGet<PaginatedResponse<UserInfo>>('/users', {
+            ids: batch.map((member) => member.uid).join(','), page, page_size: 100,
+          }, { preview: false })
+          if (token !== useAuthStore.getState().token) return
+          result.data.forEach((user) => existingUids.add(user.uid))
+          if (!result.data.length || page >= result.total_pages) break
+        }
+      }
+      const returnTo = `/portal/${portalKey}/${fromModuleKey}`
+      useImportPreview.getState().start({ members, existingUids, returnTo,
+        organizations: allOrgs, roles, positions, fileName: analysis.fileName })
+      const ui = useUiStateStore.getState()
+      ui.setSelectedOrgId(fromModuleKey, members[0]?.orgIdentities[0]?.orgId ?? null)
+      ui.setMemberPage(fromModuleKey, 1)
+      ui.setMemberSearchState(fromModuleKey, null)
+      navigate(returnTo)
+    } catch (err) {
+      message.error(extractErrorReason(err, t))
+    } finally {
+      setPreparingPreview(false)
+    }
+  }
+
   return (
     <div className="bulk-members-view">
       {/* 页头：标题 + 说明 + 操作（固定不滚动） */}
@@ -795,11 +854,21 @@ export default function BulkAddMembersView() {
             </Button>
           </Tooltip>
           {analysisPassed && (
+            <Tooltip title={t('bulkMembers.previewHint')}>
+              <Button icon={<EyeOutlined />} loading={preparingPreview}
+                disabled={previewActive || !lookupReady || importing || analysis.result.members.length === 0}
+                onClick={() => void startPreview()}>
+                {t('bulkMembers.startPreview')}
+              </Button>
+            </Tooltip>
+          )}
+          {analysisPassed && (
             <Tooltip title={t('bulkMembers.startImportHint', { n: analysis.result.total })}>
               <Button
                 type="primary"
                 className="bulk-start-import"
                 icon={<ImportOutlined />}
+                disabled={previewActive || preparingPreview}
                 onClick={() => setImportOpen(true)}
               >
                 {t('bulkMembers.startImport')}
@@ -1033,6 +1102,22 @@ export default function BulkAddMembersView() {
         width={720}
         onCancel={() => setResultOpen(false)}
         footer={[
+          importOutcomes?.some((item) => item.newPassword) && (
+            <Button key="passwords" icon={<DownloadOutlined />} onClick={() => {
+              downloadXlsx(t('bulkMembers.passwordFile'), [{
+                name: t('bulkMembers.downloadPasswords'),
+                columns: [
+                  { header: 'UID', width: 22 },
+                  { header: t('adminUsers.fieldUsername'), width: 22 },
+                  { header: t('bulkMembers.col.name'), width: 18 },
+                  { header: t('adminUsers.fieldPassword'), width: 24 },
+                ],
+                rows: importOutcomes.filter((item) => item.newPassword).map((item) => [
+                  String(item.uid), item.username, item.name, item.newPassword,
+                ]),
+              }])
+            }}>{t('bulkMembers.downloadPasswords')}</Button>
+          ),
           retryMembers.length > 0 && (
             <Button
               key="retry"
@@ -1059,6 +1144,9 @@ export default function BulkAddMembersView() {
       >
         {importOutcomes && (
           <>
+            {importOutcomes.some((item) => item.newPassword) && (
+              <Alert type="info" showIcon title={t('bulkMembers.passwordNotice')} style={{ marginBottom: 12 }} />
+            )}
             {retrying && (
               <div className="bulk-import-progress">
                 <Progress

@@ -26,7 +26,7 @@ export interface MemberBatchCreate extends OrganizationMemberInput {
   organization_id: number
 }
 
-/** DELETE /api/organization-members 批量删除任职元素 */
+/** PATCH /api/organization-members 批量删除任职元素 */
 export interface MemberBatchDelete {
   organization_id: number
   member_id: number

@@ -23,7 +23,10 @@ export function usePortalAccess(portalKey: string | undefined): boolean | null {
 
   if (!portalKey) return false
   // 角色尚未加载完成时返回 null，避免把管理端用户误判为无权而重定向
-  if (!loaded || !positionsLoaded) return null
+  if (!loaded) return null
   if (roles.some(isSuperAdminRole)) return true
+  // 管理端只依赖系统角色，不必等待组织任职接口。
+  if (portalKey === 'admin') return getAccessiblePortalKeys(roles).includes('admin')
+  if (!positionsLoaded) return null
   return getAccessiblePortalKeys(roles, positions).includes(portalKey as PortalKey)
 }

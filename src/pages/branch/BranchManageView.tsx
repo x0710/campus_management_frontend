@@ -150,6 +150,7 @@ export default function BranchManageView({
       autoSelectFirst={showOrgTree}
       autoSelectFirstWithMembers
       partyScoreColumns
+      showBulkAdd
       exportMemberInfo={fromModuleKey === 'branch_m5' || fromModuleKey === 'academy_m5'}
       focusOrgId={focusOrgId}
     />
