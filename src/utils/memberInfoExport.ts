@@ -4,7 +4,10 @@
  *   2. 「成绩信息」：姓名 + 成绩 + 加分和减分事项。
  *
  * 数据来源：
- *   - 基本信息：GET /api/users/{id}（失败时留空，不影响整表导出）；
+ *   - 基本信息：GET /api/users?ids=（批量，分块 100；列表仅返回 uid/name 时，
+ *     性别按个人档案身份证号推导，生日回退个人档案 birth_date）；
+ *   - 手机 / 邮箱：基本信息缺失时回退个人档案；
+ *   - 账户名：直接取组织成员查询返回的 user_id（本系统登录账号名即 UID），不再请求 /credentials/{uid}；
  *   - 个人资料：GET /api/profile-details?uids=（批量，分块 100）；
  *   - 党员信息：GET /api/party/profiles?uids=（批量，分块 100）；
  *   - 成绩：GET /api/party/scores?uids=（批量总数）+ GET /api/party-scores?uids=（事项明细，
@@ -12,20 +15,19 @@
  *
  * 后续二级党委端 / 学校党委端复用本函数，只需传入各自的成员范围。
  */
-import { getCredential } from '../api/auth'
 import { queryOrgMembers } from '../api/organizations'
 import { queryPartyProfiles } from '../api/partyProfiles'
 import { queryProfileDetails } from '../api/profileDetails'
 import { getPartyScore, getPartyScoreTotals, queryPartyScores } from '../api/partyScores'
-import { getUser } from '../api/users'
+import { queryUsers } from '../api/users'
 import type { PartyProfile } from '../api/types/partyProfiles'
 import type { ProfileDetail } from '../api/types/profileDetails'
 import type { PartyScore } from '../api/types/partyScores'
-import type { UserDetail } from '../api/types/users'
+import type { UserDetail, UserInfo } from '../api/types/users'
 import type { TranslateFn } from '../i18n'
 import { formatDateOnly } from './datetime'
 import { listOrgDescendantIds } from './orgTree'
-import { normalizeGender } from './gender'
+import { genderFromIdCard, normalizeGender } from './gender'
 import { formatPartyScore, formatPartyScoreTotal, isPartyScoreDeduction } from './partyScore'
 import { downloadXlsx, type XlsxSheet } from './xlsx'
 
@@ -139,39 +141,37 @@ function dateText(value: string | null | undefined): string {
 }
 
 /**
- * 批量取用户基本信息；单个失败时留空，不中断整表导出。
- * @param uids 用户 ID 列表（必填）
- * @returns Promise<Map<number, UserDetail>> 用户 ID → 详情
+ * 批量用户基本信息（`GET /api/users?ids=` 返回 uid/name；若接口后续直接返回详情字段也可透传使用，
+ * 缺失的性别 / 生日 / 手机 / 邮箱回退个人档案）。
  */
-async function fetchUserMap(uids: number[]): Promise<Map<number, UserDetail>> {
-  const map = new Map<number, UserDetail>()
-  await runLimited(uids, CONCURRENCY, async (uid) => {
-    try {
-      map.set(uid, await getUser(uid))
-    } catch {
-      // 单个用户详情取不到时留空，不影响其余成员导出
-    }
-  })
-  return map
-}
+type BatchUserInfo = UserInfo &
+  Partial<Pick<UserDetail, 'email' | 'phone' | 'birthday' | 'gender'>>
 
 /**
- * 批量取账户名（登录用户名）。
- * 仅本人或具备 credential.read 权限时可查；无权 / 不存在时留空，不影响其余列导出。
+ * 批量取用户基本信息（按 100 个 UID 分块，单块失败时留空，不中断整表导出）。
+ * 不再逐个请求 `GET /api/users/{id}`，避免成员多时产生大量单用户请求。
  * @param uids 用户 ID 列表（必填）
- * @returns Promise<Map<number, string>> 用户 ID → 账户名
+ * @returns Promise<Map<number, BatchUserInfo>> 用户 ID → 基本信息
  */
-async function fetchUsernameMap(uids: number[]): Promise<Map<number, string>> {
-  const map = new Map<number, string>()
-  await runLimited(uids, CONCURRENCY, async (uid) => {
+async function fetchUserMap(uids: number[]): Promise<Map<number, BatchUserInfo>> {
+  const map = new Map<number, BatchUserInfo>()
+  for (const chunk of chunks(uids)) {
+    const requested = new Set(chunk)
     try {
-      const info = await getCredential(uid)
-      const username = info.username?.trim()
-      if (username) map.set(uid, username)
+      let page = 1
+      let totalPages = 1
+      do {
+        const res = await queryUsers({ page, page_size: chunk.length, ids: chunk.join(',') })
+        for (const user of res.data) {
+          if (requested.has(user.uid)) map.set(user.uid, user as BatchUserInfo)
+        }
+        totalPages = res.total_pages
+        page += 1
+      } while (page <= totalPages)
     } catch {
-      // 无 credential.read 权限或账户不存在时留空
+      // 该批用户信息取不到时留空，不影响其余成员导出
     }
-  })
+  }
   return map
 }
 
@@ -287,9 +287,8 @@ export async function exportMemberInfoXlsx(options: MemberInfoExportOptions): Pr
   const { orgName, members, positionLabel, t } = options
   const uids = Array.from(new Set(members.map((member) => member.user_id)))
 
-  const [userMap, usernameMap, profileMap, partyProfileMap, scoreTotalMap, scoreRecords] = await Promise.all([
+  const [userMap, profileMap, partyProfileMap, scoreTotalMap, scoreRecords] = await Promise.all([
     fetchUserMap(uids),
-    fetchUsernameMap(uids),
     fetchProfileMap(uids),
     fetchPartyProfileMap(uids),
     fetchScoreTotalMap(uids),
@@ -347,7 +346,8 @@ export async function exportMemberInfoXlsx(options: MemberInfoExportOptions): Pr
       const user = userMap.get(member.user_id)
       const profile = profileMap.get(member.user_id)
       const partyProfile = partyProfileMap.get(member.user_id)
-      const gender = normalizeGender(user?.gender)
+      // 性别优先取用户资料；批量列表不返回性别时按个人档案身份证号推导
+      const gender = normalizeGender(user?.gender) ?? genderFromIdCard(profile?.id_card)
       const genderText = gender === 'male'
         ? t('profile.male')
         : gender === 'female'
@@ -355,9 +355,12 @@ export async function exportMemberInfoXlsx(options: MemberInfoExportOptions): Pr
           : ''
       return [
         user?.name?.trim() || `#${member.user_id}`,
-        usernameMap.get(member.user_id) ?? '',
+        // 本系统登录账号名就是 UID（批量成员导入也把登录账号名直接作为 uid），
+        // 直接用组织成员查询返回的 user_id，无需再逐个查 /credentials/{uid}
+        String(member.user_id),
         genderText,
-        dateText(user?.birthday),
+        // 生日优先取用户资料，缺失时回退个人档案出生日期
+        dateText(user?.birthday) || dateText(profile?.birth_date),
         user?.phone?.trim() || profile?.phone?.trim() || '',
         user?.email?.trim() || profile?.email?.trim() || '',
         member.organizationName?.trim() || orgName,
@@ -385,7 +388,8 @@ export async function exportMemberInfoXlsx(options: MemberInfoExportOptions): Pr
       const total = scoreTotalMap.get(member.user_id)
       return [
         user?.name?.trim() || `#${member.user_id}`,
-        usernameMap.get(member.user_id) ?? '',
+        // 登录账号名即 UID（见「党员信息」表同列说明）
+        String(member.user_id),
         total ? formatPartyScoreTotal(total) : '',
         scoreItemsText(member.user_id),
       ]

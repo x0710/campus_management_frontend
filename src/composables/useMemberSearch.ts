@@ -25,7 +25,8 @@
  * 查看方式（matchOnly）：
  *   - 默认 false：在组织里面查看匹配人员——定位到命中人员所在组织并高亮其行（上述流程）；
  *   - 切换为 true：单独查看匹配人员——一次性汇总全部匹配人员（见 resolveAllMatches），
- *     由宿主的「匹配人员表」展示，不再切换组织；上一个 / 下一个只在匹配人员之间移动。
+ *     由宿主的「匹配人员表」展示，不再切换成员表所属组织；上一个 / 下一个在匹配人员之间移动时，
+ *     仍会更新 focusKeys / locateTick，供宿主让组织树的高亮组织跟随命中成员切换。
  *   两种模式共用同一份匹配结果（matches），模式切换时由宿主决定渲染哪张表。
  *
  * 状态记忆与结束匹配：
@@ -386,9 +387,13 @@ export function useMemberSearch({
     async (hit: MemberSearchHit) => {
       const isCurrent = locateRequests.begin()
       if (!isCurrent()) return
-      // 「单独查看匹配人员」模式：只高亮目标行，不切换组织、不扫描页码
+      // 「单独查看匹配人员」模式：不切换组织、不扫描页码，但仍同步组织树的展开与高亮，
+      // 使「上一个 / 下一个」推进匹配人员时，树上的高亮组织跟随命中成员切换（见宿主 selectedKeys）。
       if (matchOnlyRef.current) {
         setHitUid(hit.uid)
+        setLocateTick((n) => n + 1)
+        onClearFilter?.()
+        setFocusKeys(listOrgChainIds(orgs, hit.targetId))
         return
       }
       // 目标不在第 1 页时，先扫描出其所在页
@@ -565,9 +570,9 @@ export function useMemberSearch({
       const target = matches[index]
       if (!target) return
       setMatchIndex(index)
-      // 单独查看模式只需移动高亮（匹配人员表会自行翻页并滚动），不必触发 loading
+      // 单独查看模式只需移动高亮与组织树定位（匹配人员表会自行翻页并滚动），不必触发 loading
       if (matchOnlyRef.current) {
-        setHitUid(target.uid)
+        await locate(target)
         return
       }
       setSearching(true)

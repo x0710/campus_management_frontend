@@ -40,8 +40,8 @@ interface MatchedMembersTableProps {
   hitUid: number | null
   /** 是否正在加载匹配人员（必填） */
   loading: boolean
-  /** 点击查看成员详情（必填） */
-  onOpenMember: (uid: number) => void
+  /** 点击查看成员详情（必填；orgId 为该成员命中的组织，用于支部端 / 二级党委端展示本组织任职） */
+  onOpenMember: (uid: number, orgId: number) => void
   /** 每页行数（可选，默认 100；代码要求 12：表格每页最多 100 行） */
   pageSize?: number
 }
@@ -182,7 +182,7 @@ export default function MatchedMembersTable({
         width: 120,
         render: (_, row) => (
           <Tooltip title={t('memberDetail.viewDetailHint')}>
-            <Button type="link" size="small" onClick={() => onOpenMember(row.uid)}>
+            <Button type="link" size="small" onClick={() => onOpenMember(row.uid, row.targetId)}>
               {t('memberDetail.detail')}
             </Button>
           </Tooltip>
@@ -206,7 +206,7 @@ export default function MatchedMembersTable({
           // 点击按钮时不触发行点击
           const target = e.target as HTMLElement
           if (target.closest('button')) return
-          onOpenMember(row.uid)
+          onOpenMember(row.uid, row.targetId)
         },
         title: t('memberDetail.rowClickHint'),
         style: { cursor: 'pointer' },

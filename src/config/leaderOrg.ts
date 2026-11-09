@@ -65,10 +65,12 @@ export const MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES: string[] = [
 ]
 
 /**
- * 成员详情页「基本信息」隐藏「系统角色」「组织任职」卡片的来源模块 key：
- * 支部端支部管理 branch_m5、党委学院端学院支部管理 academy_m5 的成员详情
- * 只需展示成员资料与党员信息，不再展示系统角色与组织任职（标题与内容整体不渲染）。
- * 注：组织任职数据仍会请求，因为「党员信息」卡片（所属支部 / 政治面貌）依赖它。
+ * 成员详情页「基本信息」隐藏「系统角色」与全部「组织任职」的来源模块 key：
+ * 支部端支部管理 branch_m5、二级党委端学院支部管理 academy_m5 的成员详情
+ * 只需展示成员资料与党员信息，不展示系统角色，也不展示该成员在其他组织的任职。
+ * 仍会展示「本组织任职」卡片：组织 ID 由成员列表跳转时通过 ?org= 传入，
+ * 只列出该组织下的职位与工作地点（见 BasicInfoPanel 的 focusOrganizationId）。
+ * 注：组织任职数据仍会请求，「党员信息」卡片（所属支部 / 政治面貌）与「本组织任职」都依赖它。
  */
 export const MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES: string[] = [
   'branch_m5',
