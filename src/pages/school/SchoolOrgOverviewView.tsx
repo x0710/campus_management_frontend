@@ -97,6 +97,7 @@ import { useT } from '../../i18n'
 import { formatPaginationTotal } from '../../utils/pagination'
 import { useUiStateStore } from '../../store/uiState'
 import { countEthnicMinority } from '../../utils/ethnic'
+import { mapInBatches } from '../../utils/mapInBatches'
 import { formatPartyScoreTotalDecimal } from '../../utils/partyScore'
 import { buildOrgTreeData, collectOrgSubtree } from '../../utils/orgTree'
 
@@ -534,31 +535,22 @@ export default function SchoolOrgOverviewView() {
     }
 
     void (async () => {
-      const next = new Map<number, OrgChildStats>()
       let firstError: unknown = null
-      for (let start = 0; start < childIds.length; start += ORG_OVERVIEW_STATS_CONCURRENCY) {
-        const chunk = childIds.slice(start, start + ORG_OVERVIEW_STATS_CONCURRENCY)
-        const batch = await Promise.all(
-          chunk.map(async (childId) => {
-            try {
-              return [childId, await getChildStats(childId)] as const
-            } catch (err) {
-              firstError ??= err
-              return [
-                childId,
-                {
-                  memberCount: null,
-                  reserveMemberCount: null,
-                  minorityCount: null,
-                  averageScore: null,
-                },
-              ] as const
-            }
-          }),
-        )
-        for (const [childId, item] of batch) next.set(childId, item)
-      }
+      const entries = await mapInBatches(childIds, async (childId) => {
+        try {
+          return [childId, await getChildStats(childId)] as const
+        } catch (err) {
+          firstError ??= err
+          return [childId, {
+            memberCount: null,
+            reserveMemberCount: null,
+            minorityCount: null,
+            averageScore: null,
+          }] as const
+        }
+      }, ORG_OVERVIEW_STATS_CONCURRENCY)
       if (cancelled) return
+      const next = new Map<number, OrgChildStats>(entries)
       // 合并到已有统计中：切换组织再切回时可直接展示已经统计过的组织结果
       setStats((prev) => {
         const merged = new Map(prev)

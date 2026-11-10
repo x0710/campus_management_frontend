@@ -23,6 +23,7 @@
  */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
+import { mapInBatches } from '../utils/mapInBatches'
 import type { ApprovalInstanceStep, ApprovalTodoQuery } from './types/approvals'
 import type { PaginatedResponse } from './types/common'
 import type {
@@ -158,25 +159,15 @@ export async function hydratePartyScoreRows(
   rows: PartyScore[],
   force?: boolean,
 ): Promise<PartyScore[]> {
-  const hydrated: PartyScore[] = []
-
-  for (let start = 0; start < rows.length; start += PARTY_SCORE_DETAIL_CONCURRENCY) {
-    const chunk = rows.slice(start, start + PARTY_SCORE_DETAIL_CONCURRENCY)
-    const enriched = await Promise.all(
-      chunk.map(async (row) => {
-        if (row.template_id !== undefined && row.created_at && row.updated_at) return row
-        try {
-          const detail = await getPartyScore(row.id, force)
-          return { ...row, ...detail }
-        } catch {
-          return row
-        }
-      }),
-    )
-    hydrated.push(...enriched)
-  }
-
-  return hydrated
+  return mapInBatches(rows, async (row) => {
+    if (row.template_id !== undefined && row.created_at && row.updated_at) return row
+    try {
+      const detail = await getPartyScore(row.id, force)
+      return { ...row, ...detail }
+    } catch {
+      return row
+    }
+  }, PARTY_SCORE_DETAIL_CONCURRENCY)
 }
 
 /**

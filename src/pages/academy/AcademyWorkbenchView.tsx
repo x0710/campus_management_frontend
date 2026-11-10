@@ -40,6 +40,7 @@ import {
 import { PARTY_SCORE_TODO_PAGE_SIZE } from '../../config/partyScoreApproval'
 import { useT } from '../../i18n'
 import { countEthnicMinority } from '../../utils/ethnic'
+import { mapInBatches } from '../../utils/mapInBatches'
 import { useUiStateStore } from '../../store/uiState'
 import { formatPartyScoreTotalDecimal, formatScoreDecimal, toPartyScoreTotal } from '../../utils/partyScore'
 
@@ -133,21 +134,6 @@ export default function AcademyWorkbenchView() {
           PARTY_PROBATIONARY_STATUS_NAME,
         ]),
       ])
-      const branchAverages = await Promise.all(
-        subsidiaries.map((branch) =>
-          getPartyScoreOrganizationAverage({ organization_id: branch.id }),
-        ),
-      )
-      const rankedBranches = subsidiaries
-        .map((branch, index) => ({
-          id: branch.id,
-          name: branch.name,
-          score: toPartyScoreTotal(branchAverages[index].average_score),
-        }))
-        .sort(
-          (a, b) =>
-            (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY),
-        )
       setMembers(memberCounts[0]?.member_count ?? 0)
       setMinorityMembers(countEthnicMinority(memberCounts[0]?.ethnic_counts))
       setPartyMembers(partyCounts[PARTY_FULL_MEMBER_STATUS_NAME]?.total ?? null)
@@ -157,6 +143,21 @@ export default function AcademyWorkbenchView() {
       setMaleProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.male ?? null)
       setFemaleProbationaryMembers(partyCounts[PARTY_PROBATIONARY_STATUS_NAME]?.female ?? null)
       setAverageScore(average.average_score)
+      const branchAverages = await mapInBatches(
+        subsidiaries,
+        (branch) => getPartyScoreOrganizationAverage({ organization_id: branch.id }),
+        6,
+      )
+      const rankedBranches = subsidiaries
+        .map((branch, index) => ({
+          id: branch.id,
+          name: branch.name,
+          score: toPartyScoreTotal(branchAverages[index].average_score)
+        }))
+        .sort(
+          (a, b) =>
+            (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY),
+        )
       setBranchRankings(rankedBranches)
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示

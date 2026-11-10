@@ -11,6 +11,7 @@
 请确保本地已安装以下工具：
 
 - yarn 前端包管理工具
+- Node.js（本项目的构建和测试已在 Node.js 26 验证）
 
 ---
 
@@ -27,9 +28,20 @@
 git clone git@github.com:x0710/campus_management_frontend.git
 cd campus-management-frontend
 
-# 2. 编译并运行前端服务（Dev 模式）
+# 2. 安装依赖并运行前端开发服务
+yarn install --frozen-lockfile
 yarn run dev
 ```
+
+验证和构建：
+
+```bash
+yarn test
+yarn lint
+yarn build
+```
+
+生产环境需将 `/api` 反向代理到后端，并为前端路由配置回退到 `index.html`。
 
 ---
 

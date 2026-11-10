@@ -72,10 +72,14 @@ export default function LoginPage() {
     try {
       const res = await login({ username: values.username.trim(), password: values.password })
       setAuth({ token: res.token, username: res.user, lastLoginAt: res.last_login_at })
-      if (values.remember) {
-        localStorage.setItem(REMEMBERED_USERNAME_KEY, res.user)
-      } else {
-        localStorage.removeItem(REMEMBERED_USERNAME_KEY)
+      try {
+        if (values.remember) {
+          localStorage.setItem(REMEMBERED_USERNAME_KEY, res.user)
+        } else {
+          localStorage.removeItem(REMEMBERED_USERNAME_KEY)
+        }
+      } catch {
+        // 浏览器禁止本地存储时仍允许登录。
       }
       // 登录成功：顶部弹窗欢迎；有上次登录时间则附带「上次登录 + 已过去」，首次登录走欢迎语
       if (res.last_login_at) {
@@ -117,7 +121,12 @@ export default function LoginPage() {
     }
   }
 
-  const rememberedUser = localStorage.getItem(REMEMBERED_USERNAME_KEY)
+  let rememberedUser: string | null = null
+  try {
+    rememberedUser = localStorage.getItem(REMEMBERED_USERNAME_KEY)
+  } catch {
+    // 无法读取时使用空用户名。
+  }
 
   return (
     <div className="login-page">

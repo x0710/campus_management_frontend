@@ -208,7 +208,7 @@ export default function UserEditPanel({
     }
   }
 
-  const removeRelation = async (rel: UserOrganization) => {
+  const removeRelation = useCallback(async (rel: UserOrganization) => {
     setOrgBusy(`rel-${rel.id}`)
     try {
       await removeOrgMember(rel.organization_id, rel.id)
@@ -221,7 +221,7 @@ export default function UserEditPanel({
     } finally {
       setOrgBusy(null)
     }
-  }
+  }, [message, onChanged, reportError, t])
 
   const relationColumns = useMemo<ColumnsType<UserOrganization>>(
     () => [
@@ -269,7 +269,7 @@ export default function UserEditPanel({
         ),
       },
     ],
-    [t, orgBusy, positionLabel, organizations],
+    [t, orgBusy, positionLabel, organizations, removeRelation],
   )
 
   if (loading || !detail) {

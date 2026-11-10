@@ -118,7 +118,7 @@ export default function PublishAnnouncementView() {
     [navigate, portalKey, moduleKey],
   )
 
-  const remove = async (record: AnnouncementListItem) => {
+  const remove = useCallback(async (record: AnnouncementListItem) => {
     setActingId(record.id)
     try {
       await deleteAnnouncement(record.id)
@@ -130,7 +130,7 @@ export default function PublishAnnouncementView() {
     } finally {
       setActingId(null)
     }
-  }
+  }, [message, refresh, reportError, t])
 
   const statusOptions = useMemo(
     () =>
@@ -220,7 +220,7 @@ export default function PublishAnnouncementView() {
         ),
       },
     ],
-    [t, locale, actingId, openEditor],
+    [t, locale, actingId, openEditor, remove],
   )
 
   return (

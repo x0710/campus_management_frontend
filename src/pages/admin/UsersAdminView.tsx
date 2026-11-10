@@ -491,7 +491,7 @@ export default function UsersAdminView() {
     }
   }
 
-  const doDelete = async (uid: number) => {
+  const doDelete = useCallback(async (uid: number) => {
     setActingUid(uid)
     try {
       await deleteUser(uid)
@@ -502,7 +502,7 @@ export default function UsersAdminView() {
     } finally {
       setActingUid(null)
     }
-  }
+  }, [message, reportError, t])
 
   const columns = useMemo<ColumnsType<UserInfo>>(
     () => [
@@ -631,6 +631,7 @@ export default function UsersAdminView() {
       isSuperAdmin,
       switchingUid,
       switchAccount,
+      doDelete,
     ],
   )
 
