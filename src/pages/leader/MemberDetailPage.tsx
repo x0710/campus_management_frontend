@@ -40,8 +40,12 @@ import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
 export default function MemberDetailPage() {
   const { uid, portalKey } = useParams()
   const [params] = useSearchParams()
-  // 成员或来源变化时重建全部页签，避免带入上个成员的表单和关联数据。
-  return <MemberDetailContent key={`${portalKey}:${uid}:${params.get('from')}`} />
+  // 成员、来源或查看组织变化时重建全部页签，避免带入上个成员的表单和关联数据。
+  return (
+    <MemberDetailContent
+      key={`${portalKey}:${uid}:${params.get('from')}:${params.get('org') ?? ''}`}
+    />
+  )
 }
 
 function MemberDetailContent() {
@@ -63,8 +67,10 @@ function MemberDetailContent() {
   // 支部端 / 学院端 / 学校端：不展示「详细信息」，并把「成绩信息」替换为
   // 「获得加分总数（基础分 70 + 党建活动加分）+ 该成员全部加分申请」
   const partyScoreView = MEMBER_DETAIL_PARTY_SCORE_FROM_MODULES.includes(fromModuleKey)
-  // 支部端 / 学院端：基本信息不再展示「系统角色」「组织任职」两块卡片
+  // 支部端 / 学院端：基本信息不再展示「系统角色」卡片，并只展示本次查看组织（?org=）的任职信息
   const hideRoleOrgCards = MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES.includes(fromModuleKey)
+  // 成员列表跳转时传入的查看组织 ID（用于展示「本组织任职」）
+  const focusOrganizationId = Number(searchParams.get('org')) || null
   const userId = Number(uid)
 
   const [user, setUser] = useState<UserDetail | null>(null)
@@ -199,6 +205,7 @@ function MemberDetailContent() {
                     canEdit={canEditBasic}
                     showPartyInfo={partyScoreView}
                     showRoleOrgCards={!hideRoleOrgCards}
+                    focusOrganizationId={focusOrganizationId}
                     reloadSeq={extrasReloadSeq}
                     onEdit={(section) => void openEdit(section)}
                   />

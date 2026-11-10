@@ -68,6 +68,7 @@ export default function BasicInfoPanel({
   canEdit,
   showPartyInfo,
   showRoleOrgCards,
+  focusOrganizationId,
   reloadSeq,
   onEdit,
 }: {
@@ -80,8 +81,16 @@ export default function BasicInfoPanel({
   canEdit: boolean
   /** 是否展示「党员信息」卡片（支部端 / 学院端 / 学校端为 true，口径同党员端「我的」） */
   showPartyInfo: boolean
-  /** 是否展示「系统角色」「组织任职」两张卡片（支部端 / 学院端为 false） */
+  /**
+   * 是否展示全部「系统角色」「组织任职」卡片（支部端 / 学院端为 false）。
+   * 为 false 时仍会根据 focusOrganizationId 展示「本组织任职」卡片。
+   */
   showRoleOrgCards: boolean
+  /**
+   * 本次查看的组织 ID（成员列表跳转时通过 ?org= 传入）。
+   * 支部端 / 二级党委端仅展示该组织的任职信息，不展示其他组织的任职。
+   */
+  focusOrganizationId: number | null
   /** 角色 / 组织任职重载令牌：保存后自增，强制绕过缓存重新请求最新关联数据（代码要求 25） */
   reloadSeq: number
   /** 打开指定区块的编辑弹窗（复用 admin/UserEditPanel；一次只编辑一个部分） */
@@ -225,8 +234,18 @@ export default function BasicInfoPanel({
     .map(positionNameOf)
     .find((name) => PARTY_POLITICAL_STATUS_NAMES.includes(name))
 
-  // 组织任职卡片按组织合并：同一组织有多个职位时只展示一张卡片，职位栏并列展示全部职位
-  const orgGroups = groupUserOrganizationsByOrg(orgs)
+  // 组织任职卡片：
+  // - 领导端 / 管理端等展示该成员的全部组织任职；
+  // - 支部端 / 二级党委端（showRoleOrgCards=false）只展示本次查看组织的任职信息，
+  //   组织 ID 由成员列表跳转时通过 ?org= 传入，避免暴露其他组织的任职。
+  const scopedOrgId = showRoleOrgCards ? null : focusOrganizationId
+  const orgGroups = groupUserOrganizationsByOrg(
+    scopedOrgId != null
+      ? orgs.filter((item) => item.organization_id === scopedOrgId)
+      : orgs,
+  )
+  // 是否展示组织任职卡片：全部展示或仅展示本组织任职时都展示
+  const showOrgCard = showRoleOrgCards || scopedOrgId != null
 
   return (
     <>
@@ -367,66 +386,68 @@ export default function BasicInfoPanel({
         </Card>
       )}
 
-      {/* 系统角色 / 组织任职：支部端 / 学院端不展示（见 MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES） */}
+      {/* 系统角色：支部端 / 学院端不展示（见 MEMBER_DETAIL_HIDDEN_ROLE_ORG_FROM_MODULES） */}
       {showRoleOrgCards && (
-        <>
-          {/* 系统角色（编辑入口置于卡片右上角） */}
-          <Card
-            size="small"
-            title={
-              <Space>
-                <TeamOutlined />
-                {t('profile.rolesTitle')}
-              </Space>
-            }
-            extra={
-              canEdit ? (
-                <Tooltip title={t('memberDetail.editRolesHint')}>
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<EditOutlined />}
-                    onClick={() => onEdit('roles')}
-                  >
-                    {t('memberDetail.editRoles')}
-                  </Button>
-                </Tooltip>
-              ) : undefined
-            }
-          >
-            {rolesError ? (
-              <ErrorState message={rolesError} />
-            ) : extrasLoading ? (
-              <Skeleton active paragraph={{ rows: 1 }} />
-            ) : visibleRoles.length === 0 ? (
-              <Text type="secondary">{t('profile.noData')}</Text>
-            ) : (
-              <Space size={[8, 8]} wrap>
-                {visibleRoles.map((role) => (
-                  <Tag key={role.id} color="blue">
-                    {role.name}
-                    {role.description ? (
-                      <Text type="secondary" style={{ marginLeft: 4 }}>
-                        ({role.description})
-                      </Text>
-                    ) : null}
-                  </Tag>
-                ))}
-              </Space>
-            )}
-          </Card>
+        <Card
+          size="small"
+          title={
+            <Space>
+              <TeamOutlined />
+              {t('profile.rolesTitle')}
+            </Space>
+          }
+          extra={
+            canEdit ? (
+              <Tooltip title={t('memberDetail.editRolesHint')}>
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => onEdit('roles')}
+                >
+                  {t('memberDetail.editRoles')}
+                </Button>
+              </Tooltip>
+            ) : undefined
+          }
+        >
+          {rolesError ? (
+            <ErrorState message={rolesError} />
+          ) : extrasLoading ? (
+            <Skeleton active paragraph={{ rows: 1 }} />
+          ) : visibleRoles.length === 0 ? (
+            <Text type="secondary">{t('profile.noData')}</Text>
+          ) : (
+            <Space size={[8, 8]} wrap>
+              {visibleRoles.map((role) => (
+                <Tag key={role.id} color="blue">
+                  {role.name}
+                  {role.description ? (
+                    <Text type="secondary" style={{ marginLeft: 4 }}>
+                      ({role.description})
+                    </Text>
+                  ) : null}
+                </Tag>
+              ))}
+            </Space>
+          )}
+        </Card>
+      )}
 
-          {/* 组织任职（组织 + 职位 + 工作地点；编辑入口置于卡片右上角） */}
+      {/* 组织任职（组织 + 职位 + 工作地点）：
+          领导端 / 管理端展示全部；支部端 / 二级党委端只展示本组织（?org=）的任职信息；
+          编辑入口仅对具备用户管理权限且展示全部组织任职的来源开放 */}
+      {showOrgCard && (
           <Card
             size="small"
             title={
               <Space>
                 <BankOutlined />
-                {t('profile.orgsTitle')}
+                {showRoleOrgCards ? t('profile.orgsTitle') : t('memberDetail.currentOrgPositions')}
               </Space>
             }
             extra={
-              canEdit ? (
+              showRoleOrgCards && canEdit ? (
                 <Tooltip title={t('memberDetail.editOrgsHint')}>
                   <Button
                     type="primary"
@@ -514,7 +535,6 @@ export default function BasicInfoPanel({
               </Space>
             )}
           </Card>
-        </>
       )}
       </Space>
 

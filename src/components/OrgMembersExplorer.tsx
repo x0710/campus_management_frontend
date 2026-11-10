@@ -489,6 +489,16 @@ export default function OrgMembersExplorer({
     persistKey: fromModuleKey,
   })
 
+  // 「单独查看匹配人员」模式下，组织树高亮当前命中成员所属组织：
+  // 匹配人员表不切换成员表所属组织（selectedId 保持不变），但树上的选中态要随上一个 / 下一个推进，
+  // 否则会一直停留在最初搜索命中的组织上。
+  const matchHitOrgId = useMemo<number | null>(() => {
+    if (!search.matchOnly || search.hitUid === null) return null
+    return search.matches.find((m) => m.uid === search.hitUid)?.targetId ?? null
+  }, [search.matchOnly, search.hitUid, search.matches])
+  // 组织树当前高亮的组织：单独查看匹配人员时跟随命中成员，其余场景沿用用户选中的组织
+  const highlightedOrgId = matchHitOrgId ?? selectedId
+
   // 组织树默认只展开根节点（进入页面不全量展开，避免树过长铺满；深层分支点击再展开）
   const rootKeys = useMemo<React.Key[]>(
     () => orgs.filter((o) => (o.parent_id ?? null) === null).map((o) => o.id),
@@ -565,11 +575,12 @@ export default function OrgMembersExplorer({
     return build(byParent.get(null))
   }, [orgs, orgById, orgSearch])
 
-  // 搜索定位到成员 / 从工作台跳转定位到组织后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
+  // 搜索定位到成员 / 从工作台跳转定位到组织后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）。
+  // 「单独查看匹配人员」时同样滚动，使树上的高亮组织跟着命中成员一起切换。
   useEffect(() => {
-    if (!showOrgTree || treeCollapsed || search.matchOnly || selectedId === null) return
+    if (!showOrgTree || treeCollapsed || highlightedOrgId === null) return
     const fromSearch = search.hitUid !== null
-    const fromJump = focusOrgId !== null && focusOrgId === selectedId
+    const fromJump = focusOrgId !== null && focusOrgId === highlightedOrgId
     if (!fromSearch && !fromJump) return
     // 等组织树完成展开动画并渲染出选中节点后再滚动，避免定位到尚未挂载的节点
     const timer = window.setTimeout(() => {
@@ -581,11 +592,10 @@ export default function OrgMembersExplorer({
   }, [
     showOrgTree,
     treeCollapsed,
-    search.matchOnly,
     search.hitUid,
     search.locateTick,
     focusOrgId,
-    selectedId,
+    highlightedOrgId,
     treeData,
   ])
 
@@ -681,12 +691,17 @@ export default function OrgMembersExplorer({
     }
   }, [allMemberIds, partyScoreColumns])
 
-  /** 双击成员行 → 进入成员详情页（?from 用于侧栏高亮来源模块） */
+  /**
+   * 双击成员行 → 进入成员详情页。
+   * ?from 用于侧栏高亮来源模块；?org 标记本次查看的组织，供支部端 / 二级党委端
+   * 成员详情展示「本组织任职」信息（成员搜索的匹配人员行传入其所属组织）。
+   */
   const openMember = useCallback(
-    (uid: number) => {
-      navigate(`/portal/${portalKey}/organization-members/${uid}?from=${fromModuleKey}`)
+    (uid: number, orgId: number | null = activeOrgId) => {
+      const orgQuery = orgId != null ? `&org=${orgId}` : ''
+      navigate(`/portal/${portalKey}/organization-members/${uid}?from=${fromModuleKey}${orgQuery}`)
     },
-    [navigate, portalKey, fromModuleKey],
+    [navigate, portalKey, fromModuleKey, activeOrgId],
   )
 
   const memberColumns = useMemo<ColumnsType<UserMemberRow>>(() => {
@@ -855,7 +870,7 @@ export default function OrgMembersExplorer({
                       search.setFocusKeys(keys)
                       setOrgTreeExpanded(fromModuleKey, keys.map((k) => Number(k)))
                     }}
-                    selectedKeys={selectedId !== null ? [selectedId] : []}
+                    selectedKeys={highlightedOrgId !== null ? [highlightedOrgId] : []}
                     onSelect={(keys: React.Key[]) => {
                       // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
                       // （false：不要按当前命中人员重新定位，否则会覆盖用户刚选中的组织）
@@ -1000,7 +1015,7 @@ export default function OrgMembersExplorer({
               rows={search.matches}
               hitUid={search.hitUid}
               loading={search.searching || search.matchesLoading}
-              onOpenMember={openMember}
+              onOpenMember={(uid, orgId) => openMember(uid, orgId)}
             />
           ) : /* 组织树隐藏（showOrgTree=false）或已收起（treeCollapsed）时，组织加载错误不会在
                 左侧树卡片中展示，需在成员卡片体兜底提示，避免报错被静默吞掉（代码要求 3） */

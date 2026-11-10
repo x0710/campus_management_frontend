@@ -6,7 +6,8 @@
  * 只要该标记为 true，弹窗就强制显示且无法关闭（无取消按钮、遮罩不可点、禁用 ESC），
  * 用户必须改密成功（PATCH /api/credentials 返回成功）后才会解除拦截。
  *
- * 后端「修改自己」分支要求校验旧密码，故表单需要填写当前（初始）密码。
+ * 首次登录强制改密无需用户输入旧密码：请求不携带 old_password，
+ * 由后端依据首次登录状态放行（主动在顶部菜单「重置密码」仍需校验旧密码）。
  */
 import { LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { Alert, App as AntdApp, Button, Form, Input, Modal } from 'antd'
@@ -17,9 +18,8 @@ import { useErrorFeedback } from '../composables/useErrorFeedback'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 
-/** 强制改密表单字段 */
+/** 强制改密表单字段（首次登录免旧密码） */
 interface ForcePasswordForm {
-  old_password: string
   new_password: string
   confirm_password: string
 }
@@ -42,7 +42,7 @@ export default function ForcePasswordChangeModal() {
     if (mustChangePassword) form.resetFields()
   }, [mustChangePassword, form])
 
-  /** 提交改密：校验旧密码后调用 PATCH /api/credentials，成功后解除强制弹窗 */
+  /** 提交改密：首次登录免旧密码，直接调用 PATCH /api/credentials，成功后解除强制弹窗 */
   const submit = async () => {
     let values: ForcePasswordForm
     try {
@@ -54,7 +54,8 @@ export default function ForcePasswordChangeModal() {
     setSubmitting(true)
     try {
       const me = await getCurrentUser()
-      await changeMyPassword(me.uid, values.old_password, values.new_password)
+      // 首次登录强制改密不传旧密码（undefined → 请求体省略 old_password）
+      await changeMyPassword(me.uid, undefined, values.new_password)
       message.success(t('password.forceSuccess'))
       finishPasswordChange()
     } catch (err) {
@@ -91,17 +92,6 @@ export default function ForcePasswordChangeModal() {
         style={{ marginBottom: 12 }}
       />
       <Form form={form} layout="vertical" autoComplete="off">
-        <Form.Item
-          name="old_password"
-          label={t('password.oldLabel')}
-          rules={[{ required: true, message: t('password.oldRequired') }]}
-        >
-          <Input.Password
-            prefix={<LockOutlined className="field-icon" />}
-            maxLength={64}
-            autoComplete="current-password"
-          />
-        </Form.Item>
         <Form.Item
           name="new_password"
           label={t('password.newLabel')}

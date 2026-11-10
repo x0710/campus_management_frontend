@@ -130,9 +130,9 @@ interface OrgAdminViewProps {
    */
   rootOrgId?: number
   /**
-   * 成员列表以「先锋等级」（党建活动加分总分）代替「工作地点」列。
+   * 成员列表展示「先锋等级」（党建活动加分总分）列。
    * 党委学校端「组织管理」开启，口径与支部端「支部管理」成员列表一致；
-   * 管理端「组织架构」保持原「工作地点」列。
+   * 管理端「组织架构」不展示该列，也不再展示「工作地点」列。
    */
   partyScoreColumns?: boolean
   /**
@@ -572,6 +572,15 @@ export default function OrgAdminView({
   })
   const { consumePendingPage } = search
 
+  // 「单独查看匹配人员」模式下成员表不切换所属组织，但组织树的高亮组织要跟随当前命中成员，
+  // 否则点「上一个 / 下一个」推进匹配人员时，树会一直停在最初命中的组织上。
+  const matchHitOrgId = useMemo<number | null>(() => {
+    if (!search.matchOnly || search.hitUid === null) return null
+    return search.matches.find((m) => m.uid === search.hitUid)?.targetId ?? null
+  }, [search.matchOnly, search.hitUid, search.matches])
+  // 组织树当前高亮的组织：单独查看匹配人员时跟随命中成员，其余场景沿用用户选中的组织
+  const highlightedOrgId = matchHitOrgId ?? selectedId
+
   // 组织树默认只展开根节点（进入页面不全量展开，避免树过长铺满；深层分支点击再展开）
   const rootKeys = useMemo<React.Key[]>(() => {
     if (rootOrgId !== undefined) return [rootOrgId]
@@ -607,9 +616,10 @@ export default function OrgAdminView({
     [orgsInTree, orgSearch, rootOrgId],
   )
 
-  // 搜索定位到成员后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）
+  // 搜索定位到成员后，组织树自动滚动到该组织节点（树很长时也能直接看到定位结果）。
+  // 「单独查看匹配人员」时同样滚动，使树上的高亮组织跟着命中成员一起切换。
   useEffect(() => {
-    if (treeCollapsed || search.matchOnly || search.hitUid === null || selectedId === null) return
+    if (treeCollapsed || search.hitUid === null || highlightedOrgId === null) return
     // 等组织树完成展开动画并渲染出选中节点后再滚动，避免定位到尚未挂载的节点
     const timer = window.setTimeout(() => {
       document
@@ -617,7 +627,7 @@ export default function OrgAdminView({
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 150)
     return () => window.clearTimeout(timer)
-  }, [treeCollapsed, search.matchOnly, search.hitUid, search.locateTick, selectedId, treeData])
+  }, [treeCollapsed, search.hitUid, search.locateTick, highlightedOrgId, treeData])
 
   const parentOptions = useMemo(
     () =>
@@ -709,9 +719,14 @@ export default function OrgAdminView({
   }, [scoreMemberIds, partyScoreColumns, refreshVersion])
 
   const onSelectTree: TreeProps['onSelect'] = (keys: React.Key[]) => {
-    // 在「单独查看匹配人员」模式下点击组织树，视为想浏览该组织：自动切回组织内查看
-    // （false：不要按当前命中人员重新定位，否则会覆盖用户刚选中的组织）
-    if (search.matchOnly) search.toggleMatchOnly(false)
+    // 点击组织树视为想浏览该组织：若正处于搜索 / 匹配状态则自动结束匹配
+    // （清空搜索词、命中高亮、匹配结果与组织树定位），恢复普通组织浏览。
+    const hasSearchState =
+      search.query.trim() !== '' ||
+      search.matches.length > 0 ||
+      search.hitUid !== null ||
+      search.matchOnly
+    if (hasSearchState) search.clear()
     setNewMember((s) => ({ ...s, position: '' }))
     setSelectedId(uiKey, keys.length ? Number(keys[0]) : null)
   }
@@ -937,11 +952,11 @@ export default function OrgAdminView({
   }
 
   /**
-   * 成员列表「工作地点 / 先锋等级」列。
-   * 党委学校端开启 partyScoreColumns 时改为党建活动加分总分（与支部端「支部管理」一致），
-   * 其余场景保持原「工作地点」列。
+   * 成员列表「先锋等级」列。
+   * 党委学校端开启 partyScoreColumns 时展示党建活动加分总分（与支部端「支部管理」一致）；
+   * 管理端「组织架构」不展示该列（同时移除原「工作地点」列）。
    */
-  const workplaceOrScoreColumn = useMemo<ColumnsType<UserMemberRow>[number]>(
+  const workplaceOrScoreColumn = useMemo<ColumnsType<UserMemberRow>[number] | null>(
     () =>
       partyScoreColumns
         ? {
@@ -959,13 +974,7 @@ export default function OrgAdminView({
               return <Tag color="green">{formatPartyScoreTotal(score)}</Tag>
             },
           }
-        : {
-            title: t('adminOrg.colWorkplace'),
-            key: 'workplace',
-            // 同一组织多个职位的工作地点去重后合并展示（如「A、B」）
-            render: (_, record) =>
-              record.workplaces.length > 0 ? record.workplaces.join('、') : '—',
-          },
+        : null,
     [partyScoreColumns, t, partyScores, partyScoresLoading, scoreSort],
   )
 
@@ -1052,8 +1061,8 @@ export default function OrgAdminView({
             </Space>
           ),
       },
-      // 「工作地点 / 先锋等级」列：党委学校端改为先锋等级（党建加分总分）
-      workplaceOrScoreColumn,
+      // 「先锋等级」列：仅党委学校端展示（管理端组织架构不再展示工作地点列）
+      ...(workplaceOrScoreColumn ? [workplaceOrScoreColumn] : []),
       {
         title: t('approval.colAction'),
         key: 'action',
@@ -1201,7 +1210,7 @@ export default function OrgAdminView({
                     search.setFocusKeys(keys)
                     setOrgTreeExpanded(uiKey, keys.map((k) => Number(k)))
                   }}
-                  selectedKeys={selectedId !== null ? [selectedId] : []}
+                  selectedKeys={highlightedOrgId !== null ? [highlightedOrgId] : []}
                   onSelect={onSelectTree}
                   showLine
                   blockNode

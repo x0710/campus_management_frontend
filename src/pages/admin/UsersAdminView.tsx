@@ -58,7 +58,6 @@ import { useAuthStore } from '../../store/auth'
 import { useUiStateStore } from '../../store/uiState'
 import { extractErrorReason } from '../../api/common'
 import ErrorState from '../../components/ErrorState'
-import OrganizationName from '../../components/OrganizationName'
 import RecentAccountSwitcher from '../../components/RecentAccountSwitcher'
 import PersonSearchBox from '../../components/PersonSearchBox'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
@@ -153,7 +152,12 @@ export default function UsersAdminView() {
   const [roleMap, setRoleMap] = useState<Map<number, RoleInfo[]>>(new Map())
   // 组织 / 职位选项：仅用于新建用户弹窗（编辑入口已移到成员详情页，见 MemberDetailPage）
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([])
-  const organizationCodes = useMemo(() => new Map(organizations.map((org) => [org.id, org.code])), [organizations])
+  // 组织 ID → 组织信息：用户任职列直接用这份全量组织数据展示名称与编码，
+  // 不再按 org_id 逐个请求 GET /organizations/{id}（组织量多时会产生大量零散请求）。
+  const organizationById = useMemo(
+    () => new Map(organizations.map((org) => [org.id, org])),
+    [organizations],
+  )
   const [myUid, setMyUid] = useState<number | null>(null)
   const { data: myRoles } = useSharedResource(myRolesResource)
   const isSuperAdmin = myRoles.some((role) => role.code === 'super_admin')
@@ -547,14 +551,22 @@ export default function UsersAdminView() {
           if (list.length === 0) return <span className="cell-sub">—</span>
           return (
             <span className="org-member-tags">
-              {list.map((o) => (
-                <Tag
-                  key={`${o.organization_id}-${o.position}`}
-                  title={`${o.organization_name}${organizationCodes.get(o.organization_id) ? `（${organizationCodes.get(o.organization_id)}）` : ''} / ${positionLabel(o.position)}${o.workplace ? ' / ' + o.workplace : ''}`}
-                >
-                  <OrganizationName id={o.organization_id} fallbackName={o.organization_name} code={organizationCodes.get(o.organization_id)} />/{positionLabel(o.position)}
-                </Tag>
-              ))}
+              {list.map((o) => {
+                // 组织名称 / 编码优先取全量组织列表，缺失时回退任职记录自带的组织名称；
+                // 全程不做单组织查询，避免按行逐个请求 GET /organizations/{id}
+                const org = organizationById.get(o.organization_id)
+                const orgName = org?.name ?? o.organization_name
+                const orgCode = org?.code
+                return (
+                  <Tag
+                    key={`${o.organization_id}-${o.position}`}
+                    title={`${orgName}${orgCode ? `（${orgCode}）` : ''} / ${positionLabel(o.position)}${o.workplace ? ' / ' + o.workplace : ''}`}
+                  >
+                    {orgName}
+                    {orgCode ? `（${orgCode}）` : ''}/{positionLabel(o.position)}
+                  </Tag>
+                )
+              })}
             </span>
           )
         },
@@ -621,7 +633,7 @@ export default function UsersAdminView() {
       roleMap,
       rolesError,
       userOrgs,
-      organizationCodes,
+      organizationById,
       positionLabel,
       actingUid,
       modal,
