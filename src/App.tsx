@@ -1,15 +1,18 @@
-/** 
+/**
  * 应用路由定义与路由守卫。
- * /login 为公开登录页；其余路由统一经过 RequireAuth 守卫。
- * / 是登录后的角色解析页，会根据当前用户角色跳转到对应门户；
- * /portal/:portalKey 是各门户的工作台（顶栏 + 侧栏 + 内容区）。
+ * /campus/login 为公开登录页；业务路由统一经过 RequireAuth 守卫。
+ * /campus 是登录后的角色解析页，根据当前用户任职跳转到对应门户；
+ * 党建门户位于 /campus/party 下，管理门户位于 /campus/admin。
  */
 
 import { lazy } from 'react'
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import ForcePasswordChangeModal from './components/ForcePasswordChangeModal'
+import { CAS_CALLBACK_PATH } from './config/auth'
+import { CAMPUS_PATH, LOGIN_PATH, PORTAL_PATHS, migrateLegacyPath } from './config/routes'
 import { BULK_ADD_MEMBERS_ROUTE } from './config/bulkMembers'
 import LoginPage from './pages/LoginPage'
+import CasCallbackPage from './pages/CasCallbackPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalRedirect from './pages/main/PortalRedirect'
 import PortalWorkspace from './pages/main/PortalWorkspace'
@@ -33,7 +36,7 @@ const BulkAddMembersView = lazy(() => import('./pages/admin/BulkAddMembersView')
 
 /**
  * 路由守卫组件。
- * 无入参；未登录时返回跳转 /login 的 Navigate 元素，
+ * 无入参；未登录时返回跳转 /campus/login 的 Navigate 元素，
  * 已登录时渲染子路由出口 Outlet。
  */
 function RequireAuth() {
@@ -41,9 +44,16 @@ function RequireAuth() {
   const location = useLocation()
 
   if (!token) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    return <Navigate to={LOGIN_PATH} replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />
   }
   return <Outlet key={token} />
+}
+
+/** 旧书签和持久化返回位置统一迁移，保留页面参数与路由状态。 */
+function LegacyRouteRedirect() {
+  const location = useLocation()
+  const to = migrateLegacyPath(`${location.pathname}${location.search}${location.hash}`)
+  return <Navigate to={to} replace state={location.state} />
 }
 
 /** App 组件。
@@ -55,61 +65,66 @@ export default function App() {
       {/* 首次登录强制改密：根级常驻，只要登录态要求改密就覆盖全站且不可关闭 */}
       <ForcePasswordChangeModal />
       <Routes>
-      <Route path="/login" element={<LoginPage />} />
+        <Route path={LOGIN_PATH} element={<LoginPage />} />
+        <Route path={CAS_CALLBACK_PATH} element={<CasCallbackPage />} />
+        <Route path="/" element={<LegacyRouteRedirect />} />
+        <Route path="/login" element={<LegacyRouteRedirect />} />
+        <Route path="/home" element={<LegacyRouteRedirect />} />
+        <Route path="/portal/:portalKey/*" element={<LegacyRouteRedirect />} />
 
-      {/* 受保护路由：统一由 RequireAuth 守卫 */}
-      <Route element={<RequireAuth />}>
-        {/* 登录后默认入口：根据角色跳转对应门户 */}
-        <Route path="/" element={<PortalRedirect />} />
+        {/* 受保护路由：统一由 RequireAuth 守卫 */}
+        <Route element={<RequireAuth />}>
+          {/* 登录后默认入口：根据角色跳转对应门户 */}
+          <Route path={CAMPUS_PATH} element={<PortalRedirect />} />
 
-        {/* 兼容旧地址 /home，直接回到角色解析页，不再显示门户选择页 */}
-        <Route path="/home" element={<Navigate to = "/" replace />} />
+          {/*
+            工作端布局：以 PortalWorkspace 作为「界面壳」（顶栏 + 侧栏 + 内容区），
+            其下子路由共享同一侧栏菜单——切换模块或进入公告详情时侧栏不变，
+            仅内容区替换。不同 portalKey 渲染对应门户的菜单。
+          */}
+          {Object.values(PORTAL_PATHS).map((path) => (
+            <Route key={path} path={path} element={<PortalWorkspace />}>
+              {/* 门户入口跳转到首个已开通模块 */}
+              <Route index element={<PortalModuleRoute />} />
+              {/* 各门户共享模块与详情路由 */}
+              <Route path=":moduleKey" element={<PortalModuleRoute />} />
+              {/* 顶栏全局入口：问题上报（独立于门户模块列表，所有已登录用户可进入） */}
+              <Route path="feedback" element={<FeedbackView />} />
+              {/* 公告新建（必须先于 :id 声明，避免 /announcements/new 被当作 id="new" 匹配） */}
+              <Route path="announcements/new" element={<AnnouncementEditorPage />} />
+              {/* 公告编辑：带 id，走 GET/PATCH /api/announcements/{id} */}
+              <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
+              {/* 公告详情，沿用同一界面壳与侧栏 */}
+              <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
+              {/* 党建活动加分审批详情：双击审核列表整行或操作列进入，
+                  沿用同一界面壳与侧栏（?from=<moduleKey>&action=<动作>） */}
+              <Route
+                path="party-score-approvals/:stepId"
+                element={<PartyScoreApprovalDetailPage />}
+              />
+              {/* 党员端成绩申报详情：首页「近期记录」点击进入，
+                  沿用同一界面壳与侧栏（?from=<moduleKey>） */}
+              <Route path="party-scores/:id" element={<PartyScoreDetailPage />} />
+              {/* 审批指标（审批模板）详情：党委支部端「指标」列表双击进入，
+                  沿用同一界面壳与侧栏（?from=<moduleKey>） */}
+              <Route
+                path="approval-templates/:id"
+                element={<ApprovalTemplateDetailPage />}
+              />
+              {/* 成员详情：领导端组织概览/老师端班级管理/党委各端支部管理/管理端组织架构/
+                  学校端组织管理点击成员进入，沿用同一界面壳与侧栏（?from=<moduleKey>） */}
+              <Route path="organization-members/:uid" element={<MemberDetailPage />} />
+              {/* 批量添加新成员：组织成员管理左侧组织树「新建组织」旁按钮进入，
+                  页内同时查看组织 / 身份 / 系统角色三张对照表与样表（?from=<moduleKey>） */}
+              <Route path={BULK_ADD_MEMBERS_ROUTE} element={<BulkAddMembersView />} />
+              <Route path="*" element={<Navigate to={path} replace />} />
+            </Route>
+          ))}
 
-        {/*
-          工作端布局：以 PortalWorkspace 作为「界面壳」（顶栏 + 侧栏 + 内容区），
-          其下子路由共享同一侧栏菜单——切换模块或进入公告详情时侧栏不变，
-          仅内容区替换。不同 portalKey 渲染对应门户的菜单。
-        */}
-        <Route path="/portal/:portalKey" element={<PortalWorkspace />}>
-          {/* 进入 /portal/:portalKey（无 moduleKey）：由 PortalModuleRoute 跳转到首个已开通模块 */}
-          <Route index element={<PortalModuleRoute />} />
-          {/* /portal/:portalKey/:moduleKey：渲染具体模块视图 */}
-          <Route path=":moduleKey" element={<PortalModuleRoute />} />
-          {/* 顶栏全局入口：问题上报（独立于门户模块列表，所有已登录用户可进入） */}
-          <Route path="feedback" element={<FeedbackView />} />
-          {/* 公告新建（必须先于 :id 声明，避免 /announcements/new 被当作 id="new" 匹配） */}
-          <Route path="announcements/new" element={<AnnouncementEditorPage />} />
-          {/* 公告编辑：带 id，走 GET/PATCH /api/announcements/{id} */}
-          <Route path="announcements/:id/edit" element={<AnnouncementEditorPage />} />
-          {/* /portal/:portalKey/announcements/:id：公告详情，沿用同一界面壳与侧栏 */}
-          <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
-          {/* 党建活动加分审批详情：双击审核列表整行或操作列进入，
-              沿用同一界面壳与侧栏（?from=<moduleKey>&action=<动作>） */}
-          <Route
-            path="party-score-approvals/:stepId"
-            element={<PartyScoreApprovalDetailPage />}
-          />
-          {/* 党员端成绩申报详情：首页「近期记录」点击进入，
-              沿用同一界面壳与侧栏（?from=<moduleKey>） */}
-          <Route path="party-scores/:id" element={<PartyScoreDetailPage />} />
-          {/* 审批指标（审批模板）详情：党委支部端「指标」列表双击进入，
-              沿用同一界面壳与侧栏（?from=<moduleKey>） */}
-          <Route
-            path="approval-templates/:id"
-            element={<ApprovalTemplateDetailPage />}
-          />
-          {/* 成员详情：领导端组织概览/老师端班级管理/党委各端支部管理/管理端组织架构/
-              学校端组织管理点击成员进入，沿用同一界面壳与侧栏（?from=<moduleKey>） */}
-          <Route path="organization-members/:uid" element={<MemberDetailPage />} />
-          {/* 批量添加新成员：组织成员管理左侧组织树「新建组织」旁按钮进入，
-              页内同时查看组织 / 身份 / 系统角色三张对照表与样表（?from=<moduleKey>） */}
-          <Route path={BULK_ADD_MEMBERS_ROUTE} element={<BulkAddMembersView />} />
+          {/* 未匹配的已登录地址统一回到角色解析页 */}
+          <Route path="*" element={<Navigate to={CAMPUS_PATH} replace />} />
         </Route>
-
-      {/* 未匹配的已登录地址统一回到角色解析页 */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+      </Routes>
     </>
   )
 }

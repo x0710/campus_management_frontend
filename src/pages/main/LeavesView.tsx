@@ -1,3 +1,4 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
 /** 请假列表页（当前未注册路由，保留供复用）。 */
 
 import { ReloadOutlined } from '@ant-design/icons'
@@ -27,8 +28,8 @@ const LEAVE_COLOR: Record<LeaveType, string> = {
 export default function LeavesView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
-  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
-    usePaginated<LeaveInfo>(queryLeaves)
+  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh, dateQuery, setDateQuery } =
+    usePaginated<LeaveInfo>(queryLeaves, undefined, 'aliased')
   /** 双击行进入的请假详情 ID（代码要求 14） */
   const [detailId, setDetailId] = useState<number | null>(null)
 
@@ -79,7 +80,8 @@ export default function LeavesView() {
       <section className="panel-card">
       <header className="panel-card-header">
         <h3 className="panel-card-title">{t('leave.title')}</h3>
-        <Button icon={<ReloadOutlined />} onClick={refresh}>
+        <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
+          <Button icon={<ReloadOutlined />} onClick={refresh}>
           {t('common.refresh')}
         </Button>
       </header>

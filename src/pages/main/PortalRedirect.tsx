@@ -1,6 +1,7 @@
+import { getPortalPath, LOGIN_PATH } from '../../config/routes'
 /**
  * 登录后的门户解析页：
- * 获取当前登录用户的任职列表，按任职职位分流并以 replace 方式跳转到 /portal/:portalKey：
+ * 获取当前登录用户的任职列表，按任职职位分流并以 replace 方式跳转到 <门户路径>：
  * - 支部书记（party_branch）→ 党委支部端；党委委员（party_committee）→ 党委学院端；
  *   校级党委（party_sch）→ 党委学校端；其余（含无角色信息）→ 党员端（DEFAULT_PORTAL_KEY）；
  * - 任职信息获取失败（后端未启动、网络不通、登录态失效等）时不显示空白错误页，
@@ -38,14 +39,14 @@ export default function PortalRedirect() {
         // 按任职职位分流：支部书记（party_branch）→ 支部端；
         // 党委委员（party_committee）→ 学院端；校级党委（party_sch）→ 学校端；其余默认党员端
         const portalKey = resolveDefaultPortalKey(positions)
-        navigate(`/portal/${portalKey}`, { replace: true })
+        navigate(getPortalPath(portalKey), { replace: true })
       })
       .catch((err) => {
         if (!isCurrent()) return
         // 先清空接口会话缓存再清登录态，避免下一位用户看到上一位用户的数据（代码要求 17）
         invalidate()
         clearAuth()
-        navigate('/login', {
+        navigate(LOGIN_PATH, {
           replace: true,
           // 登录页读取该 state 展示失败原因（含状态码与中文说明，代码要求 9）
           state: { loginError: extractErrorReason(err, t) },

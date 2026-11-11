@@ -50,6 +50,7 @@ export async function fetchMemberInfoExportRows(options: {
   orgs: Array<{ id: number; name: string; parent_id?: number | null }>
   orgId: number
   includeChildren: boolean
+  dates?: import('../api/types/common').CreatedDateQuery
 }): Promise<MemberInfoExportRow[]> {
   const { orgs, orgId, includeChildren } = options
   const orgIds = includeChildren ? [orgId, ...listOrgDescendantIds(orgs, orgId)] : [orgId]
@@ -59,7 +60,7 @@ export async function fetchMemberInfoExportRows(options: {
     let page = 1
     let totalPages = 1
     do {
-      const res = await queryOrgMembers(id, { page, page_size: BATCH_SIZE })
+      const res = await queryOrgMembers(id, { ...options.dates, page, page_size: BATCH_SIZE })
       for (const member of res.data) {
         const entry = byUser.get(member.user_id) ?? { positions: [], orgNames: [] }
         const position = member.position?.trim()

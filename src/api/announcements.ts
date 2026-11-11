@@ -3,7 +3,8 @@
 import dayjs from 'dayjs'
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PaginatedResponse } from './types/common'
+import type { CreatedDateQuery, PaginatedResponse } from './types/common'
+import { fetchAllPages } from '../utils/pagination'
 import type {
   AnnouncementCreateRequest,
   AnnouncementDetail,
@@ -63,15 +64,24 @@ export async function queryAnnouncements(
  */
 export async function listAllAnnouncements(
   force?: boolean,
+  isCurrent?: () => boolean,
+  dates: CreatedDateQuery = {},
 ): Promise<AnnouncementListItem[]> {
   const pageSize = 100
-  const all: AnnouncementListItem[] = []
-  for (let page = 1; page <= 100; page += 1) {
-    const res = await queryAnnouncements({ page, page_size: pageSize }, force)
-    all.push(...res.data)
-    if (res.data.length < pageSize || all.length >= res.total) break
+  // 裸数组形态的 queryAnnouncements 已在前端切页，读取第 1 页时已拿到全集。
+  // 继续请求后续页会重复下载并排序同一份数组。
+  const first = await cachedGet<PaginatedResponse<AnnouncementListItem> | AnnouncementListItem[]>(
+    '/announcements', { ...dates, page: 1, page_size: pageSize }, { force },
+  )
+  if (Array.isArray(first)) {
+    return [...first].sort((a, b) => {
+      const byTime = dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf()
+      return byTime !== 0 ? byTime : b.id - a.id
+    })
   }
-  return all
+  return fetchAllPages(
+    (page) => page === 1 ? Promise.resolve(first) : queryAnnouncements({ ...dates, page, page_size: pageSize }, force), pageSize, 100, isCurrent,
+  )
 }
 
 /**
@@ -168,8 +178,9 @@ export async function replaceAnnouncementVisibilities(
 export function getAnnouncementReaders(
   id: number,
   force?: boolean,
+  dates: CreatedDateQuery = {},
 ): Promise<AnnouncementReadRecord[]> {
-  return cachedGet<AnnouncementReadRecord[]>(`/announcements/${id}/readers`, undefined, {
+  return cachedGet<AnnouncementReadRecord[]>(`/announcements/${id}/readers`, { ...dates }, {
     force,
   })
 }

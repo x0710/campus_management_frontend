@@ -1,3 +1,4 @@
+import type { CreatedDateQuery } from '../api/types/common'
 /**
  * 组织成员「按学号 / 姓名搜索」通用逻辑（代码要求 1：各门户的组织成员页面复用同一套实现）。
  *
@@ -57,6 +58,9 @@ import { useUiStateStore } from '../store/uiState'
 import { listOrgChainIds } from '../utils/orgTree'
 import { isUidTerm } from '../utils/personSearch'
 import { useErrorFeedback } from './useErrorFeedback'
+import type { MemberSearchHit } from '../types/memberSearch'
+
+export type { MemberSearchHit } from '../types/memberSearch'
 
 /** 搜索所需的组织最小信息（OrganizationInfo / OrgNode / 任职组织均可直接传入） */
 export interface MemberSearchOrg {
@@ -64,18 +68,6 @@ export interface MemberSearchOrg {
   id: number
   /** 上级组织 ID（可选，缺省视为根节点） */
   parent_id?: number | null
-}
-
-/** 姓名 / 学号搜索命中的单个成员（结果条与定位共用） */
-export interface MemberSearchHit {
-  /** 用户 ID */
-  uid: number
-  /** 用户姓名（学号搜索时无从得知，为 null） */
-  name: string | null
-  /** 目标组织 ID（该用户在当前展示范围内的第一个任职组织） */
-  targetId: number
-  /** 目标组织名称 */
-  orgName: string
 }
 
 /** 姓名搜索单页解析结果 */
@@ -89,6 +81,7 @@ interface NamePageResult {
 }
 
 interface UseMemberSearchOptions {
+  memberDates?: CreatedDateQuery
   /** 当前展示的组织列表（必填） */
   orgs: MemberSearchOrg[]
   /** 成员表每页条数（必填，与宿主成员表一致，用于计算目标页） */
@@ -190,9 +183,10 @@ export async function findMemberPage(
   orgId: number,
   uid: number,
   pageSize: number,
+  dates: CreatedDateQuery = {},
 ): Promise<number | null> {
   for (let page = 1; page <= MEMBER_SEARCH_MAX_PAGES; page += 1) {
-    const res = await queryOrgMembers(orgId, { page, page_size: pageSize })
+    const res = await queryOrgMembers(orgId, { ...dates, page, page_size: pageSize })
     if (res.data.some((m) => m.user_id === uid)) return page
     // 不足一页说明已到末页，无需继续扫描
     if (res.data.length < pageSize) return null
@@ -209,8 +203,9 @@ export async function findMemberPage(
 async function inScopeOrgOf(
   uid: number,
   orgs: MemberSearchOrg[],
+  dates: CreatedDateQuery = {},
 ): Promise<UserOrganization | undefined> {
-  const owned = await listUserOrganizations(uid)
+  const owned = await listUserOrganizations(uid, undefined, false, dates)
   return owned.find((o) => orgs.some((x) => x.id === o.organization_id))
 }
 
@@ -242,6 +237,7 @@ async function resolveNamePage(
   keyword: string,
   page: number,
   orgs: MemberSearchOrg[],
+  dates: CreatedDateQuery = {},
 ): Promise<NamePageResult> {
   const res = await queryUsers({
     keyword,
@@ -251,7 +247,7 @@ async function resolveNamePage(
   // 本页用户的任职组织批量解析（一次请求），避免逐个用户发起请求
   const byUid = groupByUid(
     res.data.length
-      ? await listUserOrganizationsBatch(res.data.map((u) => u.uid))
+      ? await listUserOrganizationsBatch(res.data.map((u) => u.uid), undefined, false, dates)
       : [],
   )
   const hits: MemberSearchHit[] = []
@@ -289,6 +285,7 @@ async function resolveNamePage(
 async function resolveAllMatches(
   keyword: string,
   orgs: MemberSearchOrg[],
+  dates: CreatedDateQuery = {},
 ): Promise<NamePageResult> {
   const hits: MemberSearchHit[] = []
   let total = 0
@@ -303,7 +300,7 @@ async function resolveAllMatches(
     pages = Math.max(1, res.total_pages)
     const byUid = groupByUid(
       res.data.length
-        ? await listUserOrganizationsBatch(res.data.map((u) => u.uid))
+        ? await listUserOrganizationsBatch(res.data.map((u) => u.uid), undefined, false, dates)
         : [],
     )
     for (const user of res.data) {
@@ -334,7 +331,10 @@ async function resolveAllMatches(
  * @param options 宿主上下文（必填，见 UseMemberSearchOptions）
  * @returns 搜索状态与操作（query / run / hitUid / focusKeys / resultTotal / showPrev / showNext / clear 等）
  */
+const EMPTY_MEMBER_DATES: CreatedDateQuery = {}
+
 export function useMemberSearch({
+  memberDates = EMPTY_MEMBER_DATES,
   orgs,
   memberPageSize,
   activeOrgId,
@@ -345,6 +345,8 @@ export function useMemberSearch({
   resolveMemberPage,
   persistKey,
 }: UseMemberSearchOptions): MemberSearchController {
+  const memberDatesRef = useRef(memberDates)
+  memberDatesRef.current = memberDates
   const t = useT()
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
@@ -400,7 +402,7 @@ export function useMemberSearch({
       // 宿主已在前端过滤 / 排序并自行分页时，用其提供的解析函数计算目标页
       const page = resolveMemberPage
         ? ((await resolveMemberPage(hit.targetId, hit.uid)) ?? 1)
-        : ((await findMemberPage(hit.targetId, hit.uid, memberPageSize)) ?? 1)
+        : ((await findMemberPage(hit.targetId, hit.uid, memberPageSize, memberDates)) ?? 1)
       if (!isCurrent()) return
       setHitUid(hit.uid)
       setLocateTick((n) => n + 1)
@@ -416,7 +418,7 @@ export function useMemberSearch({
         onSelectOrg(hit.targetId)
       }
     },
-    [activeOrgId, memberPageSize, onLoadPage, onClearFilter, orgs, onSelectOrg, resolveMemberPage, locateRequests],
+    [activeOrgId, memberPageSize, onLoadPage, onClearFilter, orgs, memberDates, onSelectOrg, resolveMemberPage, locateRequests],
   )
 
   /** 清空姓名搜索结果条与候选页游标（空搜索 / 学号搜索 / 无命中时复用），并退出「只看匹配人员」 */
@@ -445,7 +447,8 @@ export function useMemberSearch({
     const token = (matchesTokenRef.current += 1)
     setMatchesLoading(true)
     try {
-      const result = await resolveAllMatches(raw, orgs)
+      const result = await resolveAllMatches(raw, orgs, memberDates)
+      if (memberDatesRef.current !== memberDates) return
       // 期间发生了新搜索 / 退出模式：丢弃旧结果
       if (token !== matchesTokenRef.current) return
       setResultTotal(result.total)
@@ -461,7 +464,7 @@ export function useMemberSearch({
     } finally {
       if (token === matchesTokenRef.current) setMatchesLoading(false)
     }
-  }, [orgs, reportError])
+  }, [orgs, memberDates, reportError])
 
   /**
    * 切换查看方式：单独查看匹配人员 ⇄ 在组织里面查看匹配人员。
@@ -496,7 +499,8 @@ export function useMemberSearch({
         // 纯数字视为学号（用户 ID），否则按姓名查询（判定逻辑与用户与账户页共用，见 utils/personSearch）
         if (isUidTerm(raw)) {
           const uid = Number(raw)
-          const targetOrg = await inScopeOrgOf(uid, orgs)
+          const targetOrg = await inScopeOrgOf(uid, orgs, memberDates)
+          if (memberDatesRef.current !== memberDates) return
           if (!targetOrg) {
             setHitUid(null)
             resetNameResult()
@@ -524,7 +528,8 @@ export function useMemberSearch({
         matchesTokenRef.current += 1
         setMatchesLoading(false)
         // 姓名搜索：第一页立即解析；匹配总数取后端 total（不是单页 page_size）
-        const first = await resolveNamePage(raw, 1, orgs)
+        const first = await resolveNamePage(raw, 1, orgs, memberDates)
+        if (memberDatesRef.current !== memberDates) return
         keywordRef.current = raw
         setResultTotal(first.total)
         setMatches(first.hits)
@@ -561,7 +566,7 @@ export function useMemberSearch({
         setSearching(false)
       }
     },
-    [query, message, t, reportError, orgs, locate, resetNameResult, loadAllMatches],
+    [query, message, t, reportError, orgs, memberDates, locate, resetNameResult, loadAllMatches],
   )
 
   /** 定位到指定下标的命中项（上一个 / 下一个共用） */
@@ -598,7 +603,8 @@ export function useMemberSearch({
     setSearching(true)
     try {
       const nextPage = candidatePage + 1
-      const result = await resolveNamePage(raw, nextPage, orgs)
+      const result = await resolveNamePage(raw, nextPage, orgs, memberDates)
+      if (memberDatesRef.current !== memberDates) return
       setCandidatePage(nextPage)
       // 该页没有落在当前组织范围内的人：只推进候选页游标，继续点「下一个」会翻后续页
       if (result.hits.length === 0) return
@@ -614,7 +620,7 @@ export function useMemberSearch({
     } finally {
       setSearching(false)
     }
-  }, [candidatePage, candidatePages, matches, orgs, locate, reportError])
+  }, [candidatePage, candidatePages, matches, orgs, memberDates, locate, reportError])
 
   const showPrev = useCallback(() => {
     if (matchIndex > 0) void showAt(matchIndex - 1)

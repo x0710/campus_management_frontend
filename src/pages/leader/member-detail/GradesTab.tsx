@@ -1,3 +1,5 @@
+import CreatedDateFilter from '../../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../../api/types/common'
 /** 成员详情 - 成绩页签：成绩查询、录入与编辑。 */
 
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
@@ -54,6 +56,7 @@ export default function GradesTab({ uid, t, readOnly }: { uid: number; t: Transl
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [reload, setReload] = useState({ seq: 0, force: false })
 
   const courseDetails = useCourseDetails(
@@ -71,7 +74,7 @@ export default function GradesTab({ uid, t, readOnly }: { uid: number; t: Transl
     setLoading(true)
     setError(null)
     try {
-      const scores = await listAllScoresForUser(uid, reload.force)
+      const scores = await listAllScoresForUser(uid, reload.force, isCurrent, createdDates)
       if (!isCurrent()) return
       setScores(scores)
     } catch (err) {
@@ -81,7 +84,7 @@ export default function GradesTab({ uid, t, readOnly }: { uid: number; t: Transl
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [uid, reload.force, t, requests])
+  }, [uid, reload.force, t, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -221,7 +224,8 @@ export default function GradesTab({ uid, t, readOnly }: { uid: number; t: Transl
 
   return (
     <>
-      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+        <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
         <Tooltip title={t('memberDetail.gradesRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}

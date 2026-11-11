@@ -29,6 +29,22 @@ async function isolated(action) {
   }
 }
 
+test('模拟导入数据遵守 UTC 创建日期范围，筛选后不重新加入范围外的既有用户', async () => isolated(async () => {
+  start()
+  const preview = activeImportPreview()
+  const today = preview.startedAt.slice(0, 10)
+  const load = async (_url, params) => page([])
+  const absent = { start_date: '1900-01-01', end_date: '1900-01-02' }
+  const hiddenUsers = await readPreviewData('/users', absent, load)
+  assert.equal(hiddenUsers.total, 0)
+  const users = await readPreviewData('/users', { start_date: today, end_date: today }, load)
+  assert.deepEqual(users.data.map((user) => user.uid), [3])
+  const noMembers = await readPreviewData('/organizations/10/members', absent, load)
+  assert.equal(noMembers.total, 0)
+  const members = await readPreviewData('/organizations/10/members', { start_date: today, end_date: today }, load)
+  assert.equal(members.total, 2)
+}))
+
 test('统一读取层先合并再筛选分页，按 UID 更新且不重复，并保留后端记录', async () => isolated(async () => {
   start()
   const load = async (_url, params) => {

@@ -3,7 +3,7 @@
  * 注意：severity 后端以 camelCase 序列化，JSON 中为小写字符串 low|medium|high|critical。
  * 供 api/violations.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateAliasQuery } from './common'
 
 /** 违规严重程度（api.json: ViolationSeverity，序列化为小写） */
 export type ViolationSeverity = 'low' | 'medium' | 'high' | 'critical'
@@ -28,7 +28,7 @@ export interface ViolationDto {
 }
 
 /** 违规分页查询参数（api.json: ViolationQueryParams） */
-export interface ViolationQuery extends PageQuery {
+export interface ViolationQuery extends PageQuery, CreatedDateAliasQuery {
   /** 按标题或描述模糊搜索 */
   keyword?: string
   /** 按学生 ID 筛选 */

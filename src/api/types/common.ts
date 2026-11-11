@@ -17,3 +17,15 @@ export interface PageQuery {
   page?: number
   page_size?: number
 }
+
+/** 按创建日期查询：YYYY-MM-DD、UTC，起止日均包含，支持仅填一端。 */
+export interface CreatedDateQuery {
+  start_date?: string
+  end_date?: string
+}
+
+/** 请假/违规接口已有业务时间字段，创建日期使用独立名称。 */
+export interface CreatedDateAliasQuery {
+  created_start_date?: string
+  created_end_date?: string
+}

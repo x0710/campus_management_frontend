@@ -1,3 +1,6 @@
+import { toCreatedDateAliases } from '../../utils/dateQuery'
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 学生端：违规记录查询（仅本人违规记录）。
@@ -18,6 +21,7 @@ import { Button, Descriptions, Input, Modal, Select, Spin, Table, Tag, Tooltip }
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRequestSequence } from '../../composables/useRequestSequence'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import { getViolation, queryViolations } from '../../api/violations'
@@ -33,6 +37,7 @@ import {
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
 import { formatDateTime } from '../../utils/datetime'
+import { fetchAllPages } from '../../utils/pagination'
 
 /** ViolationQueryView 组件。
  * @returns 类型：Element
@@ -46,6 +51,7 @@ export default function ViolationQueryView() {
   // 错误文案已含 HTTP 状态码与中文原因（代码要求 9）
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [keyword, setKeyword] = useState('')
   const [severityFilter, setSeverityFilter] = useState<ViolationSeverity[]>([])
   const [categoryFilter, setCategoryFilter] = useState<string[]>([])
@@ -54,6 +60,7 @@ export default function ViolationQueryView() {
     seq: 0,
     force: false,
   })
+  const requests = useRequestSequence()
 
   // ---- 单条违规详情弹窗 ----
   const [detailOpen, setDetailOpen] = useState(false)
@@ -62,25 +69,28 @@ export default function ViolationQueryView() {
 
   /** 重新加载本人违规记录（force=true 绕过会话缓存，代码要求 5） */
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
       // 只使用登录态 uid 查询，学生无法指定他人
       const me = await getCurrentUser()
-      const res = await queryViolations(
-        { user_id: me.uid, page_size: VIOLATION_FETCH_SIZE },
-        reload.force,
+      if (!isCurrent()) return
+      const all = await fetchAllPages(
+        (page) => queryViolations(
+          { ...toCreatedDateAliases(createdDates), user_id: me.uid, page, page_size: VIOLATION_FETCH_SIZE }, reload.force,
+        ), VIOLATION_FETCH_SIZE, 100, isCurrent,
       )
-      setRows(res.data)
+      if (isCurrent()) setRows(all)
     } catch (err) {
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        setError(extractErrorReason(err, t))
+        if (isCurrent()) setError(extractErrorReason(err, t))
       }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [reload.seq, reload.force, t]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reload.seq, reload.force, t, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -202,6 +212,7 @@ export default function ViolationQueryView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('studentViolation.title')}</h3>
           <div className="student-toolbar">
+            <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <Input.Search
               allowClear
               className="admin-search"

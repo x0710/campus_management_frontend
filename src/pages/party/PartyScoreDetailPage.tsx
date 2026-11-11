@@ -1,8 +1,10 @@
+import { getPortalPath, CAMPUS_PATH } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 党员端：成绩申报详情页（申请内容 + 审核内容）。
  *
  * 从党员首页「近期记录」点击整行进入，作为 PortalWorkspace 的子路由渲染
- * （路由：/portal/:portalKey/party-scores/:id?from=<moduleKey>），
+ * （路由：<门户路径>/party-scores/:id?from=<moduleKey>），
  * 只输出内容区，顶栏 + 侧栏由父布局提供，刷新后仍可通过 URL 中的申报 ID 恢复。
  *
  * 页面布局：
@@ -29,7 +31,7 @@ import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Descriptions, Skeleton, Spin, Tag } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { getApprovalTemplateDetail } from '../../api/approvalmodel'
 import { queryMyApprovalSteps } from '../../api/approvals'
@@ -73,7 +75,7 @@ export default function PartyScoreDetailPage() {
   const locale = useSettingsStore((s) => s.locale)
   const navigate = useNavigate()
   const location = useLocation()
-  const { portalKey, id } = useParams<{ portalKey: string; id: string }>()
+  const { portalKey, id } = usePortalParams<{ portalKey: string; id: string }>()
 
   /** 来源模块：用于返回首页与父布局侧栏高亮 */
   const fromModuleKey = new URLSearchParams(location.search).get('from')
@@ -203,13 +205,13 @@ export default function PartyScoreDetailPage() {
   /** 返回来源模块：……首页近期记录（party_m1）或成绩申报记录（party_m2）；无来源时回退门户首页 */
   const backToHome = useCallback(() => {
     if (portalKey && fromModuleKey) {
-      navigate(`/portal/${portalKey}/${fromModuleKey}`)
+      navigate(`${getPortalPath(portalKey)}/${fromModuleKey}`)
     } else if (portalKey) {
-      navigate(`/portal/${portalKey}`)
+      navigate(getPortalPath(portalKey))
     } else if (window.history.length > 1) {
       navigate(-1)
     } else {
-      navigate('/')
+      navigate(CAMPUS_PATH)
     }
   }, [portalKey, fromModuleKey, navigate])
 

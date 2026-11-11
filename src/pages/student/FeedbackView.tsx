@@ -1,3 +1,6 @@
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 /**
  * 学生端：意见反馈（提交、查看、编辑、删除本人反馈）。
  *
@@ -96,6 +99,7 @@ export default function FeedbackView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [appliedKeyword, setAppliedKeyword] = useState('')
   const [category, setCategory] = useState<FeedbackCategory | undefined>()
   const [modalState, setModalState] = useState<FeedbackModalState>({
@@ -109,7 +113,9 @@ export default function FeedbackView() {
   })
 
   /** 重新加载本人反馈（force=true 绕过会话缓存，代码要求 5） */
+  const requests = useRequestSequence()
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
@@ -118,6 +124,7 @@ export default function FeedbackView() {
       const res = await queryFeedbacks(
         {
           user_id: me.uid,
+          ...createdDates,
           page,
           page_size: FEEDBACK_PAGE_SIZE,
           keyword: appliedKeyword.trim() || undefined,
@@ -125,17 +132,19 @@ export default function FeedbackView() {
         },
         reload.force,
       )
+      if (!isCurrent()) return
       setRows(res.data)
       setTotal(res.total)
     } catch (err) {
+      if (!isCurrent()) return
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
         setError(extractErrorReason(err, t))
       }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [page, appliedKeyword, category, reload.seq, reload.force, t])
+  }, [page, appliedKeyword, category, reload.seq, reload.force, t, createdDates, requests])
 
   useEffect(() => {
     void load()
@@ -254,7 +263,8 @@ export default function FeedbackView() {
       <section className={`panel-card${showContactCard ? ' feedback-main-card' : ''}`}>
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('feedback.title')}</h3>
-          <div className="student-toolbar">
+          <div className="student-toolbar" style={{ flexWrap: 'wrap' }}>
+            <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <FeedbackSearchBox
               placeholder={t('feedback.searchPlaceholder')}
               onSubmit={(value) => {

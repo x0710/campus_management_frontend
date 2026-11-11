@@ -1,9 +1,10 @@
+import { CAMPUS_PATH } from '../config/routes'
 /**
  * 登录页：
  * 提供用户名密码登录、记住用户名、语言切换和主题切换。
  * 整屏以 login-background.jpg 作背景，登录表单收进靠右的卡片（登录小窗），避免遮挡背景主体。
- * 登录成功后写入登录态，并跳转到 / 角色解析页；
- * 已登录用户访问本页时直接重定向到 /。
+ * 登录成功后写入登录态，并跳转到 /campus 角色解析页；
+ * 已登录用户访问本页时直接重定向到 /campus。
  * 由其他页面（如角色解析页在后端未启动时）跳转而来时，读取路由 state 中的 loginError
  * 并展示失败原因（含状态码），便于定位问题。
  */
@@ -14,19 +15,19 @@ import {
   SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { App as AntdApp, Button, Checkbox, Dropdown, Form, Input } from 'antd'
+import { Button, Checkbox, Dropdown, Form, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import axios from 'axios'
 import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import ErrorState from '../components/ErrorState'
 import { login } from '../api/auth'
 import { extractErrorReason } from '../api/common'
-import { REMEMBERED_USERNAME_KEY } from '../config/auth'
+import { CAS_LOGIN_URL, REMEMBERED_USERNAME_KEY } from '../config/auth'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
-import { formatDateTime, formatElapsed } from '../utils/datetime'
+import { useLoginSuccess } from '../composables/useLoginSuccess'
 
 interface LoginFormValues {
   username: string
@@ -39,9 +40,7 @@ interface LoginFormValues {
  */
 export default function LoginPage() {
   const t = useT()
-  const { notification } = AntdApp.useApp()
   const [form] = Form.useForm<LoginFormValues>()
-  const navigate = useNavigate()
   const location = useLocation()
   // 其他页面跳转过来时携带的失败原因（如角色解析页遇到后端未启动）
   const routeError = (location.state as { loginError?: string } | null)?.loginError ?? null
@@ -49,16 +48,16 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(routeError)
 
   const token = useAuthStore((s) => s.token)
-  const setAuth = useAuthStore((s) => s.setAuth)
+  const completeLogin = useLoginSuccess()
 
   const locale = useSettingsStore((s) => s.locale)
   const setLocale = useSettingsStore((s) => s.setLocale)
   const theme = useSettingsStore((s) => s.theme)
   const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
-  // 已登录用户访问 /login 时直接进入角色解析页
+  // 已登录用户访问 /campus/login 时直接进入角色解析页
   if (token) {
-    return <Navigate to="/" replace />
+    return <Navigate to={CAMPUS_PATH} replace />
   }
 
   const localeItems: MenuProps['items'] = [
@@ -67,11 +66,11 @@ export default function LoginPage() {
   ]
 
   const onFinish = async (values: LoginFormValues) => {
+    if (submitting) return
     setSubmitting(true)
     setErrorMsg(null)
     try {
       const res = await login({ username: values.username.trim(), password: values.password })
-      setAuth({ token: res.token, username: res.user, lastLoginAt: res.last_login_at })
       try {
         if (values.remember) {
           localStorage.setItem(REMEMBERED_USERNAME_KEY, res.user)
@@ -81,25 +80,7 @@ export default function LoginPage() {
       } catch {
         // 浏览器禁止本地存储时仍允许登录。
       }
-      // 登录成功：顶部弹窗欢迎；有上次登录时间则附带「上次登录 + 已过去」，首次登录走欢迎语
-      if (res.last_login_at) {
-        const elapsed = formatElapsed(res.last_login_at, locale)
-        notification.open({
-          placement: 'top',
-          duration: 4,
-          message: t('login.welcomeBack'),
-          description: `${t('login.lastLoginAt')}：${formatDateTime(res.last_login_at, locale)}${elapsed ? `\n${t('login.elapsed')}：${elapsed}` : ''}`,
-        })
-      } else {
-        notification.open({
-          placement: 'top',
-          duration: 4,
-          message: t('login.welcomeBack'),
-          description: t('login.firstLogin'),
-        })
-      }
-      // 登录成功：进入 /，由 PortalRedirect 请求角色并跳转到对应门户
-      navigate('/', { replace: true })
+      completeLogin(res)
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status
@@ -175,6 +156,7 @@ export default function LoginPage() {
             requiredMark={false}
             initialValues={{ username: rememberedUser ?? '', password: '', remember: true }}
             onFinish={onFinish}
+            disabled={submitting}
             onValuesChange={() => setErrorMsg(null)}
           >
             <Form.Item
@@ -210,6 +192,11 @@ export default function LoginPage() {
               </Button>
             </Form.Item>
           </Form>
+
+          <Button block size="large" icon={<SafetyCertificateOutlined />}
+            href={CAS_LOGIN_URL} disabled={submitting}>
+            {t('login.casLogin')}
+          </Button>
 
           <p className="login-tips">{t('login.tips')}</p>
         </div>

@@ -1,3 +1,7 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /** 管理员端 - 用户管理：搜索、分页、增删改与详情查看。 */
 
 import { useAccountSwitch } from '../../composables/useAccountSwitch'
@@ -34,7 +38,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import {
   createUsers,
   deleteUser,
@@ -121,7 +125,7 @@ export default function UsersAdminView() {
   const t = useT()
   const { message, modal } = AntdApp.useApp()
   const navigate = useNavigate()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
 
   const listKey = `${portalKey}:admin_m1`
   const [savedList] = useState(() => useUiStateStore.getState().userLists[listKey])
@@ -131,6 +135,7 @@ export default function UsersAdminView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(savedList?.page ?? 1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>(savedList?.createdDates ?? {})
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState(savedList?.keyword ?? '')
   // 学号精确筛选（对应后端 ids 查询参数）
@@ -138,8 +143,8 @@ export default function UsersAdminView() {
   const [status, setStatus] = useState<UserStatus | 'all'>(savedList?.status ?? 'all')
   useEffect(() => {
     if (useAuthStore.getState().token !== viewToken) return
-    useUiStateStore.getState().setUserListState(listKey, { page, keyword, uidFilter, status })
-  }, [listKey, page, keyword, uidFilter, status, viewToken])
+    useUiStateStore.getState().setUserListState(listKey, { page, keyword, uidFilter, status, createdDates })
+  }, [listKey, page, keyword, uidFilter, status, viewToken, createdDates])
 
   // 列表重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
   const [reload, setReload] = useState<{ seq: number; force: boolean }>({
@@ -172,7 +177,7 @@ export default function UsersAdminView() {
   // 双击行进入成员详情页（与组织架构共用同一页面，?from=admin_m1 让侧栏保持高亮本模块）
   const openDetail = useCallback(
     (uid: number) => {
-      navigate(`/portal/${portalKey}/organization-members/${uid}?from=admin_m1`)
+      navigate(`${getPortalPath(portalKey)}/organization-members/${uid}?from=admin_m1`)
     },
     [navigate, portalKey],
   )
@@ -220,6 +225,7 @@ export default function UsersAdminView() {
         {
           page,
           page_size: DEFAULT_TABLE_PAGE_SIZE,
+          ...createdDates,
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(uidFilter ? { ids: uidFilter } : {}),
           ...(status === 'all' ? {} : { status }),
@@ -260,7 +266,7 @@ export default function UsersAdminView() {
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [page, keyword, uidFilter, status, reload.force, t, requests])
+  }, [page, keyword, uidFilter, status, reload.force, t, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -652,7 +658,8 @@ export default function UsersAdminView() {
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminUsers.title')}</h3>
-          <div className="approval-toolbar">
+          <div className="approval-toolbar" style={{ flexWrap: 'wrap' }}>
+            <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <UserListSearch onSearch={onSearchPerson} initialValue={uidFilter || keyword} />
             <Select
               value={status}

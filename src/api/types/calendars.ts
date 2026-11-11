@@ -2,7 +2,7 @@
  * 日历模块类型定义：事件类型枚举、列表项/详情、查询参数（分页与区间）与创建/更新请求体。
  * 供 api/calendars.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 日历事件类型（api.json: EventType） */
 export type EventType = 'holiday' | 'exam' | 'activity' | 'other'
@@ -23,7 +23,7 @@ export interface CalendarEventDetail extends CalendarEventInfo {
 }
 
 /** 日历事件分页查询参数 */
-export interface CalendarQuery extends PageQuery {
+export interface CalendarQuery extends PageQuery, CreatedDateQuery {
   event_type?: EventType
   from_date?: string
   to_date?: string
@@ -31,7 +31,7 @@ export interface CalendarQuery extends PageQuery {
 }
 
 /** 日期区间查询条件（用于按月/按自定义区间拉取全部事件） */
-export interface CalendarRangeQuery {
+export interface CalendarRangeQuery extends CreatedDateQuery {
   /** 起始日期下界（含，RFC3339） */
   from_date: string
   /** 起始日期上界（含，RFC3339） */

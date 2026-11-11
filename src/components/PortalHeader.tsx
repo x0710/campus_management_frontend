@@ -1,3 +1,4 @@
+import { getPortalPath, getPortalKeyFromPathname, CAMPUS_PATH, LOGIN_PATH, migrateLegacyPath } from '../config/routes'
 /** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
 import {
   DownOutlined,
@@ -107,10 +108,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const displayName = realName?.trim() ? realName : username
 
   /** 从当前 URL 推导所在门户，用于下拉菜单高亮当前门户 */
-  const currentPortalKey = useMemo<PortalKey | undefined>(() => {
-    const match = location.pathname.match(/^\/portal\/([^/]+)/)
-    return match ? (match[1] as PortalKey) : undefined
-  }, [location.pathname])
+  const currentPortalKey = getPortalKeyFromPathname(location.pathname)
 
   /** 当前门户定义与名称，供左上角门户切换按钮展示 */
   const currentPortal = useMemo(() => getPortal(currentPortalKey), [currentPortalKey])
@@ -147,7 +145,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const profileModuleKey = currentPortalKey ? PORTAL_PROFILE_MODULE_KEYS[currentPortalKey] : undefined
   const profilePath =
     currentPortalKey && profileModuleKey
-      ? `/portal/${currentPortalKey}/${profileModuleKey}`
+      ? `${getPortalPath(currentPortalKey)}/${profileModuleKey}`
       : undefined
 
   /**
@@ -228,13 +226,13 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     // （如 /credentials/me 被缓存时，会把上一位用户的 uid 带给新用户）
     invalidate()
     clearAuth()
-    navigate('/login', { replace: true })
+    navigate(LOGIN_PATH, { replace: true })
   }
 
   return (
     <header className="portal-header">
       <div className="portal-header-left">
-        <div className="header-brand" onClick={() => navigate('/')}>
+        <div className="header-brand" onClick={() => navigate(CAMPUS_PATH)}>
           <span className="sider-mark">
             <SafetyCertificateOutlined />
           </span>
@@ -254,7 +252,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
               onClick: ({ key }: { key: string }) => {
                 const portalKey = key.replace('portal:', '')
                 if (getPortal(portalKey)) {
-                  navigate(`/portal/${portalKey}`)
+                  navigate(getPortalPath(portalKey))
                 }
               },
             }}
@@ -275,7 +273,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             type="primary"
             className="feedback-nav-btn"
             icon={<QuestionCircleOutlined />}
-            onClick={() => navigate(`/portal/${currentPortalKey ?? PARTY_PORTAL_KEY}/feedback`)}
+            onClick={() => navigate(`${getPortalPath(currentPortalKey ?? PARTY_PORTAL_KEY)}/feedback`)}
           >
             {t('common.reportIssue')}
           </Button>
@@ -294,7 +292,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           <Button onClick={() => {
             invalidate()
             useAuthStore.getState().restoreAuth()
-            navigate(originalAuth.returnTo ?? '/', { replace: true })
+            navigate(migrateLegacyPath(originalAuth.returnTo ?? CAMPUS_PATH), { replace: true })
           }}>
             {t('adminUsers.restoreAccount', { name: originalAuth.username })}
           </Button>

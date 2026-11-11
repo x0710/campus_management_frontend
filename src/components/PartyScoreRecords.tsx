@@ -1,3 +1,5 @@
+import CreatedDateFilter from './CreatedDateFilter'
+import type { CreatedDateQuery } from '../api/types/common'
 import { isEntryActionTarget } from '../utils/entryInteraction'
 /**
  * 党员端：我的成绩记录表格（真实党建加分申请数据）。
@@ -29,7 +31,10 @@ import PartyScoreDetailModal from './PartyScoreDetailModal'
 export default function PartyScoreRecords() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
-  const { records, loading, error, refresh } = useMyPartyScores()
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const { records, loading, error, refresh } = useMyPartyScores(createdDates)
   const [templateNames, setTemplateNames] = useState<Map<number, string>>(new Map())
   const [detail, setDetail] = useState<PartyScore | null>(null)
 
@@ -107,13 +112,10 @@ export default function PartyScoreRecords() {
     [t, locale, templateNames],
   )
 
-  if (error) {
-    return <ErrorState message={error} onRetry={() => refresh(true)} />
-  }
-
   return (
     <>
-      <Table<PartyScore>
+      <div style={{ marginBottom: 12 }}><CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} /></div>
+      {error ? <ErrorState message={error} onRetry={() => refresh(true)} /> : <Table<PartyScore>
         rowKey="id"
         loading={loading}
         columns={columns}
@@ -128,15 +130,17 @@ export default function PartyScoreRecords() {
           style: { cursor: 'pointer' },
         })}
         pagination={{
-          pageSize: 20,
+          current: page,
+          pageSize,
+          onChange: (next, size) => { setPage(size !== pageSize ? 1 : next); setPageSize(size) },
           showSizeChanger: true,
           showQuickJumper: true,
           showTotal: (n: number) =>
             `${t('common.total')} ${n} ${t('common.items')} · ${t('common.totalPages', {
-              n: Math.max(1, Math.ceil(n / 20)),
+              n: Math.max(1, Math.ceil(n / pageSize)),
             })}`,
         }}
-      />
+      />}
       <PartyScoreDetailModal
         record={detail}
         templateNames={templateNames}

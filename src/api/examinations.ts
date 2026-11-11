@@ -14,7 +14,8 @@
  */
 import { cachedGet, invalidate } from './cache'
 import { http } from './http'
-import type { PaginatedResponse } from './types/common'
+import { PageLoadCancelled } from '../utils/pagination'
+import type { CreatedDateQuery, PaginatedResponse } from './types/common'
 import type {
   CourseScoreCreateRequest,
   CourseScoreDetail,
@@ -91,10 +92,14 @@ const SCORE_FETCH_PAGE_SIZE = 100
 export async function listAllScoresForUser(
   uid: number,
   force?: boolean,
+  isCurrent: () => boolean = () => true,
+  dates: CreatedDateQuery = {},
 ): Promise<CourseScoreInfo[]> {
   const all: CourseScoreInfo[] = []
   for (let page = 1; ; page += 1) {
-    const res = await queryScores({ uid, page, page_size: SCORE_FETCH_PAGE_SIZE }, force)
+    if (!isCurrent()) throw new PageLoadCancelled()
+    const res = await queryScores({ ...dates, uid, page, page_size: SCORE_FETCH_PAGE_SIZE }, force)
+    if (!isCurrent()) throw new PageLoadCancelled()
     all.push(...res.data)
     if (page >= res.total_pages) break
   }

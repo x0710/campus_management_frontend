@@ -1,3 +1,5 @@
+import CreatedDateFilter from '../../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../../api/types/common'
 /** 成员详情 - 请假页签：请假审批记录查询与详情。 */
 
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
@@ -37,6 +39,7 @@ export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [reloadSeq, setReloadSeq] = useState(0)
   const [detail, setDetail] = useState<LeaveRow | null>(null)
 
@@ -46,7 +49,7 @@ export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
     setLoading(true)
     setError(null)
     try {
-      const steps = await queryApprovals({ applicant_id: uid })
+      const steps = await queryApprovals({ ...createdDates, applicant_id: uid })
       // 每个审批实例取 step_order 最大的步骤状态作为该请假的当前状态
       const statusByInstance = new Map<number, { order: number; status: ApprovalStepStatus }>()
       for (const s of steps) {
@@ -77,7 +80,7 @@ export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [uid, t, requests])
+  }, [uid, t, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -130,6 +133,7 @@ export default function LeaveTab({ uid, t }: { uid: number; t: TranslateFn }) {
   return (
     <>
       <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+            <CreatedDateFilter label={t('common.approvalCreatedDateRange')} value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
         <Tooltip title={t('memberDetail.refreshHint')}>
           <Button icon={<ReloadOutlined />} onClick={() => setReloadSeq((s) => s + 1)}>
             {t('common.refresh')}

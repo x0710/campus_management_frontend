@@ -5,6 +5,7 @@
 import axios from 'axios'
 import { HTTP_STATUS_REASON_KEYS } from '../config/http'
 import type { TranslateFn } from '../i18n'
+import { PageLimitError } from '../utils/pagination'
 
 /**
  * 从 axios 异常提取「状态码 + 中文原因 + 后端原文」的可展示文案（代码要求 9：错误提示需含 404、500 等状态码）。
@@ -16,6 +17,7 @@ import type { TranslateFn } from '../i18n'
  *                 非 axios 异常返回 t('common.loadFailed')
  */
 export function extractErrorReason(err: unknown, t: TranslateFn): string {
+  if (err instanceof PageLimitError) return t('common.pageLimit', { limit: err.limit })
   if (!axios.isAxiosError(err)) return t('common.loadFailed')
   const res = err.response
   if (!res) {

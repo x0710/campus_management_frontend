@@ -1,3 +1,5 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 /** 党员端 - 党员档案页。 */
 
 import { isVisibleUserRole } from '../../config/rbac'
@@ -722,13 +724,14 @@ function NotificationsList() {
   const [notices, setNotices] = useState<Notice[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    queryNotices({ page, page_size: PARTY_NOTICE_PAGE_SIZE })
+    queryNotices({ ...createdDates, page, page_size: PARTY_NOTICE_PAGE_SIZE })
       .then((res) => {
         if (cancelled) return
         setNotices(res.data)
@@ -747,7 +750,7 @@ function NotificationsList() {
     return () => {
       cancelled = true
     }
-  }, [page, reloadSeq, t])
+  }, [page, reloadSeq, t, createdDates])
 
   /** 重新加载（事件回调内可安全重置加载态） */
   const retry = () => {
@@ -802,6 +805,7 @@ function NotificationsList() {
     }
   }
 
+  const renderContent = () => {
   if (loading) {
     return (
       <div className="party-placeholder">
@@ -901,6 +905,13 @@ function NotificationsList() {
       </div>
     </div>
   )
+  }
+  return <div>
+    <div style={{ marginBottom: 16 }}><CreatedDateFilter value={createdDates} onChange={(next) => {
+      setPage(1); setCreatedDates(next); setError(null); setLoading(true)
+    }} /></div>
+    {renderContent()}
+  </div>
 }
 
 /** PartyProfileView 组件。

@@ -216,6 +216,8 @@ export async function queryPartyScoreApprovals(
 
   while (collected.length < targetEnd) {
     const rawParams: ApprovalTodoQuery = {
+      ...(params.start_date ? { start_date: params.start_date } : {}),
+      ...(params.end_date ? { end_date: params.end_date } : {}),
       ...(params.approver_id !== undefined ? { approver_id: params.approver_id } : {}),
       ...(params.applicant_id !== undefined ? { applicant_id: params.applicant_id } : {}),
       ...(params.organization_id !== undefined

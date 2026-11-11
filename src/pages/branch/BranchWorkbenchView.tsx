@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 支部端：工作台（本支部概况 / 等级分布 / 待办事项）。
  *
@@ -21,7 +23,7 @@
  */
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link } from 'react-router'
 import { queryOrgMembers, queryOrganizationMemberCounts } from '../../api/organizations'
 import type { OrganizationMemberCountItem } from '../../api/types/organizations'
 import {
@@ -113,7 +115,7 @@ async function buildGradeDistribution(orgId: number): Promise<GradeDistributionI
  */
 export default function BranchWorkbenchView() {
   const t = useT()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
 
   /** 本支部总人数（人）；null 表示未取到（加载中或加载失败） */
   const [members, setMembers] = useState<number | null>(null)
@@ -335,7 +337,7 @@ export default function BranchWorkbenchView() {
           <ul className="branch-todo-list">
             {/* 待审核申报 → 审核管理（处理待办审批） */}
             <li className="branch-todo-item">
-              <Link className="branch-todo-link" to={`/portal/${portalKey}/branch_m3`}>
+              <Link className="branch-todo-link" to={`${getPortalPath(portalKey)}/branch_m3`}>
                 <span className="branch-todo-label">{t('branch.todo_approve')}</span>
                 <span className="branch-todo-count">
                   {statText(todoApprove)}

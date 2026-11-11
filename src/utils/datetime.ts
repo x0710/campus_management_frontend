@@ -1,7 +1,7 @@
 /** 日期时间格式化工具（按语言与本地时区展示）。 */
 
 import type { Dayjs } from 'dayjs'
-import type { Locale } from '../store/settings'
+import type { Locale } from '../types/locale'
 
 /**
  * 按当前语言格式化日期时间；后端返回 RFC3339（UTC），toLocaleString 自动转本地时区

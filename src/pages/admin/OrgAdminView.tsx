@@ -1,3 +1,7 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /** 管理员端 - 组织管理：组织树维护与成员增删改查。 */
 
 import { isEntryActionTarget } from '../../utils/entryInteraction'
@@ -44,7 +48,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import {
   addOrgMember,
   createOrganization,
@@ -263,7 +267,7 @@ export default function OrgAdminView({
   const t = useT()
   const { message, modal } = AntdApp.useApp()
   const navigate = useNavigate()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
 
   const [orgs, setOrgs] = useState<OrganizationInfo[]>([])
   const [orgsLoading, setOrgsLoading] = useState(true)
@@ -391,6 +395,7 @@ export default function OrgAdminView({
     void loadOrgs()
   }, [loadOrgs])
 
+  const [memberDates, setMemberDates] = useState<CreatedDateQuery>(() => useUiStateStore.getState().memberDateFilters[uiKey] ?? {})
   const loadMembers = useCallback(
     async (orgId: number, page: number, force?: boolean) => {
       const requestId = ++memberRequestRef.current
@@ -405,7 +410,7 @@ export default function OrgAdminView({
             if (!isCurrent()) return
             const res = await queryOrgMembers(
               orgId,
-              { page: current, page_size: MEMBER_PAGE_SIZE },
+              { ...memberDates, page: current, page_size: MEMBER_PAGE_SIZE },
               force,
             )
             if (!isCurrent()) return
@@ -420,7 +425,7 @@ export default function OrgAdminView({
         }
         const res = await queryOrgMembers(
           orgId,
-          { page, page_size: MEMBER_PAGE_SIZE },
+          { ...memberDates, page, page_size: MEMBER_PAGE_SIZE },
           force,
         )
         if (!isCurrent()) return
@@ -433,7 +438,7 @@ export default function OrgAdminView({
         if (isCurrent()) setMembersLoading(false)
       }
     },
-    [needsAllMembers, reportError],
+    [needsAllMembers, reportError, memberDates],
   )
 
   // 成员表展示行：同一成员在当前组织有多个职位时合并为一行（避免出现两个一样的人）
@@ -497,11 +502,11 @@ export default function OrgAdminView({
   /** 前端分页下定位成员所在页（供搜索命中后跳转到目标页） */
   const resolveMemberPage = useCallback(
     async (orgId: number, uid: number) => {
-      if (orgId !== selectedId) return findMemberPage(orgId, uid, MEMBER_PAGE_SIZE)
+      if (orgId !== selectedId) return findMemberPage(orgId, uid, MEMBER_PAGE_SIZE, memberDates)
       const index = memberRows.findIndex((row) => row.user_id === uid)
       return index === -1 ? null : Math.floor(index / MEMBER_PAGE_SIZE) + 1
     },
-    [memberRows, selectedId],
+    [memberRows, selectedId, memberDates],
   )
 
   // 切换组织时清空职位筛选与排序：不同组织的职位集合不同
@@ -555,6 +560,7 @@ export default function OrgAdminView({
 
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
   const search = useMemberSearch({
+    memberDates,
     orgs: orgsInTree,
     memberPageSize: MEMBER_PAGE_SIZE,
     activeOrgId: selectedId,
@@ -663,6 +669,7 @@ export default function OrgAdminView({
         orgs: orgsInTree,
         orgId: selectedOrg.id,
         includeChildren,
+        dates: memberDates,
       })
       if (rows.length === 0) {
         message.warning(t('branchExport.empty'))
@@ -682,7 +689,7 @@ export default function OrgAdminView({
     } finally {
       setExportingMembers(false)
     }
-  }, [selectedOrg, orgsInTree, exportingMembers, positionLabel, t, message])
+  }, [selectedOrg, orgsInTree, exportingMembers, positionLabel, t, message, memberDates])
 
   const displayedMemberIds = useMemo(() => search.matchOnly ? [] : visibleMemberIds, [search.matchOnly, visibleMemberIds])
   const scoreMemberIds = useMemo(() => search.matchOnly ? [] : scoreSort !== null ? allMemberIds : visibleMemberIds, [search.matchOnly, scoreSort, allMemberIds, visibleMemberIds])
@@ -735,7 +742,7 @@ export default function OrgAdminView({
   // from=uiKey 让侧栏仍高亮当前组织模块，返回时回到本页）
   const openMemberDetail = useCallback(
     (uid: number) => {
-      navigate(`/portal/${portalKey}/organization-members/${uid}?from=${uiKey}`)
+      navigate(`${getPortalPath(portalKey)}/organization-members/${uid}?from=${uiKey}`)
     },
     [navigate, portalKey, uiKey],
   )
@@ -1179,7 +1186,7 @@ export default function OrgAdminView({
                   size="small"
                   icon={<TeamOutlined />}
                   onClick={() =>
-                    navigate(`/portal/${portalKey}/${BULK_ADD_MEMBERS_ROUTE}?from=${uiKey}`)
+                    navigate(`${getPortalPath(portalKey)}/${BULK_ADD_MEMBERS_ROUTE}?from=${uiKey}`)
                   }
                 >
                   {t('adminOrg.bulkAddMembers')}
@@ -1370,6 +1377,14 @@ export default function OrgAdminView({
             />
           </div>
         </header>
+        <div className="approval-toolbar" style={{ padding: 12, flexWrap: 'wrap' }}>
+          <CreatedDateFilter value={memberDates} onChange={(next) => {
+            search.clear()
+            setMemberPage(uiKey, 1)
+            useUiStateStore.getState().setMemberDateFilter(uiKey, next)
+            setMemberDates(next)
+          }} />
+        </div>
         <div className="panel-card-body">
           {search.matchOnly ? (
             <MatchedMembersTable

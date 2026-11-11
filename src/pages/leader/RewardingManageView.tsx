@@ -1,3 +1,6 @@
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 领导端：奖学金及补助管理（分页查询 + 新增 + 查看详情 + 编辑 + 删除）。
@@ -154,6 +157,7 @@ export default function RewardingManageView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   // 已应用的筛选条件（点击「搜索」后才提交，避免输入过程中频繁触发请求）
@@ -175,13 +179,16 @@ export default function RewardingManageView() {
   /** 统一错误提示：带 HTTP 状态码与中文原因（代码要求 9） */
   const reportError = useErrorFeedback()
 
+  const requests = useRequestSequence()
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
       const res = await queryRewardings(
         {
           page,
+          ...createdDates,
           page_size: REWARDING_PAGE_SIZE,
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(applied.uid !== null ? { uid: applied.uid } : {}),
@@ -196,17 +203,19 @@ export default function RewardingManageView() {
         },
         reload.force,
       )
+      if (!isCurrent()) return
       setRows(res.data)
       setTotal(res.total)
     } catch (err) {
+      if (!isCurrent()) return
       // 401 由 http 拦截器统一处理登录态，此处不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
         setError(extractErrorReason(err, t))
       }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [page, keyword, applied, reload.seq, reload.force, t])
+  }, [page, keyword, applied, reload.seq, reload.force, t, createdDates, requests])
 
   useEffect(() => {
     void load()
@@ -345,6 +354,7 @@ export default function RewardingManageView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('rewarding.title')}</h3>
           <div className="approval-toolbar">
+            <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <Input.Search
               allowClear
               className="admin-search"

@@ -1,3 +1,5 @@
+import CreatedDateFilter from '../../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../../api/types/common'
 /** 成员详情 - 奖励页签：奖励记录增删改。 */
 
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
@@ -66,6 +68,7 @@ export default function RewardingTab({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [reload, setReload] = useState({ seq: 0, force: false })
   const [detail, setDetail] = useState<RewardingDto | null>(null)
 
@@ -82,7 +85,7 @@ export default function RewardingTab({
     setError(null)
     try {
       const res = await queryRewardings(
-        { page, page_size: MEMBER_DETAIL_PAGE_SIZE, uid },
+        { ...createdDates, page, page_size: MEMBER_DETAIL_PAGE_SIZE, uid },
         reload.force,
       )
       if (!isCurrent()) return
@@ -95,7 +98,7 @@ export default function RewardingTab({
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [uid, page, reload.force, t, requests])
+  }, [uid, page, reload.force, t, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -238,7 +241,8 @@ export default function RewardingTab({
 
   return (
     <>
-      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+        <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
         <Tooltip title={t('memberDetail.rewardingRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}

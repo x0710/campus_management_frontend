@@ -2,7 +2,7 @@
  * 组织模块类型定义：组织信息、组织成员、用户-组织任职详情与查询参数。
  * 供 api/organizations.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 组织信息（api.json: OrganizationInfoDto） */
 export interface OrganizationInfo {
@@ -132,7 +132,7 @@ export interface OrganizationTreeNode {
 }
 
 /** 组织分页查询参数 */
-export interface OrganizationQuery {
+export interface OrganizationQuery extends CreatedDateQuery {
   page?: number
   page_size?: number
   keyword?: string
@@ -140,7 +140,7 @@ export interface OrganizationQuery {
 }
 
 /** 组织成员分页查询参数 */
-export interface OrganizationMemberQuery extends PageQuery {
+export interface OrganizationMemberQuery extends PageQuery, CreatedDateQuery {
   position?: string
   user_id?: number
   /** 按用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */

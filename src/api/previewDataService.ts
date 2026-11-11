@@ -1,3 +1,5 @@
+import { isCreatedDateInRange } from '../utils/dateQuery'
+import type { CreatedDateQuery } from './types/common'
 /** 页面统一读取层：真实数据在缓存中，模拟数据仅在返回页面前合并。 */
 import { CanceledError } from 'axios'
 import { activeImportPreview } from '../store/importPreview'
@@ -27,13 +29,14 @@ function userFields(member: ImportPreview['members'][number]) {
     phone: member.phone || undefined, email: member.email || undefined, birthday: member.birthday || undefined,
   }).filter(([, value]) => value !== undefined))
 }
-function memberships(preview: ImportPreview): Row[] {
+function memberships(preview: ImportPreview, params: Params = {}): Row[] {
   let id = -1
-  return preview.members.flatMap((member) => member.orgIdentities.flatMap((org) => org.positions.map((position) => ({
+  const rows = preview.members.flatMap((member) => member.orgIdentities.flatMap((org) => org.positions.map((position) => ({
     id: id--, user_id: member.uid, position, organization_id: org.orgId,
     organization_name: preview.organizations.find((item) => item.id === org.orgId)?.name ?? '',
     workplace: '', created_at: preview.startedAt,
   }))))
+  return rows.filter((row) => isCreatedDateInRange(row.created_at, params as CreatedDateQuery))
 }
 function appendMemberships(real: Row[], added: Row[], scopedOrg?: number) {
   const key = (row: Row) => `${row.organization_id ?? scopedOrg}:${row.user_id}:${row.position}`
@@ -60,9 +63,12 @@ async function mergePreview(url: string, params: Params, load: Load, preview: Im
     const real = await allPages(load, url, query)
     const merged = new Map(real.map((row) => [Number(row.uid), row]))
     for (const member of selected) {
+      const existing = merged.get(member.uid)
+      if ((params.start_date || params.end_date) && !existing &&
+        (preview.existingUids.has(member.uid) || !isCreatedDateInRange(preview.startedAt, params as CreatedDateQuery))) continue
       if (params.status && preview.existingUids.has(member.uid) && !merged.has(member.uid)) continue
       if (params.status && params.status !== 'enabled' && !merged.has(member.uid)) continue
-      merged.set(member.uid, { ...merged.get(member.uid), uid: member.uid,
+      merged.set(member.uid, { created_at: preview.startedAt, ...merged.get(member.uid), uid: member.uid,
         name: member.name || merged.get(member.uid)?.name || null })
     }
     const keyword = String(params.keyword ?? '').trim().toLowerCase()
@@ -85,14 +91,14 @@ async function mergePreview(url: string, params: Params, load: Load, preview: Im
   if (orgMembers) {
     const orgId = Number(orgMembers[1])
     const real = await allPages(load, url, params)
-    const added = memberships(preview).filter((row) => row.organization_id === orgId &&
+    const added = memberships(preview, params).filter((row) => row.organization_id === orgId &&
       (!params.user_id || row.user_id === Number(params.user_id)) && (!requested || requested.has(Number(row.user_id))) &&
       (!params.position || params.position === row.position))
     return pageOf(appendMemberships(real, added, orgId), params)
   }
   if (url === '/organization-members') {
     const real = await load(url, params) as Row[]
-    return appendMemberships(real, memberships(preview).filter((row) => !requested || requested.has(Number(row.user_id))))
+    return appendMemberships(real, memberships(preview, params).filter((row) => !requested || requested.has(Number(row.user_id))))
   }
   if (url === '/party/profiles') {
     const real = await load(url, params) as Row[]
@@ -125,7 +131,7 @@ async function mergePreview(url: string, params: Params, load: Load, preview: Im
   }
   if (url === '/user-positions') {
     const real = await load(url, params) as Row[]
-    const added = memberships(preview).filter((row) => !requested || requested.has(Number(row.user_id))).flatMap((row) => {
+    const added = memberships(preview, params).filter((row) => !requested || requested.has(Number(row.user_id))).flatMap((row) => {
       const position = preview.positions.find((item) => item.code === row.position)
       return position ? [{ ...position, uid: row.user_id, member_organization_id: row.organization_id }] : []
     })

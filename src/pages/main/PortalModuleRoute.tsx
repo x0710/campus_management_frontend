@@ -1,3 +1,5 @@
+import { getPortalPath, CAMPUS_PATH } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 门户模块路由：作为 PortalWorkspace 布局的子路由出口，
  * 根据 URL 中的 portalKey 与 moduleKey 渲染对应已开通模块的视图。
@@ -6,7 +8,7 @@
  * 顶栏 + 侧栏由父布局 PortalWorkspace 提供，本组件只负责内容区。
  */
 import { ApiOutlined, AppstoreAddOutlined, LockOutlined } from '@ant-design/icons'
-import { Navigate, useParams } from 'react-router'
+import { Navigate } from 'react-router'
 import { lazy, type ComponentType } from 'react'
 import { Tag } from 'antd'
 import {
@@ -170,7 +172,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
  * @returns 类型：Element
  */
 export default function PortalModuleRoute() {
-  const { portalKey, moduleKey } = useParams<{
+  const { portalKey, moduleKey } = usePortalParams<{
     portalKey: string
     moduleKey?: string
   }>()
@@ -179,13 +181,13 @@ export default function PortalModuleRoute() {
   const portalAccess = usePortalAccess(portal?.key)
 
   if (!portal) {
-    return <Navigate to="/" replace />
+    return <Navigate to={CAMPUS_PATH} replace />
   }
   if (portalAccess === null) {
     return <PageLoading />
   }
   if (!portalAccess) {
-    return <Navigate to={`/portal/${DEFAULT_PORTAL_KEY}`} replace />
+    return <Navigate to={getPortalPath(DEFAULT_PORTAL_KEY)} replace />
   }
 
   const readyModules = portal.modules.filter((m) => m.status === 'ready')
@@ -201,7 +203,7 @@ export default function PortalModuleRoute() {
     defaultModuleKey &&
     (moduleKey === undefined || !accessibleModules.some((m) => m.key === moduleKey))
   ) {
-    return <Navigate to={`/portal/${portal.key}/${defaultModuleKey}`} replace />
+    return <Navigate to={`${getPortalPath(portal.key)}/${defaultModuleKey}`} replace />
   }
 
   // 有效 moduleKey：渲染对应模块视图

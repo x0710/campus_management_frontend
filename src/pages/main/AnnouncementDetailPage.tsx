@@ -1,3 +1,5 @@
+import { getPortalPath, CAMPUS_PATH } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /** 公告详情页：从列表双击整行跳转过来，单独请求全文并按 Markdown 渲染。
  *  本页作为 PortalWorkspace 布局的子路由渲染，沿用父布局提供的顶栏 + 左侧菜单，
  *  故此处只输出内容区，不再单独渲染 PortalHeader / workspace-body 等壳元素。
@@ -12,7 +14,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import { Button, Skeleton, Space, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import ErrorState from '../../components/ErrorState'
 import MarkdownView from '../../components/MarkdownView'
 import { useUserNames } from '../../composables/useUserNames'
@@ -51,7 +53,7 @@ export default function AnnouncementDetailPage() {
   const locale = useSettingsStore((s) => s.locale)
   const navigate = useNavigate()
   const location = useLocation()
-  const { id, portalKey } = useParams<{ id: string; portalKey: string }>()
+  const { id, portalKey } = usePortalParams<{ id: string; portalKey: string }>()
 
   // 来源模块：URL ?from=<moduleKey>，用于返回公告列表与父布局侧栏高亮。
   // 兼容旧的 location.state（{portalKey,moduleKey}）形式，刷新后仍以 URL 为准。
@@ -98,13 +100,13 @@ export default function AnnouncementDetailPage() {
   // 返回公告列表：优先回到来源门户的公告模块；没有来源信息时退到门户首页
   const backToList = useCallback(() => {
     if (portalKey && fromModuleKey) {
-      navigate(`/portal/${portalKey}/${fromModuleKey}`)
+      navigate(`${getPortalPath(portalKey)}/${fromModuleKey}`)
     } else if (portalKey) {
-      navigate(`/portal/${portalKey}`)
+      navigate(getPortalPath(portalKey))
     } else if (window.history.length > 1) {
       navigate(-1)
     } else {
-      navigate('/home')
+      navigate(CAMPUS_PATH)
     }
   }, [portalKey, fromModuleKey, navigate])
 

@@ -1,3 +1,7 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 「校园公告」列表，学生/教师端只读浏览，领导端复用为「公告管理」：
@@ -15,7 +19,7 @@ import type { FilterValue } from 'antd/es/table/interface'
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import {
   deleteAnnouncement,
   listAllAnnouncements,
@@ -44,6 +48,7 @@ import ErrorState from '../../components/ErrorState'
 import { formatDateTime } from '../../utils/datetime'
 import { useUserNames } from '../../composables/useUserNames'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { useRequestSequence } from '../../composables/useRequestSequence'
 
 const { Text } = Typography
 
@@ -60,10 +65,11 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
+  const requests = useRequestSequence()
   const navigate = useNavigate()
-  const { portalKey, moduleKey } = useParams<{
-    portalKey: string  // 门户键名，来源：/home/portal/:key，必填
-    moduleKey?: string  // 模块键名，来源：/home/portal/:key/:moduleKey，可选
+  const { portalKey, moduleKey } = usePortalParams<{
+    portalKey: string  // 门户键名，来源：<门户路径>，必填
+    moduleKey?: string  // 模块键名，来源：<门户路径>/:moduleKey，可选
   }>()
 
   const [items, setItems] = useState<AnnouncementListItem[]>([])
@@ -104,23 +110,27 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   const [priorityFilter, setPriorityFilter] = useState<FilterValue | null>(null)
   const [statusFilter, setStatusFilter] = useState<FilterValue | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [pageSize, setPageSize] = useState(DEFAULT_TABLE_PAGE_SIZE)
 
   const load = useCallback(
     async (force?: boolean) => {
+      const isCurrent = requests.begin()
       setLoading(true)
       setErrorText(null)
       try {
-        setItems(await listAllAnnouncements(force))
+        const result = await listAllAnnouncements(force, isCurrent, createdDates)
+        if (isCurrent()) setItems(result)
       } catch (err) {
+        if (!isCurrent()) return
         if (axios.isAxiosError(err) && err.response?.status === 401) return
         // 错误文案包含 HTTP 状态码与中文原因（如 403 无权限、404 目标数据不存在或已被删除）
         setErrorText(extractErrorReason(err, t))
       } finally {
-        setLoading(false)
+        if (isCurrent()) setLoading(false)
       }
     },
-    [t],
+    [t, requests, createdDates],
   )
 
   useEffect(() => {
@@ -141,7 +151,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
       const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
       // 跳转公告详情页，带来源门户/模块（portalKey 在路径中，moduleKey 通过 ?from 透传）
       // 详情页据此精确返回公告列表，并使父布局侧栏仍高亮原模块入口。
-      navigate(`/portal/${portalKey}/announcements/${id}${search}`)
+      navigate(`${getPortalPath(portalKey)}/announcements/${id}${search}`)
     },
     [navigate, portalKey, moduleKey],
   )
@@ -150,7 +160,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
   const openEditor = useCallback(
     (id: number) => {
       const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
-      navigate(`/portal/${portalKey}/announcements/${id}/edit${search}`)
+      navigate(`${getPortalPath(portalKey)}/announcements/${id}/edit${search}`)
     },
     [navigate, portalKey, moduleKey],
   )
@@ -359,6 +369,7 @@ export default function AnnouncementsView({ manage = false }: { manage?: boolean
         <h3 className="panel-card-title">
           {t(manage ? 'announcement.manageTitle' : 'announcement.title')}
         </h3>
+        <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
         <Button icon={<ReloadOutlined />} onClick={() => void load(true)}>
           {t('common.refresh')}
         </Button>

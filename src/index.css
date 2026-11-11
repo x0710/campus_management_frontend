@@ -954,6 +954,16 @@ h3 {
   gap: 10px;
 }
 
+.created-date-filter {
+  max-width: 100%;
+}
+
+.panel-card-header:has(.created-date-filter),
+.approval-toolbar:has(.created-date-filter),
+.student-toolbar:has(.created-date-filter) {
+  flex-wrap: wrap;
+}
+
 .approval-actions {
   display: inline-flex;
   align-items: center;

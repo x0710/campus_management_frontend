@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 党委学校端：组织概览区域（左侧组织树 + 右侧下级组织统计列表）。
@@ -67,7 +69,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import { subscribeCacheInvalidation } from '../../api/cache'
 import { extractErrorReason } from '../../api/common'
 import {
@@ -241,7 +243,7 @@ export default function SchoolOrgOverviewView() {
   const t = useT()
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
   const reportError = useErrorFeedback()
 
   /** 会话状态 key：跨路由返回仍保留选中组织与树展开态 */
@@ -603,7 +605,7 @@ export default function SchoolOrgOverviewView() {
       setSelectedId(SCHOOL_ORG_ADMIN_MODULE_KEY, orgId)
       // 组织成员管理首次加载会沿用记忆页码，这里先重置为第 1 页，确保能直接看到成员
       setMemberPage(SCHOOL_ORG_ADMIN_MODULE_KEY, 1)
-      navigate(`/portal/${portalKey ?? 'school'}/${SCHOOL_ORG_ADMIN_MODULE_KEY}`)
+      navigate(`${getPortalPath(portalKey ?? 'school')}/${SCHOOL_ORG_ADMIN_MODULE_KEY}`)
     },
     [navigate, portalKey, setMemberPage, setSelectedId],
   )

@@ -1,8 +1,10 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 人员管理：批量添加新成员（填报辅助、表格校验及导入），支部与二级党委按本级组织限定范围。
  *
  * 入口：组织成员管理左侧组织树「新建组织」旁的「批量添加新成员」按钮
- *       → /portal/:portalKey/bulk-add-members?from=<moduleKey>
+ *       → <门户路径>/bulk-add-members?from=<moduleKey>
  *
  * 页面结构（整个页面只有一张表格，靠表头切换查看内容）：
  *   1. 组织与 ID 对应表：填写「组织:身份」列时，冒号前填这里的组织 ID；
@@ -34,7 +36,7 @@ import { Alert, App as AntdApp, Button, Modal, Progress, Segmented, Space, Tag, 
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { listAllOrganizations } from '../../api/organizations'
 import { listAllPositions } from '../../api/positions'
@@ -125,7 +127,7 @@ export default function BulkAddMembersView() {
   const t = useT()
   const navigate = useNavigate()
   const location = useLocation()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
   const { message } = AntdApp.useApp()
   const previewActive = useImportPreview((state) => state.preview !== null)
   const [preparingPreview, setPreparingPreview] = useState(false)
@@ -811,7 +813,7 @@ export default function BulkAddMembersView() {
           if (!result.data.length || page >= result.total_pages) break
         }
       }
-      const returnTo = `/portal/${portalKey}/${fromModuleKey}`
+      const returnTo = `${getPortalPath(portalKey)}/${fromModuleKey}`
       useImportPreview.getState().start({ members, existingUids, returnTo,
         organizations: allOrgs, roles, positions, fileName: analysis.fileName })
       const ui = useUiStateStore.getState()
@@ -843,7 +845,7 @@ export default function BulkAddMembersView() {
           <Tooltip title={t('bulkMembers.backHint')}>
             <Button
               icon={<ArrowLeftOutlined />}
-              onClick={() => navigate(`/portal/${portalKey}/${fromModuleKey}`)}
+              onClick={() => navigate(`${getPortalPath(portalKey)}/${fromModuleKey}`)}
             >
               {t('bulkMembers.back')}
             </Button>

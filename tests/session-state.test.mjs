@@ -17,11 +17,12 @@ function remember() {
   ui.setOrgTreeCollapsed('admin_m3', true)
   ui.setOrgTreeExpanded('admin_m3', [12])
   ui.setMemberPage('admin_m3', 7)
+  ui.setMemberDateFilter('admin_m3', { start_date: '2026-11-01' })
   ui.setMemberSearchState('admin_m3', { query: 'previous account', matches: [{ uid: 100 }] })
 }
 function assertEmpty() {
   const ui = useUiStateStore.getState()
-  for (const key of ['selectedOrgIds', 'collapsedOrgTrees', 'expandedOrgTreeKeys', 'memberPages', 'memberSearchStates', 'userLists']) {
+  for (const key of ['selectedOrgIds', 'collapsedOrgTrees', 'expandedOrgTreeKeys', 'memberPages', 'memberSearchStates', 'userLists', 'memberDateFilters']) {
     assert.deepEqual(ui[key], {}, key)
   }
 }
@@ -42,6 +43,7 @@ test('代登录隔离视图，恢复原账号还原视图；普通登录和退�
   assert.equal(useAuthStore.getState().token, 'admin')
   assert.equal(useUiStateStore.getState().memberPages.admin_m3, 7)
   assert.deepEqual(useUiStateStore.getState().memberSearchStates, originalView.memberSearchStates)
+  assert.deepEqual(useUiStateStore.getState().memberDateFilters.admin_m3, { start_date: '2026-11-01' })
   remember()
   auth.clearAuth()
   assertEmpty()

@@ -1,3 +1,5 @@
+import type { CreatedDateQuery } from '../api/types/common'
+import { useRequestSequence } from './useRequestSequence'
 /**
  * 当前登录用户党建加分申请记录 Hook（党员端首页 / 我的成绩记录共用）。
  *
@@ -35,7 +37,7 @@ export interface MyPartyScoresState {
  *   - error：加载错误文案（含状态码），无错误为 null
  *   - refresh：手动刷新函数，传入 true 时强制绕过缓存
  */
-export function useMyPartyScores(): MyPartyScoresState {
+export function useMyPartyScores(dates: CreatedDateQuery = {}): MyPartyScoresState {
   const t = useT()
   const [records, setRecords] = useState<PartyScore[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +45,12 @@ export function useMyPartyScores(): MyPartyScoresState {
   const [reloadKey, setReloadKey] = useState(0)
   const forceRef = useRef(false)
 
+  const startDate = dates.start_date
+  const endDate = dates.end_date
+  const requests = useRequestSequence()
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
+    const query = { ...(startDate ? { start_date: startDate } : {}), ...(endDate ? { end_date: endDate } : {}) }
     const force = forceRef.current
     forceRef.current = false
     setLoading(true)
@@ -53,7 +60,7 @@ export function useMyPartyScores(): MyPartyScoresState {
       const me = await getCurrentUser()
       const pageSize = PARTY_DECLARATION_PAGE_SIZE
       const first = await queryPartyScores(
-        { user_id: me.uid, page: 1, page_size: pageSize },
+        { ...query, user_id: me.uid, page: 1, page_size: pageSize },
         force,
       )
       const collected = [...first.data]
@@ -61,9 +68,10 @@ export function useMyPartyScores(): MyPartyScoresState {
 
       for (let page = 2; page <= totalPages; page += 1) {
         const res = await queryPartyScores(
-          { user_id: me.uid, page, page_size: pageSize },
+          { ...query, user_id: me.uid, page, page_size: pageSize },
           force,
         )
+        if (!isCurrent()) return
         collected.push(...res.data)
       }
 
@@ -71,18 +79,19 @@ export function useMyPartyScores(): MyPartyScoresState {
       enriched.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )
-      setRecords(enriched)
+      if (isCurrent()) setRecords(enriched)
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
-      setError(extractErrorReason(err, t))
+      if (isCurrent()) setError(extractErrorReason(err, t))
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [t])
+  }, [t, startDate, endDate, requests])
 
   useEffect(() => {
     void load()
-  }, [load, reloadKey])
+    return () => requests.invalidate()
+  }, [load, reloadKey, requests])
 
   const refresh = useCallback((force = false) => {
     forceRef.current = force

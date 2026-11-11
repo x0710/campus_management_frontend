@@ -1,3 +1,4 @@
+import type { CreatedDateQuery } from './common'
 /**
  * 审批实例模块类型定义：审批步骤状态/决定枚举、审批步骤条目、提交审批结果请求体与待办查询参数。
  * 供 api/approvals.ts 的请求函数与各视图复用。
@@ -48,7 +49,7 @@ export interface ApprovalStepResult {
 }
 
 /** GET /api/approvals 分页查询审批模板参数 */
-export interface ApprovalTodoQuery {
+export interface ApprovalTodoQuery extends CreatedDateQuery {
   /** 不传 approver_id/applicant_id 时，后端默认按"我的待办（approver_id=自己）"过滤 */
   approver_id?: number
   applicant_id?: number

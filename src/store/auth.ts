@@ -19,11 +19,11 @@ interface AuthState {
   lastLoginAt: string | null
   /**
    * 是否必须先修改密码才能进入系统：
-   * 登录响应 last_login_at 为 null 表示首次登录（见 api/types/auth.ts），此时置为 true。
+   * 密码登录响应 last_login_at 为 null 表示首次登录，此时置为 true；CAS 登录不要求修改本地密码。
    * 同样持久化，刷新页面后仍保持强制改密弹窗。
    */
   mustChangePassword: boolean
-  setAuth: (snapshot: AuthSnapshot) => void
+  setAuth: (snapshot: AuthSnapshot, method?: 'password' | 'cas') => void
   /** 强制改密成功后调用，解除拦截 */
   finishPasswordChange: () => void
   clearAuth: () => void
@@ -60,7 +60,7 @@ export const useAuthStore = create<AuthState>()(
       username: null,
       lastLoginAt: null,
       mustChangePassword: false,
-      setAuth: ({ token, username, lastLoginAt }) =>
+      setAuth: ({ token, username, lastLoginAt }, method = 'password') =>
         set((state) => ({
           originalAuth: null,
           token,
@@ -69,8 +69,8 @@ export const useAuthStore = create<AuthState>()(
           // 首次登录（last_login_at 为空）必须改密；同一账号上次未改完（刷新/重开浏览器）继续保持强制，
           // 换账号登录则重新判定，避免把上一个账号的拦截状态带给新用户
           mustChangePassword:
-            lastLoginAt === null ||
-            (state.mustChangePassword && state.username === username),
+            method === 'password' && (lastLoginAt === null ||
+            (state.mustChangePassword && state.username === username)),
         })),
       finishPasswordChange: () => set({ mustChangePassword: false }),
       clearAuth: () =>

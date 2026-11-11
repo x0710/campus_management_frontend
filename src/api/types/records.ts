@@ -9,7 +9,7 @@
  *
  * 供 api/records.ts 的请求函数与各视图复用；DateTime 统一使用 RFC3339 字符串。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 记录性质（后端 RecordType，serde 序列化为 snake_case） */
 export type RecordType = 'positive' | 'negative' | 'neutral'
@@ -55,7 +55,7 @@ export interface DailyRecordUpdateRequest {
 }
 
 /** GET /api/records 分页查询参数（api.json: DailyRecordQueryParams） */
-export interface DailyRecordQuery extends PageQuery {
+export interface DailyRecordQuery extends PageQuery, CreatedDateQuery {
   /** 按记录对象（学生）用户 ID 筛选 */
   user_id?: number
   /** 按记录对象用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */

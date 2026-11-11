@@ -1,3 +1,5 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 管理端：职位管理
@@ -77,6 +79,7 @@ export default function PositionsAdminView({ rootOrgId }: { rootOrgId?: number }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   // 重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
@@ -109,6 +112,7 @@ export default function PositionsAdminView({ rootOrgId }: { rootOrgId?: number }
     setError(null)
     try {
       const params = {
+        ...createdDates,
         page,
         page_size: POSITION_PAGE_SIZE,
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
@@ -127,7 +131,7 @@ export default function PositionsAdminView({ rootOrgId }: { rootOrgId?: number }
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [page, keyword, reload.seq, reload.force, rootOrgId, requests, t]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, keyword, reload.seq, reload.force, rootOrgId, requests, t, createdDates]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void load()
@@ -316,7 +320,8 @@ export default function PositionsAdminView({ rootOrgId }: { rootOrgId?: number }
         </header>
         {/* 搜索/刷新/新建固定在卡片体内顶部，仅表格区域滚动（代码要求 23） */}
         <div className="panel-card-body data-page-body">
-          <div className="approval-toolbar page-fixed-toolbar">
+          <div className="approval-toolbar page-fixed-toolbar" style={{ flexWrap: 'wrap' }}>
+            <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <Input.Search
               allowClear
               className="admin-search"

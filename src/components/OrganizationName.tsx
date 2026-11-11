@@ -1,3 +1,4 @@
+import { usePortalParams } from '../hooks/usePortalParams'
 /** 按组织 ID 展示组织名称的组件。 */
 
 import { useEffect, useState } from 'react'
@@ -6,7 +7,6 @@ import { getOrganization, getOrganizationTree } from '../api/organizations'
 import type { OrganizationTreeNode } from '../api/types/organizations'
 import { extractErrorReason } from '../api/common'
 import { useT } from '../i18n'
-import { useParams } from 'react-router'
 
 /** 悬浮时挂载，组织链路按接口返回的根 → 当前组织顺序展示。 */
 function OrganizationTreePreview({ id, showCode }: { id: number; showCode: boolean }) {
@@ -44,7 +44,7 @@ export default function OrganizationName({ id, showTree = false, showCode, fallb
   fallbackName?: string
   code?: string
 }) {
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
   const withCode = showCode ?? (portalKey === 'admin')
 
   const [organization, setOrganization] = useState<{ id: number; name: string; code: string } | null>(null)

@@ -7,7 +7,7 @@
  *
  * 供 api/students.ts 的请求函数与各视图复用；DateTime 统一使用 RFC3339 字符串。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 学生学习状态（后端 serde 序列化为 snake_case） */
 export type StudentStatus =
@@ -46,7 +46,7 @@ export interface StudentDetail {
 }
 
 /** GET /api/students 分页查询参数（api.json: StudentQueryParams） */
-export interface StudentQuery extends PageQuery {
+export interface StudentQuery extends PageQuery, CreatedDateQuery {
   /** 按姓名或学号模糊搜索 */
   keyword?: string
   status?: StudentStatus

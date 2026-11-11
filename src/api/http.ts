@@ -1,7 +1,7 @@
 /** 全局 axios 实例与请求/响应拦截器（JWT 鉴权、401 处理、错误透传）。 */
 
 import axios from 'axios'
-import { invalidate } from './cache'
+import { publishCacheInvalidation } from './cacheInvalidation'
 import { useAuthStore } from '../store/auth'
 import { activeImportPreview } from '../store/importPreview'
 import { useSettingsStore } from '../store/settings'
@@ -29,7 +29,7 @@ http.interceptors.request.use((config) => {
     })
   }
   const token = useAuthStore.getState().token
-  if (token && !config.headers.has('Authorization')) {
+  if (token && config.url !== '/auth/cas/callback' && !config.headers.has('Authorization')) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
@@ -42,11 +42,12 @@ http.interceptors.response.use(
       axios.isAxiosError(error) &&
       error.response?.status === 401 &&
       error.config?.url !== '/login' &&
+      error.config?.url !== '/auth/cas/callback' &&
       // 切换身份前的在途请求不能清除新会话。
       error.config?.headers?.Authorization === `Bearer ${useAuthStore.getState().token}`
     ) {
       // 先清空接口会话缓存再清登录态，避免下一位登录用户读到上一位用户的数据（代码要求 17）
-      invalidate()
+      publishCacheInvalidation()
       useAuthStore.getState().clearAuth()
       /*
        * 这里不再使用 window.location.assign('/login') 强制整页跳转：

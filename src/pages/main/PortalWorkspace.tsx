@@ -1,3 +1,5 @@
+import { getPortalPath, CAMPUS_PATH } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 门户布局（界面壳）：作为各工作端（学生/老师/领导/管理员）的持久框架页。
  * 顶栏（PortalHeader）+ 左侧菜单（Layout.Sider，可收起）+ 内容区（Outlet），
@@ -6,8 +8,8 @@
  * 不同门户（student/teacher/leader/admin）渲染各自模块菜单。
  *
  * 选中态由当前 URL 推导：
- *   - /portal/:portalKey/:moduleKey        -> 高亮 moduleKey
- *   - /portal/:portalKey/announcements/:id -> 高亮 ?from=<moduleKey>（来源模块）
+ *   - <门户路径>/:moduleKey        -> 高亮 moduleKey
+ *   - <门户路径>/announcements/:id -> 高亮 ?from=<moduleKey>（来源模块）
  * 这样从公告列表双击进入详情时，左侧仍能高亮原模块入口。
  *
  * 侧栏收起状态持久化到 settings store（localStorage），跨门户与刷新保持。
@@ -19,7 +21,7 @@ import {
 import { Button, Layout, Menu, Tag, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import { Suspense, useEffect, useMemo } from 'react'
-import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import PortalHeader from '../../components/PortalHeader'
 import PageLoading from '../../components/PageLoading'
 import ImportPreviewBanner from '../../components/ImportPreviewBanner'
@@ -39,7 +41,7 @@ import { useSettingsStore } from '../../store/settings'
  * @returns 类型：Element
  */
 export default function PortalWorkspace() {
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
   const partyPortal = ['party', 'branch', 'academy', 'school'].includes(portalKey ?? '')
   return (
     <PartyTerminologyContext value={partyPortal}>
@@ -53,7 +55,7 @@ function PortalWorkspaceContent() {
   const t = useT()
   const navigate = useNavigate()
   const location = useLocation()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
   const portal = getPortal(portalKey)
   // 角色访问校验：普通用户只能进入角色授权范围内的门户（超管除外）
   const portalAccess = usePortalAccess(portal?.key)
@@ -86,37 +88,34 @@ function PortalWorkspaceContent() {
   )
 
   // 从当前 URL 推导被高亮的模块 key：
-  //   /portal/student/student_m4            -> "student_m4"
-  //   /portal/student/announcements/123?from=student_m4 -> "student_m4"
-  //   /portal/student/                      -> 无高亮（index 子路由会自行跳转到首个已开通模块）
+  //   /campus/student/student_m4            -> "student_m4"
+  //   /campus/student/announcements/123?from=student_m4 -> "student_m4"
+  //   /campus/student/                      -> 无高亮（index 子路由会自行跳转到首个已开通模块）
   const selectedKey = useMemo(() => {
     if (!portal) return undefined
-    const segments = location.pathname.split('/').filter(Boolean)
-    if (segments.length < 3 || segments[0] !== 'portal' || segments[1] !== portal.key) {
-      return undefined
-    }
-    const third = segments[2]
+    const base = getPortalPath(portal.key)
+    const child = location.pathname.slice(base.length).split('/').filter(Boolean)[0]
     // 详情类子路由（公告详情/编辑、成员详情、党建加分审批详情、成绩申报详情、审批指标详情）
     // 不在模块列表中，通过 ?from=<moduleKey> 让侧栏仍高亮来源模块
     if (
-      third === 'announcements' ||
-      third === 'organization-members' ||
-      third === 'party-score-approvals' ||
-      third === 'party-scores' ||
-      third === 'approval-templates' ||
-      third === BULK_ADD_MEMBERS_ROUTE
+      child === 'announcements' ||
+      child === 'organization-members' ||
+      child === 'party-score-approvals' ||
+      child === 'party-scores' ||
+      child === 'approval-templates' ||
+      child === BULK_ADD_MEMBERS_ROUTE
     ) {
       const from = new URLSearchParams(location.search).get('from')
       if (from && [...readyModules, ...previewModules].some((m) => m.key === from)) return from
       return undefined
     }
-    return [...readyModules, ...previewModules].some((m) => m.key === third) ? third : undefined
+    return [...readyModules, ...previewModules].some((m) => m.key === child) ? child : undefined
   }, [portal, location.pathname, location.search, readyModules, previewModules])
 
   // 仅当 portal 不存在时回首页；模块路由跳转交给子路由处理，避免与子路由抢跳转
   useEffect(() => {
     if (!portal) {
-      navigate('/', { replace: true })
+      navigate(CAMPUS_PATH, { replace: true })
     }
   }, [portal, navigate])
 
@@ -193,18 +192,18 @@ function PortalWorkspaceContent() {
   }, [readyModules, previewModules, pendingModules, plannedModules, t])
 
   // 门户 key 非法或该门户已停用（学生端 / 教师端 / 领导端）时回到默认门户：
-  // 直接输入 /portal/<key>/... 也无法进入，代码保留但不再工作
+  // 直接输入 <门户路径>/... 也无法进入，代码保留但不再工作
   if (!portal || isPortalDisabled(portal.key)) {
-    return <Navigate to="/" replace />
+    return <Navigate to={CAMPUS_PATH} replace />
   }
 
   // 角色权限校验：角色仍在加载时先展示加载态，未授权门户重定向到默认门户，
-  // 避免普通用户手动输入 /portal/admin/... 直接渲染管理端页面
+  // 避免普通用户手动输入 /campus/admin/... 直接渲染管理端页面
   if (portalAccess === null) {
     return <PageLoading />
   }
   if (!portalAccess) {
-    return <Navigate to={`/portal/${DEFAULT_PORTAL_KEY}`} replace />
+    return <Navigate to={getPortalPath(DEFAULT_PORTAL_KEY)} replace />
   }
 
   const name = t(`portal.${portal.key}_name`)
@@ -240,7 +239,7 @@ function PortalWorkspaceContent() {
             inlineCollapsed={sidebarCollapsed}
             selectedKeys={selectedKey ? [selectedKey] : []}
             onClick={({ key }: { key: string }) =>
-              navigate(`/portal/${portal.key}/${key}`)
+              navigate(`${getPortalPath(portal.key)}/${key}`)
             }
           />
           {/* 收起/展开按钮：自定义置于侧栏底部，悬停显示提示 */}

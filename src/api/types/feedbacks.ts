@@ -2,7 +2,7 @@
  * 意见反馈模块类型定义：反馈分类枚举、反馈详情、分页查询参数与创建/更新请求体。
  * 供 api/feedbacks.ts 的请求函数与反馈页面复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 反馈分类（api.json: FeedbackCategory，序列化为 snake_case） */
 export type FeedbackCategory = 'suggestion' | 'bug' | 'complaint' | 'praise' | 'other'
@@ -24,7 +24,7 @@ export interface FeedbackDto {
 }
 
 /** 反馈分页查询参数（api.json: FeedbackQueryParams） */
-export interface FeedbackQuery extends PageQuery {
+export interface FeedbackQuery extends PageQuery, CreatedDateQuery {
   /** 按提交人 ID 筛选 */
   user_id?: number
   /** 按提交人 ID 批量筛选（逗号分隔，如 "1,2,3"） */

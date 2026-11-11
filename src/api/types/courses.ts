@@ -4,7 +4,7 @@
  * 因此 JSON 中表现为**字符串**（如 "3.00"）。前端按字符串处理，避免浮点精度丢失。
  * 供 api/courses.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 课程类型（api.json: CourseType） */
 export type CourseType = 'compulsory' | 'elective' | 'general'
@@ -29,7 +29,7 @@ export interface CourseDetail extends CourseInfo {
 }
 
 /** 课程分页查询参数 */
-export interface CourseQuery extends PageQuery {
+export interface CourseQuery extends PageQuery, CreatedDateQuery {
   /** 按课程代码或课程名称模糊搜索 */
   keyword?: string
   course_type?: CourseType

@@ -1,3 +1,8 @@
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 党建活动加分审核（支部端 / 党委学院端共用页面）。
@@ -9,7 +14,7 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
  *   GET /api/users                         批量解析申请人真实姓名（useUserNames）
  *   PUT /api/party-scores/approvals/{id}/approve|reject|transfer  在审批详情页处理
  *
- * 双击行或操作列统一跳转到审批详情页（/portal/:portalKey/party-score-approvals/:stepId）：
+ * 双击行或操作列统一跳转到审批详情页（<门户路径>/party-score-approvals/:stepId）：
  *   - 行双击：打开详情页查看审批内容；
  *   - 操作列「通过 / 驳回 / 转交」：打开详情页并自动选中对应操作，
  *     让审批内容与待填写表单在同一页面同屏展示；
@@ -23,7 +28,7 @@ import { Button, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import { listSubsidiaries } from '../../api/organizations'
@@ -93,7 +98,7 @@ export default function PartyScoreApprovalView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const navigate = useNavigate()
-  const { portalKey, moduleKey } = useParams<{
+  const { portalKey, moduleKey } = usePortalParams<{
     portalKey: string
     moduleKey: string
   }>()
@@ -102,6 +107,7 @@ export default function PartyScoreApprovalView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   /** 状态多选筛选：空数组表示全部 */
   const [statusFilter, setStatusFilter] = useState<ApprovalStepStatus[]>([])
   /** 申请人筛选：null 表示全部 */
@@ -164,10 +170,13 @@ export default function PartyScoreApprovalView() {
     setStatusFilter([])
     setApplicantFilter(null)
     setOrganizationFilter(null)
+    setCreatedDates({})
   }, [])
 
+  const requests = useRequestSequence()
   const load = useCallback(
     async (force = false) => {
+      const isCurrent = requests.begin()
       setLoading(true)
       setError(null)
       try {
@@ -177,6 +186,7 @@ export default function PartyScoreApprovalView() {
         const steps = await queryPartyScoreApprovals(
           {
             approver_id: me.uid,
+            ...createdDates,
             applicant_id: applicantFilter ?? undefined,
             organization_id: organizationFilter ?? undefined,
             page,
@@ -184,10 +194,12 @@ export default function PartyScoreApprovalView() {
           },
           force,
         )
+        if (!isCurrent()) return
         const scoreMap = await fetchPartyScoreMap(
           steps.map((step) => step.instance_id),
           force,
         )
+        if (!isCurrent()) return
         setRows(
           steps.map((step) => ({
             step,
@@ -195,16 +207,17 @@ export default function PartyScoreApprovalView() {
           })),
         )
       } catch (err) {
+      if (!isCurrent()) return
         if (axios.isAxiosError(err) && err.response?.status === 401) {
           // 401 由全局拦截器处理，这里不重复提示
         } else {
           setError(extractErrorReason(err, t))
         }
       } finally {
-        setLoading(false)
+        if (isCurrent()) setLoading(false)
       }
     },
-    [page, t, applicantFilter, organizationFilter],
+    [page, t, applicantFilter, organizationFilter, createdDates, requests],
   )
 
   useEffect(() => {
@@ -222,7 +235,7 @@ export default function PartyScoreApprovalView() {
       const params = new URLSearchParams()
       if (moduleKey) params.set('from', moduleKey)
       const query = params.toString()
-      return `/portal/${portalKey}/party-score-approvals/${stepId}${query ? `?${query}` : ''}`
+      return `${getPortalPath(portalKey)}/party-score-approvals/${stepId}${query ? `?${query}` : ''}`
     },
     [portalKey, moduleKey],
   )
@@ -385,6 +398,7 @@ export default function PartyScoreApprovalView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('partyScoreApproval.title')}</h3>
           <div className="approval-toolbar" style={{ flexWrap: 'wrap' }}>
+            <CreatedDateFilter label={t('common.approvalCreatedDateRange')} value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <Select<ApprovalStepStatus[]>
               mode="multiple"
               allowClear

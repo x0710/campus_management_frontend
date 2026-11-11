@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { extractErrorReason } from '../api/common'
-import type { PaginatedResponse, PageQuery } from '../api/types/common'
+import type { CreatedDateQuery, PaginatedResponse, PageQuery } from '../api/types/common'
+import { toCreatedDateAliases } from '../utils/dateQuery'
 import { DEFAULT_TABLE_PAGE_SIZE } from '../config/table'
 import { useT } from '../i18n'
 
@@ -25,9 +26,15 @@ interface PaginatedState<T> {
 export function usePaginated<T, Q extends PageQuery = PageQuery>(
   fetcher: (query: Q, force?: boolean) => Promise<PaginatedResponse<T>>,
   initialQuery?: Omit<Q, 'page' | 'page_size'>,
+  createdDateFields: 'standard' | 'aliased' = 'standard',
 ) {
   const t = useT()
   const [page, setPage] = useState(1)
+  const [dateQuery, setDateQueryState] = useState<CreatedDateQuery>({})
+  const setDateQuery = useCallback((value: CreatedDateQuery) => {
+    setPage(1)
+    setDateQueryState(value)
+  }, [])
   // 默认每页 100 行（代码要求 12：表格每页最多 100 行）
   const [pageSize, setPageSizeState] = useState(DEFAULT_TABLE_PAGE_SIZE)
   const [state, setState] = useState<PaginatedState<T>>({
@@ -47,7 +54,8 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
     const force = forceRef.current
     forceRef.current = false
     setState((s) => ({ ...s, loading: true, error: null }))
-    fetcher({ ...(initialQueryRef.current as Q), page, page_size: pageSize }, force)
+    const dates = createdDateFields === 'aliased' ? toCreatedDateAliases(dateQuery) : dateQuery
+    fetcher({ ...(initialQueryRef.current as Q), ...dates, page, page_size: pageSize }, force)
       .then((res) => {
         if (!cancelled) setState({ data: res.data, total: res.total, loading: false, error: null })
       })
@@ -62,7 +70,7 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, reloadKey])
+  }, [page, pageSize, reloadKey, dateQuery, createdDateFields])
 
   const setPageSize = useCallback((size: number) => {
     setPage(1)
@@ -79,5 +87,5 @@ export function usePaginated<T, Q extends PageQuery = PageQuery>(
     setReloadKey((k) => k + 1)
   }, [])
 
-  return { page, setPage, pageSize, setPageSize, refresh, reload, ...state }
+  return { page, setPage, pageSize, setPageSize, refresh, reload, dateQuery, setDateQuery, ...state }
 }

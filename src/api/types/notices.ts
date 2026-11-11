@@ -3,7 +3,7 @@
  * 对应运行中后端的 notice 接口（OpenAPI 由 /api-docs/openapi.json 提供）。
  * 供 api/notices.ts 的请求函数与通知相关视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 通知分类（后端 NoticeCategory） */
 export type NoticeCategory = 'system' | 'approval' | 'announcement'
@@ -30,7 +30,7 @@ export interface Notice {
 }
 
 /** 分页查询通知参数（GET /api/notices） */
-export interface NoticeQuery extends PageQuery {
+export interface NoticeQuery extends PageQuery, CreatedDateQuery {
   /** 按通知分类过滤（可选） */
   category?: NoticeCategory
   /** 按通知正文模糊搜索（可选） */

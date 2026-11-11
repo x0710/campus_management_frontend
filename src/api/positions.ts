@@ -3,7 +3,7 @@ import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import { listAllOrganizations } from './organizations'
 import { collectOrgSubtree } from '../utils/orgTree'
-import type { PaginatedResponse } from './types/common'
+import type { CreatedDateQuery, PaginatedResponse } from './types/common'
 import type {
   PositionCreateRequest,
   PositionDetail,
@@ -129,11 +129,12 @@ export async function deletePosition(code: string): Promise<void> {
 export function queryUserPositions(
   uids: number[],
   force?: boolean,
+  dates: CreatedDateQuery = {},
 ): Promise<UserPosition[]> {
   if (uids.length === 0) return Promise.resolve([])
   return cachedGet<UserPosition[]>(
     '/user-positions',
-    { uids: uids.join(',') },
+    { uids: uids.join(','), ...dates },
     { force },
   )
 }

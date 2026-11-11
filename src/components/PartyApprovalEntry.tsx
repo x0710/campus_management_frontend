@@ -1,3 +1,4 @@
+import { getPortalPath } from '../config/routes'
 import { Alert, Button } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -28,7 +29,7 @@ export default function PartyApprovalEntry() {
   }, [])
   if (!hasPending) return null
   return <Alert type="info" showIcon title={t('partyProfile.pendingApprovalHint')}
-    action={<Button type="primary" onClick={() => navigate('/portal/party/party_m5')}>
+    action={<Button type="primary" onClick={() => navigate(`${getPortalPath('party')}/party_m5`)}>
       {t('portal.party_m5')}
     </Button>} />
 }

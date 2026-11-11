@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /** 领导端：公告编辑页（新建 / 编辑共用）。
  * - 新建：POST /api/announcements?no=leader_m4 —— 发布后直接进入 published 状态，保存后回列表
  * - 编辑：GET  /api/announcements/{id} 预填当前值 → PATCH /api/announcements/{id} 更新 → 回列表
@@ -21,7 +23,7 @@ import {
 import type { Dayjs } from 'dayjs'
 import axios from 'axios'
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import {
   createAnnouncement,
   getAnnouncement,
@@ -32,6 +34,8 @@ import type {
   AnnouncementType,
 } from '../../api/types/announcements'
 import { queryOrganizations } from '../../api/organizations'
+import { fetchAllPages } from '../../utils/pagination'
+import { useAuthStore } from '../../store/auth'
 import type { OrganizationInfo } from '../../api/types/organizations'
 import { extractErrorReason } from '../../api/common'
 import RichTextEditor from '../../components/RichTextEditor'
@@ -70,7 +74,7 @@ export default function AnnouncementEditorPage() {
   const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const location = useLocation()
-  const { portalKey, id } = useParams<{ portalKey: string; id?: string }>()
+  const { portalKey, id } = usePortalParams<{ portalKey: string; id?: string }>()
   const [form] = Form.useForm<EditorFormValues>()
 
   const editingId = id ? Number(id) : NaN
@@ -85,7 +89,7 @@ export default function AnnouncementEditorPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey ?? 'leader_m4'}`)
+  const backToList = () => navigate(`${getPortalPath(portalKey)}/${fromModuleKey ?? 'leader_m4'}`)
 
   const typeOptions = ANNOUNCEMENT_TYPES.map((v) => ({ value: v, label: t(`announcement.type_${v}`) }))
   const priorityOptions = ANNOUNCEMENT_PRIORITIES.map((v) => ({
@@ -121,9 +125,13 @@ export default function AnnouncementEditorPage() {
       }
 
       try {
-        const orgRes = await queryOrganizations({ page: 1, page_size: 100 })
+        const token = useAuthStore.getState().token
+        const orgRes = await fetchAllPages(
+          (page) => queryOrganizations({ page, page_size: 100 }), 100, 100,
+          () => !cancelled && token === useAuthStore.getState().token,
+        )
         if (cancelled) return
-        setOrgs(orgRes.data)
+        setOrgs(orgRes)
       } catch (err) {
         if (cancelled) return
         if (axios.isAxiosError(err) && err.response?.status === 401) return

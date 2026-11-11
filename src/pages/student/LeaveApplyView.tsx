@@ -1,3 +1,4 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 学生端：请假申请（表单 + 本人请假记录）。
@@ -78,8 +79,8 @@ export default function LeaveApplyView() {
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
   const [form] = Form.useForm<LeaveFormValues>()
-  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
-    usePaginated<LeaveInfo>(queryLeaves)
+  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh, dateQuery, setDateQuery } =
+    usePaginated<LeaveInfo>(queryLeaves, undefined, 'aliased')
 
   /** 双击记录行打开详情弹窗（携带请假记录 id） */
   const [detailId, setDetailId] = useState<number | null>(null)
@@ -355,6 +356,7 @@ export default function LeaveApplyView() {
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('leaveApply.myRecords')}</h3>
+          <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
           <Button icon={<ReloadOutlined />} onClick={refresh}>
             {t('common.refresh')}
           </Button>

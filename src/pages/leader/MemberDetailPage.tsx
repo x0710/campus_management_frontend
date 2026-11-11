@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /** 共享成员详情入口：处理来源、导航和编辑刷新；各业务页签位于 member-detail/。 */
 import BasicInfoPanel from './member-detail/BasicInfoPanel'
 import ProfileDetailTab from './member-detail/ProfileDetailTab'
@@ -11,7 +13,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import { Button, Modal, Skeleton, Tabs, Tooltip } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { listAllOrganizations } from '../../api/organizations'
 import type { OrganizationInfo } from '../../api/types/organizations'
@@ -38,7 +40,7 @@ import UserEditPanel, { type EditSection } from '../admin/UserEditPanel'
  * @returns 类型：Element
  */
 export default function MemberDetailPage() {
-  const { uid, portalKey } = useParams()
+  const { uid, portalKey } = usePortalParams()
   const [params] = useSearchParams()
   // 成员、来源或查看组织变化时重建全部页签，避免带入上个成员的表单和关联数据。
   return (
@@ -53,7 +55,7 @@ function MemberDetailContent() {
   const locale = useSettingsStore((s) => s.locale)
   const reportError = useErrorFeedback()
   const navigate = useNavigate()
-  const { portalKey, uid } = useParams<{ portalKey: string; uid: string }>()
+  const { portalKey, uid } = usePortalParams<{ portalKey: string; uid: string }>()
   const [searchParams] = useSearchParams()
   // 来源模块（侧栏高亮 + 返回目标）：领导端组织概览 leader_m3 / 老师端班级管理 teacher_m3 /
   // 支部端 branch_m5 / 学院端 academy_m5 / 管理端 admin_m3 / 党委学校端 school_m2
@@ -158,7 +160,7 @@ function MemberDetailContent() {
     setExtrasReloadSeq((s) => s + 1)
   }, [])
 
-  const backToList = () => navigate(`/portal/${portalKey}/${fromModuleKey}`)
+  const backToList = () => navigate(`${getPortalPath(portalKey)}/${fromModuleKey}`)
 
   /** 性别文案（与个人资料页一致） */
   const genderLabel = useMemo(() => {

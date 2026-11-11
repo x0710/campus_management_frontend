@@ -1,3 +1,4 @@
+import { CAMPUS_PATH } from '../config/routes'
 import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import axios from 'axios'
@@ -27,7 +28,7 @@ export function useAccountSwitch() {
       useAuthStore.getState().impersonate({
         token: result.token, username: result.user, lastLoginAt: result.last_login_at,
       }, `${location.pathname}${location.search}${location.hash}`)
-      navigate('/', { replace: true })
+      navigate(CAMPUS_PATH, { replace: true })
     } catch (err) {
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) reportError(err)
     } finally {

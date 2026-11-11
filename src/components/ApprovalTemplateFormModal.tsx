@@ -1,3 +1,4 @@
+import { usePortalParams } from '../hooks/usePortalParams'
 /** 审批模板表单弹窗（新增 / 编辑 / 查看，含审批步骤管理入口）。 */
 
 import { usePositionLabel } from '../composables/usePositionLabel'
@@ -34,7 +35,6 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router'
 import {
   createApprovalTemplate,
   deleteApprovalTemplateStep,
@@ -123,7 +123,7 @@ export default function ApprovalTemplateFormModal({
   const positionLabel = usePositionLabel()
   const { message } = AntdApp.useApp()
   const locale = useSettingsStore((s) => s.locale)
-  const { portalKey } = useParams<{ portalKey?: string }>()
+  const { portalKey } = usePortalParams<{ portalKey?: string }>()
 
   const [form] = Form.useForm<TemplateFormValues>()
   const [detail, setDetail] = useState<ApprovalTemplateDetail | null>(null)

@@ -1,3 +1,7 @@
+import CreatedDateFilter from './CreatedDateFilter'
+import type { CreatedDateQuery } from '../api/types/common'
+import { getPortalPath } from '../config/routes'
+import { usePortalParams } from '../hooks/usePortalParams'
 /** 组织成员浏览器：组织树 + 成员表，支持搜索、翻页与进入成员详情。 */
 
 import { isEntryActionTarget } from '../utils/entryInteraction'
@@ -48,7 +52,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
 import axios from 'axios'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import { extractErrorReason } from '../api/common'
 import { queryOrgMembers } from '../api/organizations'
 import {
@@ -233,7 +237,7 @@ export default function OrgMembersExplorer({
 }: OrgMembersExplorerProps) {
   const t = useT()
   const navigate = useNavigate()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
 
   const [orgSearch, setOrgSearch] = useState('')
   const selectedId = useUiStateStore((s) => s.selectedOrgIds[fromModuleKey] ?? null)
@@ -270,6 +274,7 @@ export default function OrgMembersExplorer({
   const [exportScopeOpen, setExportScopeOpen] = useState(false)
 
   /** 加载指定组织的成员（force=true 绕过会话缓存） */
+  const [memberDates, setMemberDates] = useState<CreatedDateQuery>(() => useUiStateStore.getState().memberDateFilters[fromModuleKey] ?? {})
   const memberRequests = useRequestSequence()
   const loadMembers = useCallback(
     async (orgId: number, page: number, force?: boolean) => {
@@ -283,7 +288,7 @@ export default function OrgMembersExplorer({
           for (let current = 1; ; current += 1) {
             const res = await queryOrgMembers(
               orgId,
-              { page: current, page_size: memberPageSize },
+              { ...memberDates, page: current, page_size: memberPageSize },
               force,
             )
             if (!isCurrent()) return
@@ -295,7 +300,7 @@ export default function OrgMembersExplorer({
           setMemberTotal(all.length)
           return
         }
-        const res = await queryOrgMembers(orgId, { page, page_size: memberPageSize }, force)
+        const res = await queryOrgMembers(orgId, { ...memberDates, page, page_size: memberPageSize }, force)
         if (!isCurrent()) return
         setMembers(res.data)
         setMemberTotal(res.total)
@@ -308,7 +313,7 @@ export default function OrgMembersExplorer({
         if (isCurrent()) setMembersLoading(false)
       }
     },
-    [memberPageSize, partyScoreColumns, t, memberRequests],
+    [memberPageSize, partyScoreColumns, t, memberRequests, memberDates],
   )
 
   // 实际查询成员的组织：
@@ -415,11 +420,11 @@ export default function OrgMembersExplorer({
   const resolveMemberPage = useCallback(
     async (orgId: number, uid: number) => {
       // 目标组织与当前组织不同：前端列表尚不包含该组织成员，退回服务端分页扫描
-      if (orgId !== activeOrgId) return findMemberPage(orgId, uid, memberPageSize)
+      if (orgId !== activeOrgId) return findMemberPage(orgId, uid, memberPageSize, memberDates)
       const index = memberRows.findIndex((row) => row.user_id === uid)
       return index === -1 ? null : Math.floor(index / memberPageSize) + 1
     },
-    [activeOrgId, memberRows, memberPageSize],
+    [activeOrgId, memberRows, memberPageSize, memberDates],
   )
 
   // 切换组织时清空职位筛选与排序：不同组织的职位集合不同
@@ -469,6 +474,7 @@ export default function OrgMembersExplorer({
 
   // 成员 ID 搜索：定位所属组织 → 展开并选中该组织 → 高亮命中成员行（逻辑见 useMemberSearch）
   const search = useMemberSearch({
+    memberDates,
     orgs,
     memberPageSize,
     activeOrgId,
@@ -625,6 +631,7 @@ export default function OrgMembersExplorer({
             orgs,
             orgId: selectedOrg.id,
             includeChildren: true,
+            dates: memberDates,
           })
         : partyScoreColumns
           ? filteredRows
@@ -651,6 +658,7 @@ export default function OrgMembersExplorer({
     selectedOrg,
     orgs,
     exporting,
+    memberDates,
     membersLoading,
     partyScoreColumns,
     filteredRows,
@@ -699,7 +707,7 @@ export default function OrgMembersExplorer({
   const openMember = useCallback(
     (uid: number, orgId: number | null = activeOrgId) => {
       const orgQuery = orgId != null ? `&org=${orgId}` : ''
-      navigate(`/portal/${portalKey}/organization-members/${uid}?from=${fromModuleKey}${orgQuery}`)
+      navigate(`${getPortalPath(portalKey)}/organization-members/${uid}?from=${fromModuleKey}${orgQuery}`)
     },
     [navigate, portalKey, fromModuleKey, activeOrgId],
   )
@@ -979,7 +987,7 @@ export default function OrgMembersExplorer({
               <Tooltip title={t('adminOrg.bulkAddHint')}>
                 <Button
                   disabled={orgsLoading || !!orgsError || orgs.length === 0}
-                  onClick={() => navigate(`/portal/${portalKey}/${BULK_ADD_MEMBERS_ROUTE}?from=${fromModuleKey}`)}
+                  onClick={() => navigate(`${getPortalPath(portalKey)}/${BULK_ADD_MEMBERS_ROUTE}?from=${fromModuleKey}`)}
                 >
                   {t('adminOrg.bulkAddMembers')}
                 </Button>
@@ -1008,6 +1016,14 @@ export default function OrgMembersExplorer({
             )}
           </div>
         </header>
+        <div className="approval-toolbar" style={{ padding: 12, flexWrap: 'wrap' }}>
+          <CreatedDateFilter value={memberDates} onChange={(next) => {
+            search.clear()
+            setMemberPage(fromModuleKey, 1)
+            useUiStateStore.getState().setMemberDateFilter(fromModuleKey, next)
+            setMemberDates(next)
+          }} />
+        </div>
         <div className="panel-card-body">
           {/* 单独查看匹配人员：只展示匹配出来的用户，不再依赖当前组织 */}
           {search.matchOnly ? (

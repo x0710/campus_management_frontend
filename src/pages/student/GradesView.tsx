@@ -1,3 +1,6 @@
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 学生端：成绩查询（仅本人成绩）。
@@ -83,6 +86,7 @@ export default function GradesView() {
   const [error, setError] = useState<string | null>(null)
   const [semester, setSemester] = useState<string>('all')
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   // 重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
   const [reload, setReload] = useState<{ seq: number; force: boolean }>({
     seq: 0,
@@ -96,22 +100,27 @@ export default function GradesView() {
   const [detailError, setDetailError] = useState<string | null>(null)
 
   // ============ 本人成绩加载 ============
+  const requests = useRequestSequence()
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
       // 只使用登录态 uid 查询，学生无法指定他人
       const me = await getCurrentUser()
-      setScores(await listAllScoresForUser(me.uid, reload.force))
+      const scores = await listAllScoresForUser(me.uid, reload.force, isCurrent, createdDates)
+      if (!isCurrent()) return
+      setScores(scores)
     } catch (err) {
+      if (!isCurrent()) return
       // 401 由全局拦截器处理，这里不重复提示
       if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
         setError(extractErrorReason(err, t))
       }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [reload.seq, reload.force]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reload.seq, reload.force, createdDates, requests]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void load()
@@ -263,6 +272,7 @@ export default function GradesView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('grades.title')}</h3>
           <div className="student-toolbar">
+            <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <Tooltip title={t('grades.semesterFilterHint')}>
               <Select
                 size="small"

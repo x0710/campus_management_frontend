@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 领导端：审批指标（审批模板）管理（查询 + 新增 + 查看详情 + 编辑 + 删除 + 审批步骤增删改）。
@@ -13,14 +15,14 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
  * 因此本页一次性取回（page_size = APPROVAL_TEMPLATE_FETCH_SIZE）后在前端完成多选筛选与分页；
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
  * 交互：工具栏可按名称、启用状态筛选；双击表格任意一行或「详情」按钮进入独立详情页
- * （/portal/:portalKey/approval-templates/:id?from=<moduleKey>），不再弹窗；新增仍使用弹窗。
+ * （<门户路径>/approval-templates/:id?from=<moduleKey>），不再弹窗；新增仍使用弹窗。
  */
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import { deleteApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
 import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import { extractErrorReason } from '../../api/common'
@@ -47,7 +49,7 @@ export default function ApprovalTemplateManageView() {
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
-  const { portalKey, moduleKey } = useParams<{
+  const { portalKey, moduleKey } = usePortalParams<{
     portalKey?: string
     moduleKey?: string
   }>()
@@ -76,7 +78,7 @@ export default function ApprovalTemplateManageView() {
     (templateId: number) => {
       if (!portalKey) return
       navigate(
-        `/portal/${portalKey}/approval-templates/${templateId}?from=${moduleKey ?? 'academy_m2'}`,
+        `${getPortalPath(portalKey)}/approval-templates/${templateId}?from=${moduleKey ?? 'academy_m2'}`,
       )
     },
     [portalKey, moduleKey, navigate],
@@ -323,7 +325,7 @@ export default function ApprovalTemplateManageView() {
           if (createdId !== undefined) {
             const query = new URLSearchParams({ action: 'add-step' })
             if (moduleKey) query.set('from', moduleKey)
-            navigate(`/portal/${portalKey}/approval-templates/${createdId}?${query}`)
+            navigate(`${getPortalPath(portalKey)}/approval-templates/${createdId}?${query}`)
           } else {
             setReload((r) => ({ seq: r.seq + 1, force: false }))
           }

@@ -2,7 +2,7 @@
  * 公告模块类型定义：公告类型/等级/状态枚举、列表项、详情、查询参数与创建/更新请求体。
  * 供 api/announcements.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 公告类型（api.json: AnnouncementType） */
 export type AnnouncementType =
@@ -55,7 +55,7 @@ export interface AnnouncementDetail {
 }
 
 /** 公告分页查询参数 */
-export interface AnnouncementQuery extends PageQuery {
+export interface AnnouncementQuery extends PageQuery, CreatedDateQuery {
   keyword?: string
   e_type?: AnnouncementType
   priority?: AnnouncementPriority

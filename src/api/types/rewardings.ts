@@ -4,7 +4,7 @@
  * uid 为学号/用户 ID（后端 int64，JSON 中序列化为整数）。
  * 供 api/rewardings.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 奖学金记录详情（api.json: RewardingDto，列表项即完整详情） */
 export interface RewardingDto {
@@ -20,7 +20,7 @@ export interface RewardingDto {
 }
 
 /** 奖学金分页查询参数（api.json: RewardingQueryParams） */
-export interface RewardingQuery extends PageQuery {
+export interface RewardingQuery extends PageQuery, CreatedDateQuery {
   /** 按学生/用户 ID 精确筛选 */
   uid?: number
   /** 按学生/用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */

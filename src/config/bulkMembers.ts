@@ -67,7 +67,7 @@ export const POSITION_USAGE_SCOPE_LABEL_KEYS: Record<PositionUsageScope, string>
   self_and_descendants: 'bulkMembers.scopeSelfAndDescendants',
 }
 
-/** 批量添加新成员页的子路由路径（相对 /portal/:portalKey/） */
+/** 批量添加新成员页的子路由路径（相对各门户根路径） */
 export const BULK_ADD_MEMBERS_ROUTE = 'bulk-add-members'
 
 /** 下载的样表文件名 */

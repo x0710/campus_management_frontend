@@ -1,3 +1,6 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 党员端「成绩申报」：申报表单 + 我的申报记录。
@@ -24,7 +27,7 @@ import { ReloadOutlined } from '@ant-design/icons'
 import { App as AntdApp, Button, Form, Input, InputNumber, Select, Space, Spin, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import { getApprovalTemplateDetail, queryApprovalTemplates } from '../../api/approvalmodel'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
@@ -93,7 +96,7 @@ export default function PartyDeclarationView() {
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
   const navigate = useNavigate()
-  const { portalKey, moduleKey } = useParams<{ portalKey: string; moduleKey?: string }>()
+  const { portalKey, moduleKey } = usePortalParams<{ portalKey: string; moduleKey?: string }>()
   const [form] = Form.useForm<DeclarationFormValues>()
 
   const [submitting, setSubmitting] = useState(false)
@@ -291,7 +294,7 @@ export default function PartyDeclarationView() {
    * 我的申报记录：显式按 user_id 过滤（接口不会自动限定当前用户）。
    * user_id 就绪前返回空页占位，避免短暂展示到他人的申报数据。
    */
-  const { data, total, loading, error, page, pageSize, setPage, setPageSize, reload, refresh } =
+  const { data, total, loading, error, page, pageSize, setPage, setPageSize, reload, refresh, dateQuery, setDateQuery } =
     usePaginated<PartyScore>(
       async (query, force): Promise<PaginatedResponse<PartyScore>> => {
         if (myUid === null) {
@@ -404,7 +407,7 @@ export default function PartyDeclarationView() {
   const openRecordDetail = (record: PartyScore) => {
     if (!portalKey) return
     navigate(
-      `/portal/${portalKey}/party-scores/${record.id}?from=${moduleKey ?? 'party_m2'}`,
+      `${getPortalPath(portalKey)}/party-scores/${record.id}?from=${moduleKey ?? 'party_m2'}`,
     )
   }
 
@@ -581,6 +584,7 @@ export default function PartyDeclarationView() {
       <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('partyDeclaration.listTitle')}</h3>
+          <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
           <Button icon={<ReloadOutlined />} onClick={refresh}>
             {t('common.refresh')}
           </Button>

@@ -1,3 +1,4 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
 /** 校历列表页（当前未注册路由，保留供复用）。 */
 
 import { ReloadOutlined } from '@ant-design/icons'
@@ -20,7 +21,7 @@ import { formatDateTime } from '../../utils/datetime'
 export default function CalendarsView() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
-  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh } =
+  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh, dateQuery, setDateQuery } =
     usePaginated<CalendarEventInfo>(queryEvents)
   /** 双击行进入的事件详情（代码要求 14） */
   const [selected, setSelected] = useState<CalendarEventInfo | null>(null)
@@ -66,7 +67,8 @@ export default function CalendarsView() {
       <section className="panel-card">
       <header className="panel-card-header">
         <h3 className="panel-card-title">{t('calendar.title')}</h3>
-        <Button icon={<ReloadOutlined />} onClick={refresh}>
+        <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
+          <Button icon={<ReloadOutlined />} onClick={refresh}>
           {t('common.refresh')}
         </Button>
       </header>

@@ -1,3 +1,5 @@
+import type { CreatedDateQuery } from '../api/types/common'
+import { useRequestSequence } from './useRequestSequence'
 /**
  * 校历日历数据层（学生端 / 领导端共用）：
  * - 按「当前选中日期所在月份」拉取区间事件（分页聚合 + 会话缓存，见 queryEventsInRange）；
@@ -51,6 +53,8 @@ export function useCalendarEvents() {
   const t = useT()
   /** 选中日期：其所在月份即看板当前展示的月份 */
   const [value, setValue] = useState<Dayjs>(() => dayjs())
+  const [dateQuery, setDateQuery] = useState<CreatedDateQuery>({})
+  const requests = useRequestSequence()
   const [typeFilter, setTypeFilter] = useState<CalendarTypeFilter>([])
 
   /** 后端返回的原始事件列表（未做多类型本地过滤） */
@@ -77,6 +81,7 @@ export function useCalendarEvents() {
    */
   const load = useCallback(
     async (force?: boolean) => {
+      const isCurrent = requests.begin()
       setLoading(true)
       setError(null)
       try {
@@ -84,6 +89,7 @@ export function useCalendarEvents() {
         const singleType = typeKey.length > 0 && !typeKey.includes(',') ? (typeKey as EventType) : undefined
         const list = await queryEventsInRange(
           {
+            ...dateQuery,
             // 向前多取一段时间，覆盖「起始日期在上月但仍在进行中」的跨月事件
             from_date: monthStart
               .subtract(CALENDAR_LOOKBACK_DAYS, 'day')
@@ -99,14 +105,14 @@ export function useCalendarEvents() {
           },
           force,
         )
-        setRawEvents(list)
+        if (isCurrent()) setRawEvents(list)
       } catch (err) {
-        if (!isAuthError(err)) setError(extractErrorReason(err, t))
+        if (isCurrent() && !isAuthError(err)) setError(extractErrorReason(err, t))
       } finally {
-        setLoading(false)
+        if (isCurrent()) setLoading(false)
       }
     },
-    [monthKey, typeKey, t],
+    [monthKey, typeKey, t, dateQuery, requests],
   )
 
   // 月份或筛选变化时自动加载（相同条件命中缓存，不重复请求）
@@ -220,6 +226,8 @@ export function useCalendarEvents() {
     setValue: changeValue,
     typeFilter,
     setTypeFilter,
+    dateQuery,
+    setDateQuery,
     /** 按天归组的事件（含相邻月份可见日期格），供月历格子渲染 */
     eventsByDay,
     loading,

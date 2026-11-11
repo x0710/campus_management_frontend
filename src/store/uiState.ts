@@ -1,3 +1,4 @@
+import type { CreatedDateQuery } from '../api/types/common'
 /**
  * 视图层会话状态（非持久化）：用于在路由切换时保留某些页面的 UI 状态，
  * 例如「组织架构」页面选中的组织 ID。仅存在于内存，刷新后重置。
@@ -5,7 +6,7 @@
  */
 import { create } from 'zustand'
 import { useAuthStore } from './auth'
-import type { MemberSearchHit } from '../composables/useMemberSearch'
+import type { MemberSearchHit } from '../types/memberSearch'
 
 /**
  * 组织成员搜索的可恢复状态（按模块 key 保存，仅存内存，刷新后重置）。
@@ -34,6 +35,7 @@ export interface MemberSearchState {
 }
 
 export interface UserListState {
+  createdDates?: CreatedDateQuery
   page: number
   keyword: string
   uidFilter: string
@@ -41,6 +43,8 @@ export interface UserListState {
 }
 
 interface UiState {
+  memberDateFilters: Partial<Record<string, CreatedDateQuery>>
+  setMemberDateFilter: (key: string, value: CreatedDateQuery) => void
   userLists: Partial<Record<string, UserListState>>
   setUserListState: (moduleKey: string, state: UserListState) => void
   reset: () => void
@@ -68,8 +72,10 @@ interface UiState {
 export const useUiStateStore = create<UiState>()((set) => ({
   reset: () => set({
     selectedOrgIds: {}, collapsedOrgTrees: {}, expandedOrgTreeKeys: {},
-    memberPages: {}, memberSearchStates: {}, userLists: {},
+    memberPages: {}, memberSearchStates: {}, userLists: {}, memberDateFilters: {},
   }),
+  memberDateFilters: {},
+  setMemberDateFilter: (key, value) => set((s) => ({ memberDateFilters: { ...s.memberDateFilters, [key]: value } })),
   userLists: {},
   setUserListState: (moduleKey, state) =>
     set((s) => ({ userLists: { ...s.userLists, [moduleKey]: state } })),
@@ -97,8 +103,8 @@ export const useUiStateStore = create<UiState>()((set) => ({
 
 /** 仅暂存原账号的视图数据，不缓存接口响应，不与代登录账号共享。 */
 function snapshotUi() {
-  const { selectedOrgIds, collapsedOrgTrees, expandedOrgTreeKeys, memberPages, memberSearchStates, userLists } = useUiStateStore.getState()
-  return { selectedOrgIds, collapsedOrgTrees, expandedOrgTreeKeys, memberPages, memberSearchStates, userLists }
+  const { selectedOrgIds, collapsedOrgTrees, expandedOrgTreeKeys, memberPages, memberSearchStates, userLists, memberDateFilters } = useUiStateStore.getState()
+  return { selectedOrgIds, collapsedOrgTrees, expandedOrgTreeKeys, memberPages, memberSearchStates, userLists, memberDateFilters }
 }
 let originalUi: { token: string; view: ReturnType<typeof snapshotUi> } | null = null
 

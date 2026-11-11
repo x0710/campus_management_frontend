@@ -3,7 +3,7 @@
  * 后端金额字段 amount_cents 以「分」为单位（int64），展示与输入统一转换为「元」，
  * 避免浮点精度问题；格式化结果带人民币符号与千分位，如 ¥1,000.00。
  */
-import type { Locale } from '../store/settings'
+import type { Locale } from '../types/locale'
 
 /**
  * 把以「分」为单位的金额格式化为人民币字符串（如 100000 → ¥1,000.00）。

@@ -8,6 +8,8 @@ registerHooks({
     if (specifier.startsWith('.') && context.parentURL) {
       const url = new URL(`${specifier}.ts`, context.parentURL)
       if (existsSync(fileURLToPath(url))) return nextResolve(url.href, context)
+      const index = new URL(`${specifier}/index.ts`, context.parentURL)
+      if (existsSync(fileURLToPath(index))) return nextResolve(index.href, context)
     }
     return nextResolve(specifier, context)
   },

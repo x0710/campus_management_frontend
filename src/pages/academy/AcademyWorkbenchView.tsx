@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 党委学院端：工作台（学院先锋指数总览 / 各支部排名 / 待办事项）。
  *
@@ -25,7 +27,7 @@
 import { Tooltip } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { extractErrorReason } from '../../api/common'
 import { listSubsidiaries, queryOrganizationMemberCounts } from '../../api/organizations'
 import { getPartyScoreOrganizationAverage, queryPartyScoreApprovals } from '../../api/partyScores'
@@ -56,7 +58,7 @@ interface BranchRankingItem {
 export default function AcademyWorkbenchView() {
   const t = useT()
   const navigate = useNavigate()
-  const { portalKey } = useParams<{ portalKey: string }>()
+  const { portalKey } = usePortalParams<{ portalKey: string }>()
   const setSelectedOrgId = useUiStateStore((s) => s.setSelectedOrgId)
   const setMemberPage = useUiStateStore((s) => s.setMemberPage)
   const setOrgTreeExpanded = useUiStateStore((s) => s.setOrgTreeExpanded)
@@ -199,7 +201,7 @@ export default function AcademyWorkbenchView() {
       )
       // 组织树被收起时先展开，保证跳转后能看到定位到该支部的节点
       setOrgTreeCollapsed(ACADEMY_BRANCH_MODULE_KEY, false)
-      navigate(`/portal/${portalKey ?? 'academy'}/${ACADEMY_BRANCH_MODULE_KEY}`, {
+      navigate(`${getPortalPath(portalKey ?? 'academy')}/${ACADEMY_BRANCH_MODULE_KEY}`, {
         // 透传定位目标：学院支部管理挂载后把组织树滚动到该支部节点
         state: { focusOrgId: branchId },
       })
@@ -360,7 +362,7 @@ export default function AcademyWorkbenchView() {
           <ul className="branch-todo-list">
             {/* 待审核加分申报 → 审核管理（处理待办审批） */}
             <li className="branch-todo-item">
-              <Link className="branch-todo-link" to={`/portal/${portalKey}/academy_m3`}>
+              <Link className="branch-todo-link" to={`${getPortalPath(portalKey)}/academy_m3`}>
                 <span className="branch-todo-label">{t('academy.todoApprove')}</span>
                 <span className="branch-todo-count">
                   {statText(todoApprove)}

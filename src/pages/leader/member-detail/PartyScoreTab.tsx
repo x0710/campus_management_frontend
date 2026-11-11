@@ -1,3 +1,5 @@
+import CreatedDateFilter from '../../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../../api/types/common'
 /** 成员详情 - 党员积分页签：积分明细、汇总与扣分。 */
 
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
@@ -53,6 +55,7 @@ export default function PartyScoreTab({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [reload, setReload] = useState({ seq: 0, force: false })
 
   const [detailOpen, setDetailOpen] = useState(false)
@@ -67,7 +70,7 @@ export default function PartyScoreTab({
     try {
       // 该成员的全部加分申请（分页最多 100 行，代码要求 12）
       const res = await queryPartyScores(
-        { user_id: uid, page, page_size: MEMBER_DETAIL_PAGE_SIZE },
+        { ...createdDates, user_id: uid, page, page_size: MEMBER_DETAIL_PAGE_SIZE },
         reload.force,
       )
       // 列表摘要可能缺 template_id / created_at / updated_at，详情接口才返回完整字段；
@@ -101,7 +104,7 @@ export default function PartyScoreTab({
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [uid, page, reload.force, t, reportError, requests])
+  }, [uid, page, reload.force, t, reportError, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -198,7 +201,8 @@ export default function PartyScoreTab({
 
   return (
     <>
-      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+        <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
         <PartyScoreDeductionButton key={uid} userId={uid} onSaved={() => {
           setPage(1)
           setReload((r) => ({ seq: r.seq + 1, force: true }))

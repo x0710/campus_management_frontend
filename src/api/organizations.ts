@@ -3,7 +3,7 @@ import { cachedGet, invalidate } from './cache'
 import { http } from './http'
 import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import { ORGANIZATION_MEMBER_COUNT_BATCH_SIZE } from '../config/organization'
-import type { PaginatedResponse } from './types/common'
+import type { CreatedDateQuery, PaginatedResponse } from './types/common'
 import type {
   MemberBatchCreate,
   MemberBatchDelete,
@@ -52,11 +52,11 @@ export function getOrganization(id: number, force?: boolean): Promise<Organizati
  * @param force 类型：boolean；默认值：无；是否必填：可选
  * @returns 类型：Promise<OrganizationInfo[]>
  */
-export async function listAllOrganizations(force?: boolean): Promise<OrganizationInfo[]> {
+export async function listAllOrganizations(force?: boolean, dates: CreatedDateQuery = {}): Promise<OrganizationInfo[]> {
   const pageSize = 100
   const all: OrganizationInfo[] = []
   for (let page = 1; ; page += 1) {
-    const res = await queryOrganizations({ page, page_size: pageSize }, force)
+    const res = await queryOrganizations({ ...dates, page, page_size: pageSize }, force)
     all.push(...res.data)
     if (page >= res.total_pages) break
   }
@@ -260,8 +260,8 @@ export async function removeOrgMembers(
  * @param orgId 类型：number；默认值：无；是否必填：必填
  * @returns 类型：Promise<OrganizationInfo[]>
  */
-export async function listSubsidiaries(orgId: number): Promise<OrganizationInfo[]> {
-  return cachedGet<OrganizationInfo[]>(`/organizations/${orgId}/subsidiaries`)
+export async function listSubsidiaries(orgId: number, dates: CreatedDateQuery = {}): Promise<OrganizationInfo[]> {
+  return cachedGet<OrganizationInfo[]>(`/organizations/${orgId}/subsidiaries`, { ...dates })
 }
 
 /**
@@ -286,11 +286,12 @@ export async function listUserOrganizationsBatch(
   uids: number[],
   force?: boolean,
   realOnly = false,
+  dates: CreatedDateQuery = {},
 ): Promise<UserOrganization[]> {
   if (uids.length === 0) return []
   return cachedGet<UserOrganization[]>(
     '/organization-members',
-    { uids: uids.join(',') },
+    { uids: uids.join(','), ...dates },
     { force, preview: !realOnly },
   )
 }
@@ -301,8 +302,8 @@ export async function listUserOrganizationsBatch(
  * @param force 是否绕过会话缓存强制重新请求（默认 false；任职变更后刷新展示时传 true）
  * @returns Promise<UserOrganization[]> 任职记录数组
  */
-export function listUserOrganizations(uid: number, force?: boolean, realOnly = false): Promise<UserOrganization[]> {
-  return listUserOrganizationsBatch([uid], force, realOnly)
+export function listUserOrganizations(uid: number, force?: boolean, realOnly = false, dates: CreatedDateQuery = {}): Promise<UserOrganization[]> {
+  return listUserOrganizationsBatch([uid], force, realOnly, dates)
 }
 
 /**

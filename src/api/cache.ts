@@ -4,6 +4,7 @@ import { http } from './http'
 import { useAuthStore } from '../store/auth'
 import { GetRequestCache, type CachedGetOptions } from '../utils/getRequestCache'
 import { readPreviewData } from './previewDataService'
+import { publishCacheInvalidation, subscribeCacheInvalidation } from './cacheInvalidation'
 
 export { makeCacheKey } from '../utils/getRequestCache'
 export type { CachedGetOptions } from '../utils/getRequestCache'
@@ -11,7 +12,9 @@ export type { CachedGetOptions } from '../utils/getRequestCache'
 const cache = new GetRequestCache((url, params) => http.get(url, { params }).then((res) => res.data))
 // 升级时删除旧的永久业务缓存；不再将接口数据写入 localStorage。
 try { localStorage.removeItem('campus-organization-data-v1') } catch { /* 本地存储不可用时不影响请求。 */ }
-const listeners = new Set<(prefix?: string) => void>()
+export { subscribeCacheInvalidation }
+// HTTP 层发布失效事件时同步清除请求缓存；HTTP 不再依赖此模块。
+subscribeCacheInvalidation((prefix) => cache.invalidate(prefix))
 
 /**
  * 相同查询共享在途请求；force 刷新及失效后，旧响应不得写回缓存。
@@ -31,18 +34,7 @@ export function cachedGet<T>(url: string, params?: Record<string, unknown>, opts
  * @returns 类型：void
  */
 export function invalidate(prefix?: string): void {
-  cache.invalidate(prefix)
-  for (const listener of listeners) listener(prefix)
-}
-
-/**
- * 派生的共享数据也需要响应 mutation 和账号切换。
- * @param listener 类型：(prefix?: string) => void；默认值：无；是否必填：必填
- * @returns 类型：() => void
- */
-export function subscribeCacheInvalidation(listener: (prefix?: string) => void): () => void {
-  listeners.add(listener)
-  return () => { listeners.delete(listener) }
+  publishCacheInvalidation(prefix)
 }
 
 /**

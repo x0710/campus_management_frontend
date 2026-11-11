@@ -17,7 +17,7 @@
  * 供 api/partyScores.ts 的请求函数与党建端各视图复用。
  */
 import type { ApprovalStepStatus } from './approvals'
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 党建活动加分申请记录（api.json: PartyScoreInfo，列表项不含 template_id） */
 export interface PartyScore {
@@ -59,7 +59,7 @@ export interface PartyScoreDetail extends PartyScore {
  * GET /api/party-scores 分页查询参数。
  * 继承 PageQuery（page/page_size 均可选）。
  */
-export interface PartyScoreQuery extends PageQuery {
+export interface PartyScoreQuery extends PageQuery, CreatedDateQuery {
   /** 按审批模板 ID 精确筛选 */
   template_id?: number
   /** 按申请用户 ID 精确筛选 */
@@ -108,7 +108,7 @@ export interface PartyScoreCreateResponse {
  * GET /api/party-scores/approvals 查询参数。
  * 继承 PageQuery（page/page_size 均可选）；返回裸数组（无分页 total）。
  */
-export interface PartyScoreApprovalQuery extends PageQuery {
+export interface PartyScoreApprovalQuery extends PageQuery, CreatedDateQuery {
   /** 按审批人 ID 筛选 */
   approver_id?: number
   /** 按申请人 ID 筛选 */

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
 import { getScore, listAllScoresForUser } from '../../api/examinations'
+import { useAuthStore } from '../../store/auth'
 import type {
   CourseScoreDetail,
   CourseScoreInfo,
@@ -309,6 +310,8 @@ export default function StudentScoresView() {
     }
 
     let cancelled = false
+    const token = useAuthStore.getState().token
+    const isCurrent = () => !cancelled && token === useAuthStore.getState().token
     const force = forceRef.current
     forceRef.current = false
     setScoresLoading(true)
@@ -317,18 +320,19 @@ export default function StudentScoresView() {
     void (async () => {
       const next = new Map<number, CourseScoreInfo[]>()
       let failed = false
-      await Promise.all(
-        pageStudents.map(async (s) => {
+      for (let start = 0; start < pageStudents.length && isCurrent(); start += 6) {
+        await Promise.all(pageStudents.slice(start, start + 6).map(async (s) => {
           try {
-            next.set(s.uid, await listAllScoresForUser(s.uid, force))
+            next.set(s.uid, await listAllScoresForUser(s.uid, force, isCurrent))
           } catch (err) {
+            if (!isCurrent()) return
             if (axios.isAxiosError(err) && err.response?.status === 401) return
             failed = true
             next.set(s.uid, [])
           }
-        }),
-      )
-      if (!cancelled) {
+        }))
+      }
+      if (isCurrent()) {
         setScoresByUid(next)
         setScoresError(failed ? 'failed' : null)
         setScoresLoading(false)

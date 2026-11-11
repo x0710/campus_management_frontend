@@ -4,7 +4,7 @@
  * 因此 JSON 中表现为**字符串**（如 "70.00"）。前端按字符串接收/提交，避免浮点精度丢失。
  * 供 api/examinations.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 考试类型（api.json: ExamType，后端枚举序列化为 snake_case） */
 export type ExamType = 'start' | 'middle' | 'final' | 'makeup' | 'retake'
@@ -59,7 +59,7 @@ export interface CourseScoreUpdateRequest {
 }
 
 /** 成绩分页查询参数（api.json: CourseScoreQueryParams） */
-export interface CourseScoreQuery extends PageQuery {
+export interface CourseScoreQuery extends PageQuery, CreatedDateQuery {
   /** 按学生 ID 筛选（单个） */
   uid?: number
   /** 按学生 ID 批量筛选（逗号分隔，如 "1,2,3"） */

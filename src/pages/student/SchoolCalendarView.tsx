@@ -1,3 +1,4 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
 /**
  * 学生端：校历日历（只读）。
  * 数据与交互全部复用 useCalendarEvents + CalendarBoard：
@@ -20,6 +21,8 @@ export default function SchoolCalendarView() {
     setValue,
     typeFilter,
     setTypeFilter,
+    dateQuery,
+    setDateQuery,
     eventsByDay,
     loading,
     error,
@@ -49,6 +52,7 @@ export default function SchoolCalendarView() {
       loading={loading}
       error={error}
       onRefresh={reload}
+      toolbarExtra={<CreatedDateFilter value={dateQuery} onChange={setDateQuery} />}
     />
   )
 }

@@ -2,7 +2,7 @@
  * 请假模块类型定义：请假类型/状态枚举、请假记录、详情、创建请求、时间冲突结果与查询参数。
  * 供 api/leaves.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateAliasQuery } from './common'
 
 /** 请假类型（api.json: LeaveType） */
 export type LeaveType = 'personal' | 'sick' | 'public' | 'other'
@@ -59,7 +59,7 @@ export interface CancelLeaveRequest {
 }
 
 /** 请假分页查询参数（api.json: LeaveQueryParams；不支持按审批状态筛选） */
-export interface LeaveQuery extends PageQuery {
+export interface LeaveQuery extends PageQuery, CreatedDateAliasQuery {
   leave_type?: LeaveType
   start_date?: string
   end_date?: string

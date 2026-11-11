@@ -1,3 +1,6 @@
+import { useRequestSequence } from '../../composables/useRequestSequence'
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../api/types/common'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /**
  * 请假审批待办（GET /api/approvals + PUT /api/approvals）。
@@ -67,6 +70,7 @@ export default function LeaveApprovalView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [status, setStatus] = useState<ApprovalStepStatus | 'all'>('all')
   const [submitting, setSubmitting] = useState(false)
   const [action, setAction] = useState<{
@@ -78,30 +82,35 @@ export default function LeaveApprovalView() {
   // 同时保留该行（审批步骤）信息，可在详情弹窗内直接「同意 / 驳回」
   const [detailRow, setDetailRow] = useState<ApprovalInstanceStep | null>(null)
 
+  const requests = useRequestSequence()
   const load = useCallback(async () => {
+    const isCurrent = requests.begin()
     setLoading(true)
     setError(null)
     try {
       const [me, list] = await Promise.all([
         getCurrentUser(),
         queryApprovals({
+          ...createdDates,
           page,
           page_size: DEFAULT_TABLE_PAGE_SIZE,
           ...(status === 'all' ? {} : { status }),
         }),
       ])
+      if (!isCurrent()) return
       setUid(me.uid)
       setRows(list)
     } catch (err) {
+      if (!isCurrent()) return
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         // 401 由全局拦截器处理，这里不重复提示
       } else {
         setError(extractErrorReason(err, t))
       }
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [page, status, t])
+  }, [page, status, t, createdDates, requests])
 
   useEffect(() => {
     void load()
@@ -236,6 +245,7 @@ export default function LeaveApprovalView() {
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('approval.title')}</h3>
           <div className="approval-toolbar">
+            <CreatedDateFilter label={t('common.approvalCreatedDateRange')} value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
             <Select
               value={status}
               options={statusOptions}

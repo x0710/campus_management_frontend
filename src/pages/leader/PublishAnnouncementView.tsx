@@ -1,3 +1,6 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 import { isEntryActionTarget } from '../../utils/entryInteraction'
 /** 领导端：我发布的通知（列表 + 管理）。
  * - 列表：GET /api/announcements?publisher_id=<当前用户> 分页查询（会话缓存），支持状态筛选；
@@ -14,7 +17,7 @@ import { App as AntdApp, Button, Popconfirm, Select, Table, Tag, Tooltip } from 
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import {
   deleteAnnouncement,
   queryAnnouncements,
@@ -56,7 +59,7 @@ export default function PublishAnnouncementView() {
   const { message } = AntdApp.useApp()
   const reportError = useErrorFeedback()
   const navigate = useNavigate()
-  const { portalKey, moduleKey } = useParams<{ portalKey: string; moduleKey?: string }>()
+  const { portalKey, moduleKey } = usePortalParams<{ portalKey: string; moduleKey?: string }>()
 
   const [uid, setUid] = useState<number | null>(null)
   /** 当前用户加载失败的完整错误文案（状态码 + 中文原因）；null 表示未失败 */
@@ -68,7 +71,7 @@ export default function PublishAnnouncementView() {
     () => (uid === null ? {} : { publisher_id: uid, ...(statusFilter === 'all' ? {} : { status: statusFilter }) }),
     [uid, statusFilter],
   )
-  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh, reload } =
+  const { data, total, loading, error, page, setPage, pageSize, setPageSize, refresh, reload, dateQuery, setDateQuery } =
     usePaginated<AnnouncementListItem, PublishListQuery>(queryAnnouncements, listQuery)
 
   // 初次加载：当前用户（用于按发布人过滤）
@@ -102,8 +105,8 @@ export default function PublishAnnouncementView() {
       const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
       navigate(
         id === undefined
-          ? `/portal/${portalKey}/announcements/new${search}`
-          : `/portal/${portalKey}/announcements/${id}/edit${search}`,
+          ? `${getPortalPath(portalKey)}/announcements/new${search}`
+          : `${getPortalPath(portalKey)}/announcements/${id}/edit${search}`,
       )
     },
     [navigate, portalKey, moduleKey],
@@ -113,7 +116,7 @@ export default function PublishAnnouncementView() {
   const openDetail = useCallback(
     (id: number) => {
       const search = moduleKey ? `?from=${encodeURIComponent(moduleKey)}` : ''
-      navigate(`/portal/${portalKey}/announcements/${id}${search}`)
+      navigate(`${getPortalPath(portalKey)}/announcements/${id}${search}`)
     },
     [navigate, portalKey, moduleKey],
   )
@@ -228,6 +231,7 @@ export default function PublishAnnouncementView() {
       <header className="panel-card-header">
         <h3 className="panel-card-title">{t('publish.myNotices')}</h3>
         <div className="approval-toolbar">
+          <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
           <Select
             value={statusFilter}
             options={statusOptions}

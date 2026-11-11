@@ -89,6 +89,8 @@ export async function queryEventsInRange(
   force?: boolean,
 ): Promise<CalendarEventInfo[]> {
   const base: CalendarQuery = {
+    ...(range.start_date ? { start_date: range.start_date } : {}),
+    ...(range.end_date ? { end_date: range.end_date } : {}),
     page_size: CALENDAR_PAGE_SIZE_MAX,
     from_date: range.from_date,
     to_date: range.to_date,

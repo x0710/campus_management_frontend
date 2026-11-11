@@ -1,3 +1,6 @@
+import { toCreatedDateAliases } from '../../../utils/dateQuery'
+import CreatedDateFilter from '../../../components/CreatedDateFilter'
+import type { CreatedDateQuery } from '../../../api/types/common'
 /** 成员详情 - 违规页签：违规记录增删改。 */
 
 import { isEntryActionTarget } from '../../../utils/entryInteraction'
@@ -66,6 +69,7 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [createdDates, setCreatedDates] = useState<CreatedDateQuery>({})
   const [total, setTotal] = useState(0)
   const [reload, setReload] = useState({ seq: 0, force: false })
 
@@ -82,7 +86,7 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
     setError(null)
     try {
       const res = await queryViolations(
-        { user_id: uid, page, page_size: VIOLATION_PAGE_SIZE },
+        { ...toCreatedDateAliases(createdDates), user_id: uid, page, page_size: VIOLATION_PAGE_SIZE },
         reload.force,
       )
       if (!isCurrent()) return
@@ -95,7 +99,7 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [uid, page, reload.force, t, requests])
+  }, [uid, page, reload.force, t, requests, createdDates])
 
   useEffect(() => {
     void load()
@@ -216,7 +220,8 @@ export default function ViolationTab({ uid, t, readOnly }: { uid: number; t: Tra
 
   return (
     <>
-      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12 }}>
+      <div className="approval-toolbar approval-toolbar-right" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+        <CreatedDateFilter value={createdDates} onChange={(next) => { setPage(1); setCreatedDates(next) }} />
         <Tooltip title={t('memberDetail.violationRefreshHint')}>
           <Button
             icon={<ReloadOutlined />}

@@ -1,3 +1,5 @@
+import { getPortalPath, CAMPUS_PATH } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /** 领导端 - 审批模板详情页：模板信息与审批步骤增改删。 */
 
 import { usePositionLabel } from '../../composables/usePositionLabel'
@@ -5,7 +7,7 @@ import { usePositionLabel } from '../../composables/usePositionLabel'
  * 领导端：审批指标（审批模板）详情页。
  *
  * 从「指标」模块列表双击整行或「详情」按钮进入，作为 PortalWorkspace 的子路由渲染
- * （路由：/portal/:portalKey/approval-templates/:id?from=<moduleKey>），
+ * （路由：<门户路径>/approval-templates/:id?from=<moduleKey>），
  * 不再使用弹窗，刷新后仍可通过 URL 中的指标 ID 恢复。
  *
  * 页面空间分配：
@@ -46,7 +48,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import {
   deleteApprovalTemplateStep,
   getApprovalTemplateDetail,
@@ -94,7 +96,7 @@ export default function ApprovalTemplateDetailPage() {
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const location = useLocation()
-  const { portalKey, id } = useParams<{ portalKey: string; id: string }>()
+  const { portalKey, id } = usePortalParams<{ portalKey: string; id: string }>()
   /** 来源模块：用于返回指标列表与父布局侧栏高亮 */
   const fromModuleKey = new URLSearchParams(location.search).get('from')
 
@@ -196,13 +198,13 @@ export default function ApprovalTemplateDetailPage() {
   /** 返回指标列表；没有来源模块信息时回退门户首页 */
   const backToList = useCallback(() => {
     if (portalKey && fromModuleKey) {
-      navigate(`/portal/${portalKey}/${fromModuleKey}`)
+      navigate(`${getPortalPath(portalKey)}/${fromModuleKey}`)
     } else if (portalKey) {
-      navigate(`/portal/${portalKey}`)
+      navigate(getPortalPath(portalKey))
     } else if (window.history.length > 1) {
       navigate(-1)
     } else {
-      navigate('/')
+      navigate(CAMPUS_PATH)
     }
   }, [portalKey, fromModuleKey, navigate])
 

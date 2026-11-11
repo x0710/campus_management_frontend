@@ -3,7 +3,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type Locale = 'zh' | 'en'
+import type { Locale } from '../types/locale'
+export type { Locale } from '../types/locale'
 export type ThemeMode = 'light' | 'dark'
 
 interface SettingsState {

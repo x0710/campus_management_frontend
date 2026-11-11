@@ -2,7 +2,7 @@
  * 用户模块类型定义：用户状态/性别枚举、用户列表项、用户详情、分页查询参数与创建/更新请求体。
  * 供 api/users.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 用户状态（对应后端 Status：enabled / disabled） */
 export type UserStatus = 'enabled' | 'disabled'
@@ -32,7 +32,7 @@ export interface UserDetail {
 }
 
 /** 用户分页查询参数 */
-export interface UserQuery extends PageQuery {
+export interface UserQuery extends PageQuery, CreatedDateQuery {
   keyword?: string
   status?: UserStatus
   /** 按用户 ID 批量筛选，逗号分隔，如 '1,2,3'（对应后端 ids 查询参数） */

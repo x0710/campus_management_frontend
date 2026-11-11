@@ -1,3 +1,5 @@
+import { getPortalPath, CAMPUS_PATH } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 党建活动加分审批详情页。
  *
@@ -42,7 +44,7 @@ import {
 } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { getApprovalTemplateDetail } from '../../api/approvalmodel'
 import { findApprovalStepById, getApprovalRecords } from '../../api/approvals'
 import { getCurrentUser } from '../../api/auth'
@@ -114,13 +116,13 @@ function toActionMode(action: ApprovalAction | null): ActionMode {
  * @returns 类型：Element
  */
 export default function PartyScoreApprovalDetailPage() {
-  const { stepId } = useParams<{ stepId: string }>()
+  const { stepId } = usePortalParams<{ stepId: string }>()
   return <PartyScoreApprovalDetail key={stepId ?? 'missing'} />
 }
 
 /**
  * 党建活动加分审批详情页（内容区）。
- * 路由：/portal/:portalKey/party-score-approvals/:stepId?from=<moduleKey>&action=<动作>
+ * 路由：<门户路径>/party-score-approvals/:stepId?from=<moduleKey>&action=<动作>
  */
 function PartyScoreApprovalDetail() {
   const t = useT()
@@ -129,7 +131,7 @@ function PartyScoreApprovalDetail() {
   const reportError = useErrorFeedback()
   const navigate = useNavigate()
   const location = useLocation()
-  const { portalKey, stepId: stepIdParam } = useParams<{
+  const { portalKey, stepId: stepIdParam } = usePortalParams<{
     portalKey: string
     stepId: string
   }>()
@@ -311,13 +313,13 @@ function PartyScoreApprovalDetail() {
   /** 返回审核列表：优先回到来源门户的审核模块；没有来源信息时回退历史/门户首页 */
   const backToList = useCallback(() => {
     if (portalKey && fromModuleKey) {
-      navigate(`/portal/${portalKey}/${fromModuleKey}`)
+      navigate(`${getPortalPath(portalKey)}/${fromModuleKey}`)
     } else if (portalKey) {
-      navigate(`/portal/${portalKey}`)
+      navigate(getPortalPath(portalKey))
     } else if (window.history.length > 1) {
       navigate(-1)
     } else {
-      navigate('/')
+      navigate(CAMPUS_PATH)
     }
   }, [portalKey, fromModuleKey, navigate])
 

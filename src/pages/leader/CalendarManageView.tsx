@@ -1,3 +1,4 @@
+import CreatedDateFilter from '../../components/CreatedDateFilter'
 /**
  * 领导端：校历管理（校历日历 + 事件增删改）。
  * 复用 useCalendarEvents + CalendarBoard，在其上叠加管理能力：
@@ -64,6 +65,8 @@ export default function CalendarManageView() {
     setValue,
     typeFilter,
     setTypeFilter,
+    dateQuery,
+    setDateQuery,
     eventsByDay,
     loading,
     error,
@@ -180,7 +183,8 @@ export default function CalendarManageView() {
         loading={loading}
         error={error}
         onRefresh={reload}
-        toolbarExtra={
+        toolbarExtra={<>
+          <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
           <Button
             size="small"
             type="primary"
@@ -189,7 +193,7 @@ export default function CalendarManageView() {
           >
             {t('calendar.createEvent')}
           </Button>
-        }
+        </>}
         renderEventActions={(event) => (
           <>
             <Tooltip title={t('calendar.editEvent')}>

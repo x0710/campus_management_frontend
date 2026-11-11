@@ -1,3 +1,5 @@
+import { getPortalPath } from '../../config/routes'
+import { usePortalParams } from '../../hooks/usePortalParams'
 /**
  * 党员端：首页（先锋指数概览 + 近期成绩申报记录）。
  * 顶部「姓名 | 组织链路」：经 useCurrentIdentity 取当前登录用户的真实姓名与任职组织，
@@ -17,7 +19,7 @@
 import { isPartyScoreDeduction } from '../../utils/partyScore'
 import { Skeleton, Spin, Tag } from 'antd'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useNavigate } from 'react-router'
 import { getOrganizationTree } from '../../api/organizations'
 import type { PartyScore } from '../../api/types/partyScores'
 import ErrorState from '../../components/ErrorState'
@@ -51,7 +53,7 @@ type PartyOrgChain = string[]
 export default function PartyHomeView() {
   const t = useT()
   const navigate = useNavigate()
-  const { portalKey, moduleKey } = useParams<{
+  const { portalKey, moduleKey } = usePortalParams<{
     portalKey: string
     moduleKey?: string
   }>()
@@ -144,7 +146,7 @@ export default function PartyHomeView() {
   const openRecordDetail = (record: PartyScore) => {
     if (!portalKey) return
     navigate(
-      `/portal/${portalKey}/party-scores/${record.id}?from=${moduleKey ?? 'party_m1'}`,
+      `${getPortalPath(portalKey)}/party-scores/${record.id}?from=${moduleKey ?? 'party_m1'}`,
     )
   }
 

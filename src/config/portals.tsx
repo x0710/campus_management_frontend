@@ -248,7 +248,7 @@ export function getPortal(key: string | undefined): PortalDef | undefined {
 /**
  * 已停用的门户（学生端 / 教师端 / 领导端）。
  * 代码与模块定义均保留，但对外不开放：可访问门户列表会过滤掉它们，
- * PortalWorkspace 也会把直接输入 /portal/<key> 的访问重定向回角色默认门户。
+ * PortalWorkspace 也会把直接输入 <门户路径> 的访问重定向回角色默认门户。
  */
 export const DISABLED_PORTAL_KEYS: PortalKey[] = ['student', 'teacher', 'leader']
 

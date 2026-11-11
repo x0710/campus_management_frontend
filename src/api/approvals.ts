@@ -1,3 +1,4 @@
+import type { CreatedDateQuery } from './types/common'
 /** 审批模块, 提供审批相关 API */
 
 import { cachedGet, invalidate } from './cache'
@@ -94,8 +95,8 @@ export async function findApprovalStepById(
  * @param force 是否绕过会话缓存重新请求，默认 false
  * @returns Promise<ApprovalRecordItem[]> 按环节顺序排列的审批记录
  */
-export function getApprovalRecords(instanceId: number, force?: boolean) {
-  return cachedGet<ApprovalRecordItem[]>(`/approvals/${instanceId}/records`, undefined, { force })
+export function getApprovalRecords(instanceId: number, force?: boolean, dates: CreatedDateQuery = {}) {
+  return cachedGet<ApprovalRecordItem[]>(`/approvals/${instanceId}/records`, { ...dates }, { force })
 }
 
 /**

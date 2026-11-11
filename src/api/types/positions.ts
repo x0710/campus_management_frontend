@@ -2,7 +2,7 @@
  * 职位模块类型定义：职位详情、分页查询参数与创建/更新请求体。
  * 供 api/positions.ts 的请求函数与各视图复用。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 export type PositionUsageScope = 'self_only' | 'self_and_children' | 'self_and_descendants'
 
@@ -26,7 +26,7 @@ export interface UserPosition extends PositionDetail {
 }
 
 /** 职位分页查询参数 */
-export interface PositionQuery extends PageQuery {
+export interface PositionQuery extends PageQuery, CreatedDateQuery {
   keyword?: string
   /** 按目标组织可任职资格筛选，包含父组织向直属子组织开放的职位，以及祖先组织向全部下级开放的职位。 */
   usable_in_organization_id?: number

@@ -2,7 +2,7 @@
  * 用户详细信息（profile_detail）类型定义。
  * 对应后端 /api/profile-details 接口，表结构为 user_profile。
  */
-import type { PageQuery } from './common'
+import type { PageQuery, CreatedDateQuery } from './common'
 
 /** GET /api/profile-details 返回的档案记录 */
 export interface ProfileDetail {
@@ -76,7 +76,7 @@ export interface ProfileDetailCreateRequest {
 export type ProfileDetailUpdateRequest = Partial<Omit<ProfileDetailCreateRequest, 'user_id'>>
 
 /** GET /api/profile-details 查询参数 */
-export interface ProfileDetailQuery extends PageQuery {
+export interface ProfileDetailQuery extends PageQuery, CreatedDateQuery {
   /** 身份证号 / 籍贯模糊搜索 */
   keyword?: string
   /** 按用户 ID 精确筛选 */
