@@ -45,7 +45,7 @@ import OrganizationName from '../../components/OrganizationName'
 import MyWorkplaceField from '../../components/MyWorkplaceField'
 
 /**
- * 党员端：我的（我的成绩记录 / 年度评价报告 / 消息通知 / 审批指南 / 关于井大大先锋）。
+ * 党员端：我的（我的档案 / 我的成绩记录 / 消息通知 / 审批指南）。
  * 「我的档案」按学生端个人信息页展示真实基本资料（GET /api/users/me），
  * 并保留党员编号 / 所属支部 / 政治面貌 / 入党时间等党员端扩展信息。
  * 党员编号 / 入党时间取 GET /api/party/profiles；政治面貌取任职职位名称；所属支部取真实任职组织。
@@ -432,22 +432,6 @@ function ProfileDescriptions() {
         </Form>
       </Modal>
     </>
-  )
-}
-
-/** 占位内容（年度评价报告 / 关于井大大先锋 暂不实现） */
-function Placeholder() {
-  const t = useT()
-  return (
-    <div className="party-placeholder">
-      <Alert
-        type="warning"
-        showIcon
-        title={t('partyProfile.mockHint')}
-        style={{ marginBottom: 12 }}
-      />
-      <Empty description={t('partyProfile.emptyHint')} />
-    </div>
   )
 }
 
@@ -924,7 +908,6 @@ export default function PartyProfileView() {
  
     { key: 'notifications', label: t('partyProfile.tabNotifications'), children: <NotificationsList /> },
     { key: 'guide', label: t('partyProfile.tabGuide'), children: <ApprovalGuide /> },
-    { key: 'about', label: t('partyProfile.tabAbout'), children: <Placeholder /> },
   ]
 
   return (
