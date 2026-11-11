@@ -137,40 +137,18 @@ function PortalWorkspaceContent() {
       ),
     })
 
-    /** 预览项（preview）：可点击，带「预览」标签，页面内为模拟数据 */
-    const previewItem = (m: PortalModule) => ({
-      key: m.key,
-      icon: m.icon,
-      label: (
-        <span className="workspace-menu-label">
-          {t(`portal.${m.key}`)}
-          <Tag color="blue" variant="filled" className="workspace-menu-tag">
-            {t('portal.tagPreview')}
-          </Tag>
-        </span>
-      ),
-    })
-
     const groups: NonNullable<MenuProps['items']> = []
-    if (readyModules.length > 0) {
-      groups.push({
-        key: 'group-ready',
-        type: 'group',
-        label: t('portal.groupReady'),
-        children: readyModules.map((m) => ({
+    // 系统投入正式使用，菜单不再按「已开通 / 预览中」分组展示状态标签，
+    // 已开通与预览模块统一按配置顺序作为一级菜单项展示
+    const availableModules = [...readyModules, ...previewModules]
+    if (availableModules.length > 0) {
+      groups.push(
+        ...availableModules.map((m) => ({
           key: m.key,
           icon: m.icon,
           label: t(`portal.${m.key}`),
         })),
-      })
-    }
-    if (previewModules.length > 0) {
-      groups.push({
-        key: 'group-preview',
-        type: 'group',
-        label: t('portal.groupPreview'),
-        children: previewModules.map(previewItem),
-      })
+      )
     }
     if (pendingModules.length > 0) {
       groups.push({

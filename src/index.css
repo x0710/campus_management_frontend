@@ -3168,94 +3168,6 @@ h3 {
   color: #ff7875;
 }
 
-/* 整改提升：整改任务卡片（淡黄底） */
-.improve-task-card {
-  padding: 16px 20px;
-  border-radius: 12px;
-  background: #fffbe6;
-  border: 1px solid #ffe58f;
-}
-
-.improve-task-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2433;
-  margin-bottom: 12px;
-}
-
-.improve-task-icon {
-  color: #fa8c16;
-}
-
-.improve-task-line {
-  font-size: 14px;
-  line-height: 2;
-  color: #1f2433;
-}
-
-.improve-task-label {
-  opacity: 0.6;
-}
-
-.improve-task-btn {
-  margin-top: 12px;
-}
-
-/* 整改提升：年度计划提交按钮 */
-.improve-plan-btn {
-  height: 44px;
-  font-size: 15px;
-  border-color: var(--brand);
-  color: var(--brand);
-}
-
-/* 整改提升：历史整改记录 */
-.improve-history-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.improve-history-item {
-  padding: 14px 20px;
-  border-radius: 10px;
-  background: var(--card-bg);
-  border: 1px solid var(--line);
-}
-
-.improve-history-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 6px;
-}
-
-.improve-history-link {
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: 14px;
-  color: var(--brand);
-  cursor: pointer;
-}
-
-/* 暗色模式：淡黄卡片需同步调整底色与文字色 */
-:root[data-theme='dark'] .improve-task-card {
-  background: #2b2611;
-  border-color: #4a3f14;
-}
-
-:root[data-theme='dark'] .improve-task-title,
-:root[data-theme='dark'] .improve-task-line {
-  color: var(--ink);
-}
-
 /* 我的：页签内容容器 */
 .party-tab-body {
   display: flex;
@@ -3263,7 +3175,7 @@ h3 {
   gap: 16px;
 }
 
-/* 我的：占位内容（年度评价报告 / 关于井大大先锋） */
+/* 我的：加载 / 空状态占位容器 */
 .party-placeholder {
   padding: 32px 0;
 }

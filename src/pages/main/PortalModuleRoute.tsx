@@ -51,7 +51,6 @@ const RolesAdminView = lazy(() => import('../admin/RolesAdminView'))
 const PositionsAdminView = lazy(() => import('../admin/PositionsAdminView'))
 const PartyHomeView = lazy(() => import('../party/PartyHomeView'))
 const PartyDeclarationView = lazy(() => import('../party/PartyDeclarationView'))
-const PartyImprovementView = lazy(() => import('../party/PartyImprovementView'))
 const PartyProfileView = lazy(() => import('../party/PartyProfileView'))
 const PartyScoreApprovalView = lazy(() => import('../party/PartyScoreApprovalView'))
 const BranchWorkbenchView = lazy(() => import('../branch/BranchWorkbenchView'))
@@ -114,7 +113,6 @@ const AcademyBranchManageModule = () => (
 const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'party:party_m1': PartyHomeView,
   'party:party_m2': PartyDeclarationView,
-  'party:party_m3': PartyImprovementView,
   'party:party_m4': PartyProfileView,
   'branch:branch_m1': BranchWorkbenchView,
   // 支部端「审核管理」：党建活动加分审批（步骤列表前端合成 + PUT 通过/驳回/转交）

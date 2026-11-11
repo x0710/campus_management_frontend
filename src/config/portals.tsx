@@ -19,7 +19,6 @@ import {
   CrownOutlined,
   DollarOutlined,
   FileDoneOutlined,
-  FileSearchOutlined,
   FlagOutlined,
   FormOutlined,
   HeartOutlined,
@@ -30,7 +29,6 @@ import {
   NotificationOutlined,
   ProfileOutlined,
   ReadOutlined,
-  RiseOutlined,
   SafetyCertificateOutlined,
   ScheduleOutlined,
   SettingOutlined,
@@ -94,7 +92,7 @@ export interface PortalDef {
 export const PORTALS: PortalDef[] = [
   {
     // 党员端门户：首页近期记录接真实成绩申报接口（先锋指数仍为模拟数据，页面内有说明）；
-    // 成绩申报、整改提升使用虚拟数据预览；我的已开通并复用真实档案/成绩记录/消息通知页面
+    // 成绩申报接真实接口；我的已开通并复用真实档案/成绩记录/消息通知页面
     key: 'party',
     icon: <FlagOutlined />,
     gradient: 'linear-gradient(135deg, #a8071a 0%, #f5222d 100%)',
@@ -102,7 +100,6 @@ export const PORTALS: PortalDef[] = [
     modules: [
       { key: 'party_m1', status: 'ready', icon: <HomeOutlined /> },
       { key: 'party_m2', status: 'ready', icon: <FormOutlined /> },
-      { key: 'party_m3', status: 'preview', icon: <RiseOutlined /> },
       { key: 'party_m4', status: 'ready', icon: <UserOutlined /> },
       { key: 'party_m5', status: 'ready', icon: <AuditOutlined />, hiddenFromMenu: true },
     ],
@@ -230,7 +227,6 @@ export const PORTALS: PortalDef[] = [
       { key: 'admin_m1', status: 'ready', icon: <TeamOutlined /> },
       { key: 'admin_m2', status: 'ready', icon: <SafetyCertificateOutlined /> },
       { key: 'admin_m3', status: 'ready', icon: <ApartmentOutlined /> },
-      { key: 'admin_m4', status: 'planned', icon: <FileSearchOutlined /> },
       { key: 'admin_m5', status: 'ready', icon: <AuditOutlined /> },
     ],
   },
