@@ -13,10 +13,16 @@ export function exchangeCasTicket(search: string): Promise<LoginResponse> {
   const query = new URLSearchParams(search)
   const ticket = query.get('ticket')
   const state = query.get('state')
-  if (!ticket?.trim() || query.getAll('ticket').length !== 1 || query.getAll('state').length > 1 || state === '') {
+  // 后端回调接口要求 ticket 与 state 均必填且各出现一次
+  if (
+    !ticket?.trim() ||
+    !state?.trim() ||
+    query.getAll('ticket').length !== 1 ||
+    query.getAll('state').length !== 1
+  ) {
     return Promise.reject(new InvalidCasCallbackError())
   }
-  const params = state === null ? { ticket } : { ticket, state }
+  const params = { ticket, state }
   const key = JSON.stringify(params)
   const previous = pending.get(key)
   if (previous) return previous

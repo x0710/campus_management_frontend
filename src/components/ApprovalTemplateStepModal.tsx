@@ -84,7 +84,11 @@ export default function ApprovalTemplateStepModal({
     }
     form.setFieldsValue({
       position: step.position ?? undefined,
-      assignee_value: step.assignee_value ?? undefined,
+      // 后端返回 int64，表单/下拉选项均为字符串，统一转字符串后回填
+      assignee_value:
+        step.assignee_value === null || step.assignee_value === undefined
+          ? undefined
+          : String(step.assignee_value),
       description: step.description ?? undefined,
     })
   }, [open, mode, step, form])

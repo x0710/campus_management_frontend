@@ -2294,20 +2294,22 @@ h3 {
 @media (max-width: 1100px) {
   .admin-org-view {
     flex-direction: column;
-    height: calc(100vh - 104px);
-    max-height: calc(100vh - 104px);
+    /* 窄屏不再把两块卡片压进一屏：改为按内容撑开、整页滚动，
+       让组织树和成员/下级组织表都有足够高度 */
+    height: auto;
+    max-height: none;
   }
   .org-tree-card {
     width: 100%;
-    /* 内容不足时按内容高度展示，超出时最多占约四成视口高（树在卡内滚动）。
-       不参与收缩（flex: none）：成员表数据多时其内容高度很大，
-       若允许收缩，组织树会被按比例压缩到几乎不可见。 */
+    /* 组织树最多占约六成视口高，超出时树在卡片内滚动 */
     flex: none;
-    max-height: 38vh;
+    max-height: 58vh;
   }
   .org-members-card {
-    flex: 1 1 auto;
-    min-height: 0;
+    /* 成员/下级组织表保留一整块可读高度，页面整体上下滚动 */
+    flex: none;
+    height: 76vh;
+    min-height: 460px;
   }
   /* 上方还有提示条的复用页（老师端班级管理）：同样给出确定高度，
      使内部「组织树 + 成员表」能按剩余空间分配高度 */
@@ -2361,11 +2363,15 @@ h3 {
   max-height: 100%;
 }
 
-/* 窄屏：组织树与成员表在区域内部上下堆叠，仍由卡片占据区域剩余高度 */
+/* 窄屏：组织树与成员表在区域内部上下堆叠，区域随内容撑开（页面整体滚动） */
 @media (max-width: 1100px) {
+  .school-org-region {
+    height: auto;
+    min-height: 0;
+  }
   .school-org-section > .admin-org-view {
-    height: 100%;
-    max-height: 100%;
+    height: auto;
+    max-height: none;
   }
 }
 

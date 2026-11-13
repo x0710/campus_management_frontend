@@ -42,7 +42,7 @@ export interface ApprovalTemplate {
  * @property id 步骤 ID（必填）
  * @property template_id 所属模板 ID（必填）
  * @property step_no 步骤编号（必填）
- * @property assignee_value 审批人参数（后端可为空）
+ * @property assignee_value 审批人参数（后端返回 int64；提交时仍为字符串，展示/回填需转字符串）
  * @property position 审批人角色（后端可为空；落库为职位编码，须存在于 position 表，assignee_value 为空时启用）
  * @property description 步骤说明（审批层级，如「党总支」「所在学院党委」；后端可能为空串）
  * @property created_at 创建时间（RFC3339）
@@ -52,7 +52,7 @@ export interface ApprovalStep {
   id: number
   template_id: number
   step_no: number
-  assignee_value: string | null
+  assignee_value: number | null
   position: string | null
   description: string | null
   created_at: string

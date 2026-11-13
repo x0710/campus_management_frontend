@@ -33,12 +33,12 @@ import {
   Spin,
   Table,
   Tag,
-  Tooltip,
   Tree,
   TreeSelect,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
+import HoverTooltip from '../../components/HoverTooltip'
 import axios from 'axios'
 import {
   useCallback,
@@ -1061,9 +1061,9 @@ export default function OrgAdminView({
           ) : (
             <Space wrap size={[8, 4]}>
               {record.positions.map((code) => (
-                <Tooltip key={code} title={positionLabel(code)}>
+                <HoverTooltip key={code} title={positionLabel(code)}>
                   <Tag color="blue">{positionLabel(code)}</Tag>
-                </Tooltip>
+                </HoverTooltip>
               ))}
             </Space>
           ),
@@ -1076,7 +1076,7 @@ export default function OrgAdminView({
         width: (showResetPassword ? 170 : 140) + (showSwitchAccount ? 90 : 0),
         render: (_, record) => (
           <div className="approval-actions">
-            <Tooltip title={t('adminOrg.viewUser')}>
+            <HoverTooltip title={t('adminOrg.viewUser')}>
               <Button
                 type="link"
                 size="small"
@@ -1084,7 +1084,7 @@ export default function OrgAdminView({
               >
                 {t('adminOrg.viewUser')}
               </Button>
-            </Tooltip>
+            </HoverTooltip>
             {showResetPassword && (
               <Dropdown
                 trigger={['click']}
@@ -1181,7 +1181,7 @@ export default function OrgAdminView({
             </Button>
             {/* 批量添加新成员：进入填报辅助页（组织 / 身份 / 系统角色对照表 + 样表说明） */}
             {showBulkAdd && (
-              <Tooltip title={t('adminOrg.bulkAddHint')}>
+              <HoverTooltip title={t('adminOrg.bulkAddHint')}>
                 <Button
                   size="small"
                   icon={<TeamOutlined />}
@@ -1191,11 +1191,11 @@ export default function OrgAdminView({
                 >
                   {t('adminOrg.bulkAddMembers')}
                 </Button>
-              </Tooltip>
+              </HoverTooltip>
             )}
-            <Tooltip title={t('common.refresh')}>
+            <HoverTooltip title={t('common.refresh')}>
               <Button size="small" icon={<ReloadOutlined />} onClick={() => void loadOrgs(true)} />
-            </Tooltip>
+            </HoverTooltip>
           </div>
         </header>
         <div className="panel-card-body">
@@ -1234,7 +1234,7 @@ export default function OrgAdminView({
         <header className="panel-card-header org-member-header">
           <div className="org-members-title">
             {/* 左侧组织树收起/展开 */}
-            <Tooltip
+            <HoverTooltip
               title={
                 treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
               }
@@ -1248,7 +1248,7 @@ export default function OrgAdminView({
                 icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                 onClick={() => setTreeCollapsed(uiKey, !treeCollapsed)}
               />
-            </Tooltip>
+            </HoverTooltip>
             <h3 className="panel-card-title">
               {search.matchOnly
                 ? t('orgExplorer.matchOnlyTitle')
@@ -1281,7 +1281,7 @@ export default function OrgAdminView({
               >
                 {t('adminOrg.addMember')}
               </Button>
-              <Tooltip title={t('common.refresh')}>
+              <HoverTooltip title={t('common.refresh')}>
                 <Button
                   size="small"
                   icon={<ReloadOutlined />}
@@ -1294,7 +1294,7 @@ export default function OrgAdminView({
                     void loadMembers(selectedOrg.id, memberPage)
                   }}
                 />
-              </Tooltip>
+              </HoverTooltip>
               <Button size="small" icon={<PlusOutlined />} onClick={() => openCreate(selectedOrg)}>
                 {t('adminOrg.newSubOrg')}
               </Button>
@@ -1350,15 +1350,15 @@ export default function OrgAdminView({
             />
             {/* 结束本次匹配：清除搜索词、匹配结果与高亮，恢复普通组织浏览（代码要求 10：悬停提示） */}
             {search.hasActive && (
-              <Tooltip title={t('orgExplorer.endMatchHint')}>
+              <HoverTooltip title={t('orgExplorer.endMatchHint')}>
                 <Button size="small" icon={<CloseOutlined />} onClick={search.clear}>
                   {t('orgExplorer.endMatch')}
                 </Button>
-              </Tooltip>
+              </HoverTooltip>
             )}
             {/* 管理端组织架构 / 学校党委端：导出当前组织全部成员的党员信息与成绩信息（两个工作表） */}
             {exportMemberInfo && selectedOrg && !search.matchOnly && (
-              <Tooltip title={t('branchExport.hint')}>
+              <HoverTooltip title={t('branchExport.hint')}>
                 <Button
                   icon={<DownloadOutlined />}
                   loading={exportingMembers}
@@ -1367,7 +1367,7 @@ export default function OrgAdminView({
                 >
                   {t('branchExport.button')}
                 </Button>
-              </Tooltip>
+              </HoverTooltip>
             )}
             {/* 右对齐：切换「单独查看匹配人员 / 在组织里面查看匹配人员」 */}
             <MemberSearchModeToggle

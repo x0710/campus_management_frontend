@@ -6,6 +6,7 @@ import type { PaginatedResponse } from './types/common'
 import type {
   UserBatchUpdate,
   UserCreateRequest,
+  UserCreateResponse,
   UserDetail,
   UserInfo,
   UserQuery,
@@ -58,21 +59,22 @@ export function getMyProfile(): Promise<UserDetail> {
  * insert 重复报错，ignore 跳过重复，replace 按 UID 原地更新。
  * @param body 类型：UserCreateRequest[]；默认值：无；是否必填：必填（每项须含 uid 与 username）
  * @param signal 取消信号（可选，批量导入取消时中断在途请求）
- * @returns 类型：Promise<number>
+ * @returns 类型：Promise<number>（实际写入数，新建加替换，不计跳过项）
  */
 export async function createUsers(
   body: UserCreateRequest[],
   signal?: AbortSignal,
   mode: UserInsertMode = 'insert',
 ): Promise<number> {
-  const res = await http.post<number>('/users', body, {
+  // 后端已改为返回 UserCreateResponse（含逐条 results），这里只取 count 供调用方展示
+  const res = await http.post<UserCreateResponse>('/users', body, {
     signal,
     params: { mode },
     timeout: BATCH_REQUEST_TIMEOUT_MS,
   })
   invalidate('GET /users')
   if (mode === 'replace') invalidate('GET /credentials')
-  return res.data
+  return res.data.count
 }
 
 /**

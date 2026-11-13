@@ -180,7 +180,9 @@ function MemberDetailContent() {
       <section className="panel-card" style={{ width: '100%' }}>
       <header className="panel-card-header">
         <h3 className="panel-card-title">
-          {t('memberDetail.title')} · {user?.name ?? `#${userId}`}
+          {/* 标题只展示已加载到的姓名；未加载到时仅显示模块名，避免把用户 ID 当成姓名 */}
+          {t('memberDetail.title')}
+          {user?.name?.trim() ? ` · ${user.name.trim()}` : ''}
         </h3>
         <Tooltip title={t('memberDetail.back')}>
           <Button icon={<ArrowLeftOutlined />} onClick={backToList}>

@@ -54,6 +54,22 @@ export interface UserCreateRequest {
   workplaces?: string[]
 }
 
+/** POST /api/users 单条创建结果（按输入顺序返回；密码仅在本次成功设置时提供） */
+export interface UserCreateResult {
+  uid: number
+  username: string
+  /** created 新建 / replaced 按 UID 替换 / ignored 重复跳过 */
+  status: 'created' | 'replaced' | 'ignored'
+  new_password?: string | null
+}
+
+/** POST /api/users 批量创建响应 */
+export interface UserCreateResponse {
+  /** 实际写入数（新建加替换，不计跳过项） */
+  count: number
+  results: UserCreateResult[]
+}
+
 /** PATCH /api/users/{id} 可更新字段 */
 export interface UserUpdateRequest {
   name?: string

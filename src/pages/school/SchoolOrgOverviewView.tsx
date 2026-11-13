@@ -54,12 +54,12 @@ import {
   Popconfirm,
   Spin,
   Table,
-  Tooltip,
   Tree,
   TreeSelect,
 } from 'antd'
 import type { ColumnsType, TableProps } from 'antd/es/table'
 import type { TreeProps } from 'antd/es/tree'
+import HoverTooltip from '../../components/HoverTooltip'
 import axios from 'axios'
 import {
   useCallback,
@@ -703,9 +703,9 @@ export default function SchoolOrgOverviewView({
         key: 'name',
         width: 220,
         render: (_, record) => (
-          <Tooltip title={record.code}>
+          <HoverTooltip title={record.code}>
             <span>{record.name}</span>
-          </Tooltip>
+          </HoverTooltip>
         ),
       },
       {
@@ -719,9 +719,9 @@ export default function SchoolOrgOverviewView({
         // 悬停说明预备党员人数的统计口径（按职位名称统计，代码要求 10）；
         // 标题已有口径提示，关闭 antd 的排序提示避免 Tooltip 嵌套
         title: (
-          <Tooltip title={t('schoolOrgOverview.reserveHint')}>
+          <HoverTooltip title={t('schoolOrgOverview.reserveHint')}>
             <span>{t('schoolOrgOverview.colReserveMembers')}</span>
-          </Tooltip>
+          </HoverTooltip>
         ),
         key: 'reserveMemberCount',
         width: 130,
@@ -776,11 +776,11 @@ export default function SchoolOrgOverviewView({
         key: 'action',
         width: 120,
         render: (_, record) => (
-          <Tooltip title={t('schoolOrgOverview.viewDetailHint')}>
+          <HoverTooltip title={t('schoolOrgOverview.viewDetailHint')}>
             <Button type="link" size="small" onClick={() => openOrgMembers(record.id)}>
               {t('schoolOrgOverview.viewDetail')}
             </Button>
-          </Tooltip>
+          </HoverTooltip>
         ),
       },
     ],
@@ -804,9 +804,9 @@ export default function SchoolOrgOverviewView({
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminOrg.treeTitle')}</h3>
           <div className="approval-toolbar">
-            <Tooltip title={t('common.refresh')}>
+            <HoverTooltip title={t('common.refresh')}>
               <Button size="small" icon={<ReloadOutlined />} onClick={refresh} />
-            </Tooltip>
+            </HoverTooltip>
           </div>
         </header>
         <div className="panel-card-body">
@@ -848,7 +848,7 @@ export default function SchoolOrgOverviewView({
           <div className="org-members-title">
             {/* 左侧组织树收起/展开（无下级组织时不展示组织树，也就无需收起按钮） */}
             {!treeHidden && (
-              <Tooltip
+              <HoverTooltip
                 title={
                   treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
                 }
@@ -862,7 +862,7 @@ export default function SchoolOrgOverviewView({
                   icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                   onClick={() => setTreeCollapsed(uiKey, !treeCollapsed)}
                 />
-              </Tooltip>
+              </HoverTooltip>
             )}
             <h3 className="panel-card-title">
               {activeOrg
@@ -882,13 +882,13 @@ export default function SchoolOrgOverviewView({
           </div>
           <div className="approval-toolbar">
             {/* 说明统计口径：人数与平均分均含下级组织（代码要求 10：悬停提示） */}
-            <Tooltip title={t('schoolOrgOverview.countHint')}>
+            <HoverTooltip title={t('schoolOrgOverview.countHint')}>
               <span className="cell-sub">{t('schoolOrgOverview.listTitle')}</span>
-            </Tooltip>
+            </HoverTooltip>
             {/* 组织维护：与「组织成员管理」一致，操作对象为左侧当前选中的组织；只读入口不展示 */}
             {showOrgActions && (
               <>
-                <Tooltip title={t('schoolOrgOverview.newSubOrgHint')}>
+                <HoverTooltip title={t('schoolOrgOverview.newSubOrgHint')}>
                   <Button
                     size="small"
                     icon={<PlusOutlined />}
@@ -897,8 +897,8 @@ export default function SchoolOrgOverviewView({
                   >
                     {t('adminOrg.newSubOrg')}
                   </Button>
-                </Tooltip>
-                <Tooltip title={t('schoolOrgOverview.editOrgHint')}>
+                </HoverTooltip>
+                <HoverTooltip title={t('schoolOrgOverview.editOrgHint')}>
                   <Button
                     size="small"
                     icon={<EditOutlined />}
@@ -907,8 +907,8 @@ export default function SchoolOrgOverviewView({
                   >
                     {t('adminOrg.editOrg')}
                   </Button>
-                </Tooltip>
-                <Tooltip
+                </HoverTooltip>
+                <HoverTooltip
                   title={
                     activeOrg === null
                       ? t('schoolOrgOverview.selectOrgFirstHint')
@@ -932,7 +932,7 @@ export default function SchoolOrgOverviewView({
                       </Button>
                     </Popconfirm>
                   </span>
-                </Tooltip>
+                </HoverTooltip>
               </>
             )}
           </div>
