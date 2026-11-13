@@ -80,7 +80,7 @@ export default function LoginPage() {
       } catch {
         // 浏览器禁止本地存储时仍允许登录。
       }
-      completeLogin(res)
+      completeLogin(res, 'password', values.password)
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status

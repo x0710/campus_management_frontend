@@ -95,24 +95,22 @@ export async function getMyPortalPositions(force?: boolean): Promise<{ code: str
 
 /**
  * 修改当前登录用户自己的密码（PATCH /api/credentials）。
- * 本人主动修改时需提供旧密码供后端校验（错误返回 403）；
- * 首次登录强制改密场景不传旧密码，由后端按首次登录状态放行。
+ * 本人修改时需提供旧密码供后端校验（错误返回 403），首次登录使用暂存的登录密码。
  * @param uid 当前登录用户 ID（必填，取自 getCurrentUser().uid）
- * @param oldPassword 旧密码（主动改密必填；首次登录强制改密传 undefined）
+ * @param oldPassword 旧密码（必填）
  * @param newPassword 新密码（必填）
  * @returns 类型：Promise<void>
  */
 export async function changeMyPassword(
   uid: number,
-  oldPassword: string | undefined,
+  oldPassword: string,
   newPassword: string,
 ): Promise<void> {
   const body: UpdateCredentialRequest = {
     uid,
+    old_password: oldPassword,
     new_password: newPassword,
   }
-  // 首次登录强制改密不携带 old_password，后端据此免校验旧密码
-  if (oldPassword) body.old_password = oldPassword
   await http.patch('/credentials', body)
   invalidate('GET /credentials')
 }

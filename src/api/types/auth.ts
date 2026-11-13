@@ -47,7 +47,7 @@ export interface AdminUpdateStatusRequest {
 export interface UpdateCredentialRequest {
   /** 目标用户 ID（本人改密码时传自己的 uid） */
   uid: number
-  /** 旧密码（本人主动修改时必填，后端用于校验；首次登录强制改密无需提供） */
+  /** 旧密码（本人修改密码时必填，首次登录同样需要） */
   old_password?: string
   /** 新密码（可选，不传表示仅修改用户名等其他字段） */
   new_password?: string

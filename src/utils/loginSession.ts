@@ -14,12 +14,12 @@ export function readLoginResponse(data: unknown): LoginResponse {
   throw new Error('Invalid login response')
 }
 
-export function saveLoginSession(data: unknown, method: 'password' | 'cas' = 'password'): LoginResponse {
+export function saveLoginSession(data: unknown, method: 'password' | 'cas' = 'password', password?: string): LoginResponse {
   const response = readLoginResponse(data)
   useAuthStore.getState().setAuth({
     token: response.token,
     username: response.user,
     lastLoginAt: response.last_login_at,
-  }, method)
+  }, method, password)
   return response
 }

@@ -13,8 +13,8 @@ export function useLoginSuccess() {
   const navigate = useNavigate()
   const { notification } = AntdApp.useApp()
   const locale = useSettingsStore((state) => state.locale)
-  return useCallback((data: unknown, method: 'password' | 'cas' = 'password') => {
-    const response = saveLoginSession(data, method)
+  return useCallback((data: unknown, method: 'password' | 'cas' = 'password', password?: string) => {
+    const response = saveLoginSession(data, method, password)
     const elapsed = response.last_login_at ? formatElapsed(response.last_login_at, locale) : null
     notification.open({
       placement: 'top',

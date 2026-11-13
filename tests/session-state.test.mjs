@@ -274,3 +274,70 @@ test('门户职位来自本人组织任职，新增任职后共享入口数据�
     useAuthStore.getState().clearAuth()
   }
 })
+
+test('首次登录密码仅暂存于内存，改密、换账号、CAS、代登录和退出后清除', async () => {
+  const previous = useAuthStore.getState()
+  const auth = useAuthStore.getState()
+  const first = { token: 'first-password', username: 'first-user', lastLoginAt: null }
+  try {
+    auth.clearAuth()
+    auth.setAuth(first, 'password', 'initial password')
+    assert.equal(useAuthStore.getState().pendingPassword, 'initial password')
+    assert.equal(useAuthStore.getState().mustChangePassword, true)
+    // 独立实例在模拟 localStorage 初始化后加载，避免其他测试提前导入导致持久化不可用。
+    const { useAuthStore: persistedStore } = await import('../src/store/auth.ts?password-storage-test')
+    persistedStore.getState().setAuth(first, 'password', 'initial password')
+    const persisted = JSON.parse(localStorage.getItem('campus-auth')).state
+    assert.equal(Object.hasOwn(persisted, 'pendingPassword'), false)
+    assert.equal(JSON.stringify(persisted).includes('initial password'), false)
+    await persistedStore.persist.rehydrate()
+    persistedStore.getState().clearAuth()
+    auth.finishPasswordChange()
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    assert.equal(useAuthStore.getState().mustChangePassword, false)
+    auth.setAuth({ ...first, lastLoginAt: '2026-01-01' }, 'password', 'regular password')
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    auth.setAuth(first, 'password', 'initial password')
+    auth.setAuth({ ...first, username: 'other', lastLoginAt: '2026-01-01' }, 'password', 'other password')
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    auth.setAuth(first, 'password', 'initial password')
+    auth.setAuth(first, 'cas')
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    assert.equal(useAuthStore.getState().mustChangePassword, false)
+    auth.setAuth(first, 'password', 'initial password')
+    auth.impersonate({ ...first, username: 'target' })
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    auth.restoreAuth()
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    auth.setAuth(first, 'password', 'initial password')
+    auth.clearAuth()
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+  } finally {
+    useAuthStore.setState(previous)
+  }
+})
+
+test('首次登录改密请求传递暂存登录密码作为 old_password', async () => {
+  const { saveLoginSession } = await import('../src/utils/loginSession.ts')
+  const { changeMyPassword } = await import('../src/api/auth.ts')
+  const { http } = await import('../src/api/http.ts')
+  const previous = useAuthStore.getState()
+  const adapter = http.defaults.adapter
+  try {
+    saveLoginSession({ token: 'password-test', user: 'first-user', last_login_at: null }, 'password', ' initial password ')
+    let body
+    http.defaults.adapter = async (config) => {
+      assert.equal(config.method, 'patch')
+      assert.equal(config.url, '/credentials')
+      body = JSON.parse(config.data)
+      return { config, status: 200, statusText: 'OK', headers: {}, data: null }
+    }
+    await changeMyPassword(42, useAuthStore.getState().pendingPassword, 'new password')
+    assert.deepEqual(body, { uid: 42, old_password: ' initial password ', new_password: 'new password' })
+    useAuthStore.getState().finishPasswordChange()
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+  } finally {
+    http.defaults.adapter = adapter
+    useAuthStore.setState(previous)
+  }
+})
