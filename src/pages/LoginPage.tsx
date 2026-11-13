@@ -3,8 +3,8 @@ import { CAMPUS_PATH } from '../config/routes'
  * 登录页：
  * 提供用户名密码登录、记住用户名、语言切换和主题切换。
  * 整屏以 login-background.jpg 作背景，登录表单收进靠右的卡片（登录小窗），避免遮挡背景主体。
- * 登录成功后写入登录态，并跳转到 /campus 角色解析页；
- * 已登录用户访问本页时直接重定向到 /campus。
+ * 登录成功后写入登录态，并跳转到 CAMPUS_PATH 角色解析页；
+ * 已登录用户访问本页时直接重定向到 CAMPUS_PATH。
  * 由其他页面（如角色解析页在后端未启动时）跳转而来时，读取路由 state 中的 loginError
  * 并展示失败原因（含状态码），便于定位问题。
  */
@@ -55,7 +55,7 @@ export default function LoginPage() {
   const theme = useSettingsStore((s) => s.theme)
   const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
-  // 已登录用户访问 /campus/login 时直接进入角色解析页
+  // 已登录用户访问 LOGIN_PATH 时直接进入角色解析页
   if (token) {
     return <Navigate to={CAMPUS_PATH} replace />
   }

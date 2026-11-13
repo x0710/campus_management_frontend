@@ -2039,9 +2039,6 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .workspace-sider {
-    display: none;
-  }
 }
 
 /* ========== Markdown 渲染（自动适配明暗主题） ========== */
@@ -4015,4 +4012,185 @@ h3 {
 /* 附件上传：上传完成后的文件名可点击在线预览 */
 .ant-upload-list-item-name[role='button'] {
   cursor: pointer;
+}
+
+
+/* 手机工作区：菜单改为抽屉，内容占满宽度，表格在自身区域滚动。 */
+@media (max-width: 767px) {
+  .workspace-page,
+  .login-page {
+    min-height: 100dvh;
+  }
+
+  .portal-header {
+    height: auto;
+    min-height: 56px;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .portal-header-left {
+    flex: 1 1 auto;
+  }
+
+  .workspace-mobile-menu-trigger {
+    order: -1;
+    width: 40px;
+    height: 40px;
+    flex: none;
+  }
+
+  .header-brand-name,
+  .header-username,
+  .feedback-nav-btn > span:not(.anticon):not(.ant-btn-icon) {
+    display: none;
+  }
+
+  .header-brand {
+    border-right: 0;
+    padding-right: 0;
+    margin-right: 0;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-left: auto;
+    max-width: 100%;
+  }
+
+  .feedback-nav-btn {
+    width: 36px;
+    padding-inline: 0;
+  }
+
+  .header-right .ant-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .portal-switcher-name {
+    max-width: 84px;
+  }
+
+  .portal-switcher {
+    padding-inline: 4px;
+  }
+
+  .header-user {
+    margin-inline: 2px;
+  }
+
+  .workspace-body {
+    min-height: calc(100dvh - 56px);
+  }
+
+  .workspace-content {
+    width: 100%;
+    padding: 12px;
+    height: auto;
+  }
+
+  .workspace-content .panel-card,
+  .workspace-content .panel-card-body {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .panel-card-header,
+  .approval-toolbar,
+  .student-toolbar,
+  .party-approval-detail-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .panel-card-header {
+    padding: 12px;
+  }
+
+  .panel-card-body {
+    padding: 12px;
+  }
+
+  .approval-toolbar > *,
+  .student-toolbar > *,
+  .panel-card-header .ant-space,
+  .panel-card-header .ant-input-affix-wrapper,
+  .panel-card-header .ant-select {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .workspace-content .ant-space {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .workspace-content .ant-space-item {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-content .ant-table-content {
+    overflow-x: auto;
+  }
+
+  .workspace-content .ant-table-content > table {
+    min-width: 640px;
+  }
+
+  .workspace-content .ant-pagination {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .data-page-view,
+  .admin-org-view,
+  .org-explorer-page {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .data-page-view > .panel-card > .panel-card-body.data-page-body,
+  .fill-tabs .ant-tabs-body-holder {
+    overflow: visible;
+  }
+
+  .data-scroll {
+    flex: 0 1 auto;
+    max-height: 65dvh;
+    overflow: auto;
+  }
+
+  .org-tree-card {
+    max-height: 34dvh;
+  }
+
+  .org-member-header,
+  .user-post-row,
+  .leave-form-grid,
+  .school-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .notice-popover {
+    width: min(320px, calc(100vw - 40px));
+  }
+
+  .login-page {
+    padding: 72px 16px 64px;
+  }
+
+  .login-heading h2 {
+    font-size: 23px;
+  }
+
+  .login-footer {
+    max-width: calc(100% - 32px);
+    white-space: normal;
+    text-align: center;
+  }
 }

@@ -6,16 +6,16 @@ import { MemoryRouter, Routes, Route } from 'react-router'
 import { CAMPUS_PATH, LOGIN_PATH, PORTAL_PATHS, getPortalPath, getPortalKeyFromPathname, migrateLegacyPath } from '../src/config/routes.ts'
 import { usePortalParams } from '../src/hooks/usePortalParams.ts'
 
-test('党建门户统一归入 party，管理端独立放在 campus/admin', () => {
-  assert.equal(CAMPUS_PATH, '/campus')
-  assert.equal(LOGIN_PATH, '/campus/login')
-  assert.equal(getPortalPath('party'), '/campus/party')
+test('所有门户与登录入口均基于 APP_BASE，根入口与党员门户不冲突', () => {
+  assert.equal(CAMPUS_PATH, '/campus/party')
+  assert.equal(LOGIN_PATH, '/campus/party/login')
+  assert.equal(getPortalPath('party'), '/campus/party/member')
   assert.equal(getPortalPath('branch'), '/campus/party/branch')
   assert.equal(getPortalPath('academy'), '/campus/party/academy')
   assert.equal(getPortalPath('school'), '/campus/party/school')
-  assert.equal(getPortalPath('admin'), '/campus/admin')
-  assert.equal(getPortalPath('unknown'), '/campus/party')
-  assert.equal(getPortalPath('toString'), '/campus/party')
+  assert.equal(getPortalPath('admin'), '/campus/party/admin')
+  assert.equal(getPortalPath('unknown'), '/campus/party/member')
+  assert.equal(getPortalPath('toString'), '/campus/party/member')
 })
 
 test('识别不同深度的门户和详情路径，避免前缀误匹配', () => {
@@ -31,15 +31,20 @@ test('识别不同深度的门户和详情路径，避免前缀误匹配', () =>
 
 test('旧地址迁移保留详情路径、查询参数和锚点，支持已保存的返回位置', () => {
   const cases = [
-    ['/', '/campus'], ['/home?tab=all#top', '/campus?tab=all#top'],
-    ['/login?retry=1', '/campus/login?retry=1'],
-    ['/portal/party/party_m5', '/campus/party/party_m5'],
+    ['/', '/campus/party'], ['/home?tab=all#top', '/campus/party?tab=all#top'],
+    ['/login?retry=1', '/campus/party/login?retry=1'],
+    ['/portal/party/party_m5', '/campus/party/member/party_m5'],
     ['/portal/branch/party-score-approvals/34?from=branch_m3&action=approve#detail',
       '/campus/party/branch/party-score-approvals/34?from=branch_m3&action=approve#detail'],
     ['/portal/academy/approval-templates/3?from=academy_m2', '/campus/party/academy/approval-templates/3?from=academy_m2'],
     ['/portal/school/organization-members/27?from=school_m2', '/campus/party/school/organization-members/27?from=school_m2'],
-    ['/portal/admin/admin_m1?filter=all#users', '/campus/admin/admin_m1?filter=all#users'],
-    ['/campus/admin/admin_m1', '/campus/admin/admin_m1'],
+    ['/portal/admin/admin_m1?filter=all#users', '/campus/party/admin/admin_m1?filter=all#users'],
+    ['/campus/admin/admin_m1', '/campus/party/admin/admin_m1'],
+    ['/campus/login?retry=1', '/campus/party/login?retry=1'],
+    ['/campus?tab=all', '/campus/party?tab=all'],
+    ['/campus/student/student_m4', '/campus/party/student/student_m4'],
+    ['/campus/party/party-scores/9?from=party_m4#detail', '/campus/party/member/party-scores/9?from=party_m4#detail'],
+    ['/campus/party/member/party_m5', '/campus/party/member/party_m5'],
   ]
   for (const [from, to] of cases) assert.equal(migrateLegacyPath(from), to)
 })
@@ -63,5 +68,14 @@ test('实际路由匹配保留门户、模块和详情参数，党建子门户�
       const actual = JSON.parse(html.replace(/^<span>|<\/span>$/g, '').replaceAll('&quot;', '"'))
       assert.deepEqual(actual, expected, `${base}${suffix}`)
     }
+  }
+})
+
+
+test('新页面路由始终在站点内，重复迁移不会再添加前缀', () => {
+  assert.notEqual(CAMPUS_PATH, getPortalPath('party'))
+  for (const path of [LOGIN_PATH, ...Object.values(PORTAL_PATHS)]) {
+    assert.equal(path.startsWith(`${CAMPUS_PATH}/`), true)
+    assert.equal(migrateLegacyPath(path), path)
   }
 })

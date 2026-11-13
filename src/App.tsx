@@ -1,8 +1,8 @@
 /**
  * 应用路由定义与路由守卫。
- * /campus/login 为公开登录页；业务路由统一经过 RequireAuth 守卫。
- * /campus 是登录后的角色解析页，根据当前用户任职跳转到对应门户；
- * 党建门户位于 /campus/party 下，管理门户位于 /campus/admin。
+ * LOGIN_PATH 为公开登录页；业务路由统一经过 RequireAuth 守卫。
+ * 站点根路径是登录后的角色解析页，根据当前用户任职跳转到对应门户；
+ * 所有门户路径由 APP_BASE 派生。
  */
 
 import { lazy } from 'react'
@@ -36,7 +36,7 @@ const BulkAddMembersView = lazy(() => import('./pages/admin/BulkAddMembersView')
 
 /**
  * 路由守卫组件。
- * 无入参；未登录时返回跳转 /campus/login 的 Navigate 元素，
+ * 无入参；未登录时返回跳转 LOGIN_PATH 的 Navigate 元素，
  * 已登录时渲染子路由出口 Outlet。
  */
 function RequireAuth() {
@@ -52,25 +52,27 @@ function RequireAuth() {
 /** 旧书签和持久化返回位置统一迁移，保留页面参数与路由状态。 */
 function LegacyRouteRedirect() {
   const location = useLocation()
-  const to = migrateLegacyPath(`${location.pathname}${location.search}${location.hash}`)
-  return <Navigate to={to} replace state={location.state} />
+  const current = `${location.pathname}${location.search}${location.hash}`
+  const to = migrateLegacyPath(current)
+  return <Navigate to={to === current ? CAMPUS_PATH : to} replace state={location.state} />
 }
 
 /** App 组件。
  * @returns 类型：Element
  */
 export default function App() {
+  const { pathname } = useLocation()
+  const isCasCallback = pathname.replace(/\/+$/, '') === CAS_CALLBACK_PATH
   return (
     <>
       {/* 首次登录强制改密：根级常驻，只要登录态要求改密就覆盖全站且不可关闭 */}
-      <ForcePasswordChangeModal />
+      {!isCasCallback && <ForcePasswordChangeModal />}
       <Routes>
         <Route path={LOGIN_PATH} element={<LoginPage />} />
         <Route path={CAS_CALLBACK_PATH} element={<CasCallbackPage />} />
-        <Route path="/" element={<LegacyRouteRedirect />} />
-        <Route path="/login" element={<LegacyRouteRedirect />} />
-        <Route path="/home" element={<LegacyRouteRedirect />} />
-        <Route path="/portal/:portalKey/*" element={<LegacyRouteRedirect />} />
+        {['/', '/login', '/home', '/campus', '/campus/login', '/portal/:portalKey/*']
+          .filter((path) => ![CAMPUS_PATH, LOGIN_PATH, ...Object.values(PORTAL_PATHS)].includes(path))
+          .map((path) => <Route key={path} path={path} element={<LegacyRouteRedirect />} />)}
 
         {/* 受保护路由：统一由 RequireAuth 守卫 */}
         <Route element={<RequireAuth />}>
@@ -122,7 +124,7 @@ export default function App() {
           ))}
 
           {/* 未匹配的已登录地址统一回到角色解析页 */}
-          <Route path="*" element={<Navigate to={CAMPUS_PATH} replace />} />
+          <Route path="*" element={<LegacyRouteRedirect />} />
         </Route>
       </Routes>
     </>

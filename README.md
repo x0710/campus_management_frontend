@@ -41,30 +41,38 @@ yarn lint
 yarn build
 ```
 
-接口地址统一由 `src/config/api.ts` 中的 `API_BASE` 配置，默认 `/campus/party/api`。
-复制 `.env.example` 为 `.env.local`，按部署环境填写：
+站点基础路径通过 `VITE_APP_BASE` 配置，默认 `/campus/party`。
+复制 `.env.example` 为 `.env.local`：
 
 ```dotenv
-VITE_API_BASE=/campus/party/api
-# 也可配置其他前缀或完整后端地址，例如：
-# VITE_API_BASE=/api/v1
-# VITE_API_BASE=https://backend.example.com/api
+VITE_APP_BASE=/campus/party
+# 留空时 API 自动使用站点基础路径下的 /api，也可独立填写完整后端地址。
+VITE_API_BASE=
 ```
 
-该值包含接口前缀，例如配置 `/api/v1` 后，用户查询请求为 `/api/v1/users`。
-修改后需重启开发服务，生产环境需重新构建；也可在构建命令中设置该环境变量。
-使用同源路径时，需将配置的路径反向代理到后端；使用跨域地址时，后端需允许前端来源的 CORS 请求。
-本地 Vite 代理默认将 `/campus/party/api` 转发到 `http://localhost:8000/api`，同时保留 `/api` 代理，如需调整代理目标或路径，修改 `vite.config.ts`。
-前端路由需配置回退到 `index.html`。
+Vite 的 `base` 与运行时的 `APP_BASE` 共用这项配置；页面路由、JS/CSS、公共图片、
+登录跳转和 CAS 前端回调均从基础路径派生。修改后需重启开发服务，生产环境需重新构建。
+`API_BASE` 默认跟随站点基础路径，也可用 `VITE_API_BASE` 单独覆盖。
+同源部署需配置 Nginx 静态文件映射与页面回退，跨域 API 需由后端允许前端来源的 CORS 请求。
+本地 Vite 代理将配置的 API 路径转发到 `http://localhost:8000/api`。
 
-前端统一使用 `/campus` 路径：登录页 `/campus/login`，党员端 `/campus/party`，
-支部端 `/campus/party/branch`，学院党委端 `/campus/party/academy`，
-学校党委端 `/campus/party/school`，管理端 `/campus/admin`。各端的模块和详情路径挂在对应入口下。
-`/campus` 按当前用户任职进入默认门户；原 `/login`、`/home`、`/portal/...` 地址会自动迁移并保留查询参数和锚点。
-前端静态资源部署在 `/campus/party/` 下，Vite 的 `base` 已设为 `/campus/party/`：
-构建后的 JS、CSS 使用 `/campus/party/assets/...`，公共图片和图标也使用该前缀。
-后端接口地址由 `VITE_API_BASE` 单独配置，默认 `/campus/party/api`。
-部署时将 `dist` 的内容放入 Nginx 对应的 `/campus/party/` 静态目录。
+默认部署地址：
+
+| 入口 | 路径 |
+| --- | --- |
+| 站点与门户选择 | `/campus/party` |
+| 登录 | `/campus/party/login` |
+| 党员个人端 | `/campus/party/member` |
+| 支部、学院、学校端 | `/campus/party/branch`、`/campus/party/academy`、`/campus/party/school` |
+| 管理、学生、教师、领导端 | `/campus/party/admin`、`/campus/party/student`、`/campus/party/teacher`、`/campus/party/leader` |
+| 静态资源 | `/campus/party/assets/...` |
+| API | `/campus/party/api/...` |
+
+旧 `/campus/login`、`/campus/admin/...`、`/portal/...` 等地址进入前端后会迁移并保留参数和锚点。
+多应用共用域名时，Nginx 是否继续把旧地址交给本应用需单独配置；新链接始终使用站点基础路径。
+修改部署基础路径后，后端 `CAS_SERVICE_URL` 和 Nginx 映射也需同步调整。
+
+手机端使用抽屉菜单，顶部操作自动换行，宽表格可在内容区横向滚动。
 
 支持日期查询的列表提供「创建日期（UTC）」筛选，日期格式为 `YYYY-MM-DD`，
 包含所选起止日，也可仅填写一端；修改或清空筛选会回到第一页。
@@ -72,26 +80,41 @@ VITE_API_BASE=/campus/party/api
 用户列表和组织成员列表的日期条件会随页面返回保留，并在切换账户时隔离。
 
 登录页支持用户名密码和 CAS 统一身份认证。点击「统一身份认证登录」后，
-浏览器在当前页面直接访问学校 CAS 登录页 `https://authserver.jgsu.edu.cn/authserver/login`，
-通过 `service` 查询参数传入 `https://partymc.jgsu.edu.cn/campus/api/auth/cas/callback`，认证后由 CAS 自动跳回该地址。
-该地址打开前端公开回调页，由页面携带 `ticket`（有 `state` 时同时携带）请求后端
-`GET /campus/party/api/auth/cas/callback`。后端验票返回与密码登录一致的 `token`、`user`、`last_login_at` 后，
-前端保存登录态并跳转 `/campus`，由门户解析页进入当前用户的门户。CAS 登录不触发本地首次改密。
+浏览器先访问 `/campus/party/api/auth/cas/login`，由后端设置流程 Cookie、生成 `state` 并跳转学校认证中心。
+认证成功后，学校须跳回前端页面 `/campus/party/auth/cas/callback?ticket=...&state=...`。
+前端页面再携带 `ticket`、`state` 和浏览器 Cookie 请求后端 `/campus/party/api/auth/cas/callback`，
+收到 `token`、`user`、`last_login_at` 后保存登录态并进入站点根路径。CAS 登录不触发本地首次改密。
 
-部署时 `/campus/api/auth/cas/callback` 必须回退到前端 `index.html`，不能直接代理到后端输出 JSON；
-默认配置下 `/campus/party/api/auth/cas/callback` 代理到后端。两者的路径不同；CAS 验票与其余业务请求均使用 `API_BASE`，前端公开回调页地址保持上述路径。
+后端环境变量必须配置为前端回调页的完整 HTTPS 地址（域名请替换为实际部署域名）：
 
-Nginx 可为前端回调增加精确匹配（使用现有前端静态目录的 `root`）：
+```dotenv
+CAS_SERVICE_URL=https://partymc.jgsu.edu.cn/campus/party/auth/cas/callback
+```
+
+修改后需重启后端并从登录入口重新发起认证；学校注册的 service 规则须允许此地址及后端追加的随机 `state`。
+登录入口、前端回调页和后端验票接口须使用同一域名的 HTTPS，以携带后端设置的安全 Cookie。
+
+Nginx 须把前端回调页交给静态站点，把 API 路径转发到后端。以下假定构建产物放在
+`/var/www/html/campus/party/`，后端监听 `127.0.0.1:8000`；请按实际目录和端口调整：
 
 ```nginx
-location = /campus/api/auth/cas/callback {
-    try_files $uri /index.html;
+location /campus/party/api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location = /campus/party/auth/cas/callback {
+    root /var/www/html;
+    try_files /campus/party/index.html =404;
+    add_header Cache-Control "no-store" always;
+    add_header Referrer-Policy "no-referrer" always;
 }
 ```
 
-后端对应配置为 `CAS_SERVICE_URL=https://partymc.jgsu.edu.cn/campus/api/auth/cas/callback`。
-当前本地后端回调还要求后端登录入口生成的 `state` 和流程 Cookie，需配套支持前端直接发起的认证流程；
-前端不会伪造该流程凭据或绕过后端校验。
+如果浏览器认证后直接显示包含 token 的 JSON，说明学校仍回调到后端 API，或 Nginx 把前端回调地址代理到了后端。
+此时前端页面没有运行，不能接收该 JSON；需要同时检查后端 `CAS_SERVICE_URL` 与上述 Nginx 路由。
+
 
 
 ---

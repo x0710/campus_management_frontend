@@ -1,5 +1,7 @@
+import { appPath } from './appBase'
+
 /** 后端接口根地址，包含接口前缀；修改环境变量后需重新启动或构建。 */
-export const API_BASE = (import.meta.env?.VITE_API_BASE?.trim() || '/campus/party/api').replace(/\/+$/, '')
+export const API_BASE = (import.meta.env?.VITE_API_BASE?.trim() || appPath('api')).replace(/\/+$/, '')
 
 /** 将接口返回的相对附件地址接到配置的根地址，兼容历史 /api 前缀。 */
 export function resolveApiUrl(url: string, base = API_BASE): string {

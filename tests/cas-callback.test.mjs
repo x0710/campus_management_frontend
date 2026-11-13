@@ -5,18 +5,16 @@ import { exchangeCasTicket, InvalidCasCallbackError } from '../src/api/cas.ts'
 import { http } from '../src/api/http.ts'
 import { useAuthStore } from '../src/store/auth.ts'
 import { readLoginResponse, saveLoginSession } from '../src/utils/loginSession.ts'
-import { CAS_CALLBACK_PATH, CAS_LOGIN_URL, CAS_SERVICE_URL } from '../src/config/auth.ts'
+import { CAS_CALLBACK_PATH, CAS_LOGIN_URL } from '../src/config/auth.ts'
 
 const response = { token: 'cas-token', user: 'cas-user', last_login_at: null }
 const ok = (config, data = response) => ({ config, status: 200, statusText: 'OK', headers: {}, data })
 
-test('CAS 直接登录携带前端回调地址，业务接口使用 Nginx API 前缀', () => {
-  const login = new URL(CAS_LOGIN_URL)
-  assert.equal(login.origin, 'https://authserver.jgsu.edu.cn')
-  assert.equal(login.pathname, '/authserver/login')
-  assert.equal(login.searchParams.get('service'), CAS_SERVICE_URL)
-  assert.equal(new URL(CAS_SERVICE_URL).pathname, CAS_CALLBACK_PATH)
-  assert.equal(CAS_CALLBACK_PATH, '/campus/api/auth/cas/callback')
+test('CAS 从后端入口创建浏览器绑定，前端回调页与后端 JSON 验票接口分开', () => {
+  assert.equal(CAS_LOGIN_URL, '/campus/party/api/auth/cas/login')
+  assert.equal(CAS_CALLBACK_PATH, '/campus/party/auth/cas/callback')
+  assert.equal(CAS_CALLBACK_PATH.startsWith('/campus/party/'), true)
+  assert.equal(CAS_CALLBACK_PATH.startsWith('/campus/party/api/'), false)
   assert.equal(http.getUri({ url: '/auth/cas/callback' }), '/campus/party/api/auth/cas/callback')
 })
 
@@ -103,6 +101,21 @@ test('缺少或重复票据不发送请求，验票失败或异常响应不会�
     assert.equal(useAuthStore.getState().token, 'keep-token')
   } finally {
     http.defaults.adapter = adapter
+    useAuthStore.setState(previous)
+  }
+})
+
+
+test('同一账号未完成首次改密后通过 CAS 登录，清除改密拦截与暂存密码', () => {
+  const previous = useAuthStore.getState()
+  try {
+    saveLoginSession(response, 'password', 'initial-password')
+    assert.equal(useAuthStore.getState().mustChangePassword, true)
+    saveLoginSession(response, 'cas')
+    assert.equal(useAuthStore.getState().mustChangePassword, false)
+    assert.equal(useAuthStore.getState().pendingPassword, null)
+    assert.equal(useAuthStore.getState().token, response.token)
+  } finally {
     useAuthStore.setState(previous)
   }
 })

@@ -17,10 +17,11 @@ import { usePortalParams } from '../../hooks/usePortalParams'
 import {
   DoubleLeftOutlined,
   DoubleRightOutlined,
+  MenuOutlined,
 } from '@ant-design/icons'
-import { Button, Layout, Menu, Tag, Tooltip } from 'antd'
+import { Button, Drawer, Grid, Layout, Menu, Tag, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
-import { Suspense, useEffect, useMemo } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import PortalHeader from '../../components/PortalHeader'
 import PageLoading from '../../components/PageLoading'
@@ -51,6 +52,9 @@ export default function PortalWorkspace() {
 }
 
 function PortalWorkspaceContent() {
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const previewRevision = useImportPreview((state) => state.revision)
   const t = useT()
   const navigate = useNavigate()
@@ -88,9 +92,9 @@ function PortalWorkspaceContent() {
   )
 
   // 从当前 URL 推导被高亮的模块 key：
-  //   /campus/student/student_m4            -> "student_m4"
-  //   /campus/student/announcements/123?from=student_m4 -> "student_m4"
-  //   /campus/student/                      -> 无高亮（index 子路由会自行跳转到首个已开通模块）
+  //   <学生门户路径>/student_m4            -> "student_m4"
+  //   <学生门户路径>/announcements/123?from=student_m4 -> "student_m4"
+  //   <学生门户路径>/                      -> 无高亮（index 子路由会自行跳转到首个已开通模块）
   const selectedKey = useMemo(() => {
     if (!portal) return undefined
     const base = getPortalPath(portal.key)
@@ -176,7 +180,7 @@ function PortalWorkspaceContent() {
   }
 
   // 角色权限校验：角色仍在加载时先展示加载态，未授权门户重定向到默认门户，
-  // 避免普通用户手动输入 /campus/admin/... 直接渲染管理端页面
+  // 避免普通用户手动输入 <管理门户路径>/... 直接渲染管理端页面
   if (portalAccess === null) {
     return <PageLoading />
   }
@@ -189,10 +193,37 @@ function PortalWorkspaceContent() {
   return (
     <div className="workspace-page">
       <PortalHeader
+        left={isMobile ? <Button
+          type="text"
+          className="workspace-mobile-menu-trigger"
+          icon={<MenuOutlined />}
+          aria-label={t('portal.expand')}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="workspace-mobile-menu"
+          onClick={() => setMobileMenuOpen(true)}
+        /> : undefined}
       />
+      <Drawer
+        title={name}
+        placement="left"
+        open={isMobile && mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        styles={{ wrapper: { width: 'min(320px, 88vw)' }, body: { padding: '8px 0' } }}
+      >
+        <Menu
+          id="workspace-mobile-menu"
+          mode="inline"
+          items={menuItems}
+          selectedKeys={selectedKey ? [selectedKey] : []}
+          onClick={({ key }) => {
+            navigate(`${getPortalPath(portal.key)}/${key}`)
+            setMobileMenuOpen(false)
+          }}
+        />
+      </Drawer>
 
       <div className="workspace-body">
-        <Layout.Sider
+        {!isMobile && <Layout.Sider
           className="workspace-sider"
           width={224}
           collapsedWidth={64}
@@ -231,7 +262,7 @@ function PortalWorkspaceContent() {
               />
             </Tooltip>
           </div>
-        </Layout.Sider>
+        </Layout.Sider>}
 
         <main className="workspace-content">
           <ImportPreviewBanner />

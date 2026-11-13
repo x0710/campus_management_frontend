@@ -272,6 +272,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
           <Button
             type="primary"
             className="feedback-nav-btn"
+            aria-label={t('common.reportIssue')}
             icon={<QuestionCircleOutlined />}
             onClick={() => navigate(`${getPortalPath(currentPortalKey ?? PARTY_PORTAL_KEY)}/feedback`)}
           >
