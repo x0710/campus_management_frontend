@@ -9,7 +9,7 @@ import type { Locale } from '../store/settings'
 const messages = {
   zh: {
     common: {
-      appName: '校园管理平台',
+      appName: '',
       appNameEn: 'Campus Manager',
       loading: '加载中…',
       retry: '重试',

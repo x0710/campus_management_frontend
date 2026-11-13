@@ -6,7 +6,6 @@ import {
   LogoutOutlined,
   MoonOutlined,
   QuestionCircleOutlined,
-  SafetyCertificateOutlined,
   SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -233,9 +232,12 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
     <header className="portal-header">
       <div className="portal-header-left">
         <div className="header-brand" onClick={() => navigate(CAMPUS_PATH)}>
-          <span className="sider-mark">
-            <SafetyCertificateOutlined />
-          </span>
+          {/* 界面壳左上角品牌标识：校徽使用 public/logo2.svg */}
+          <img
+            className="header-school-logo"
+            src={`${import.meta.env.BASE_URL}logo2.svg`}
+            alt="井冈山大学"
+          />
           <span className="header-brand-name">{t('common.appName')}</span>
         </div>
         {showPortalSwitcher && (

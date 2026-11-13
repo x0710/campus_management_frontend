@@ -58,6 +58,9 @@ export const ORG_BRANCH_NAME_KEYWORD = '支部'
 /** 党委学校端「组织概览」区域（内嵌在总览页）的会话状态 key，记忆选中组织与树展开态 */
 export const SCHOOL_ORG_OVERVIEW_UI_KEY = 'school_org_overview'
 
+/** 二级党委端工作台「组织概览」区域的会话状态 key，记忆选中组织与树展开态 */
+export const ACADEMY_ORG_OVERVIEW_UI_KEY = 'academy_org_overview'
+
 /**
  * 党委学院端「学院支部管理」模块 key。
  * 学院工作台点击各支部成绩排名时，按该 key 写入选中支部并跳转，展示该支部成员列表。

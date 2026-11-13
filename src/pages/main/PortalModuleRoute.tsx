@@ -65,6 +65,12 @@ const SchoolOverviewView = lazy(() => import('../school/SchoolOverviewView'))
 const LeaderAnnouncementManageView = () => <AnnouncementsView manage />
 
 /**
+ * 管理端「组织架构」：组织树 + 组织 CRUD + 成员任职管理，接真实组织/成员接口。
+ * 成员表面板支持「导出表格」：党员信息 + 成绩信息两个工作表，与支部端口径一致。
+ */
+const AdminOrgAdminView = () => <OrgAdminView exportMemberInfo />
+
+/**
  * 党委学校端「组织成员管理」：复用管理端组织架构页面（组织树 + 组织 CRUD + 成员任职管理），
  * 接真实组织/成员接口；用独立 uiKey 隔离选中态，避免与管理端串用。
  * 成员列表以「先锋等级」列代替「工作地点」，操作列额外提供「重置密码」（与管理端用户与账户一致）。
@@ -162,7 +168,7 @@ const MODULE_VIEWS: Partial<Record<`${PortalKey}:${string}`, ComponentType>> = {
   'leader:leader_m9': RewardingManageView,
   'admin:admin_m1': UsersAdminView,
   'admin:admin_m2': RolesAdminView,
-  'admin:admin_m3': OrgAdminView,
+  'admin:admin_m3': AdminOrgAdminView,
   'admin:admin_m5': PositionsAdminView,
 }
 

@@ -146,7 +146,7 @@ interface OrgAdminViewProps {
   showResetPassword?: boolean
   /**
    * 是否显示「导出表格」按钮（可选，默认 false）。
-   * 导出当前组织全部成员的「党员信息」与「成绩信息」两个工作表；仅党委学校端开启。
+   * 导出当前组织全部成员的「党员信息」与「成绩信息」两个工作表；管理端「组织架构」与党委学校端「组织管理」开启。
    */
   exportMemberInfo?: boolean
   /**
@@ -657,7 +657,7 @@ export default function OrgAdminView({
   )
 
   /**
-   * 学校党委端「组织成员管理」导出：当前组织（可选择是否含下级）全部成员的党员信息与成绩信息。
+   * 管理端「组织架构」/ 学校党委端「组织成员管理」导出：当前组织（可选择是否含下级）全部成员的党员信息与成绩信息。
    * 导出时按组织范围重新拉取全部成员（不局限于当前页），与支部端导出同一份表格结构。
    * @param includeChildren 是否包含下级组织（必填）
    */
@@ -1356,7 +1356,7 @@ export default function OrgAdminView({
                 </Button>
               </Tooltip>
             )}
-            {/* 学校党委端：导出当前组织全部成员的党员信息与成绩信息（两个工作表） */}
+            {/* 管理端组织架构 / 学校党委端：导出当前组织全部成员的党员信息与成绩信息（两个工作表） */}
             {exportMemberInfo && selectedOrg && !search.matchOnly && (
               <Tooltip title={t('branchExport.hint')}>
                 <Button

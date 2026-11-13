@@ -95,8 +95,8 @@ export const PORTALS: PortalDef[] = [
     // 成绩申报接真实接口；我的已开通并复用真实档案/成绩记录/消息通知页面
     key: 'party',
     icon: <FlagOutlined />,
-    gradient: 'linear-gradient(135deg, #a8071a 0%, #f5222d 100%)',
-    accent: '#a8071a',
+    gradient: 'linear-gradient(135deg, #8f1821 0%, #c93435 100%)',
+    accent: '#a61f27',
     modules: [
       { key: 'party_m1', status: 'ready', icon: <HomeOutlined /> },
       { key: 'party_m2', status: 'ready', icon: <FormOutlined /> },
@@ -112,8 +112,8 @@ export const PORTALS: PortalDef[] = [
     // 支部管理按组织树深度判定所属支部并展示其成员（有下级支部则展示组织树），均接真实接口
     key: 'branch',
     icon: <ApartmentOutlined />,
-    gradient: 'linear-gradient(135deg, #873800 0%, #fa8c16 100%)',
-    accent: '#873800',
+    gradient: 'linear-gradient(135deg, #9b1d24 0%, #cf4940 100%)',
+    accent: '#ad252c',
     modules: [
       { key: 'branch_m1', status: 'ready', icon: <LineChartOutlined /> },
       { key: 'branch_m3', status: 'ready', icon: <AuditOutlined /> },
@@ -129,8 +129,8 @@ export const PORTALS: PortalDef[] = [
     // 学院支部管理与支部端同一套支部判定逻辑，均接真实接口
     key: 'academy',
     icon: <BookOutlined />,
-    gradient: 'linear-gradient(135deg, #531dab 0%, #9254de 100%)',
-    accent: '#531dab',
+    gradient: 'linear-gradient(135deg, #831923 0%, #bd3438 100%)',
+    accent: '#991f28',
     modules: [
       { key: 'academy_m1', status: 'ready', icon: <HomeOutlined /> },
       { key: 'academy_m2', status: 'ready', icon: <ProfileOutlined /> },
@@ -147,8 +147,8 @@ export const PORTALS: PortalDef[] = [
     // 岗位管理复用管理端「岗位管理」页面，均接真实接口
     key: 'school',
     icon: <SafetyCertificateOutlined />,
-    gradient: 'linear-gradient(135deg, #006d75 0%, #13c2c2 100%)',
-    accent: '#08979c',
+    gradient: 'linear-gradient(135deg, #7b161f 0%, #b82e34 100%)',
+    accent: '#8f1d26',
     modules: [
       { key: 'school_m1', status: 'ready', icon: <LineChartOutlined /> },
       { key: 'school_m2', status: 'ready', icon: <ApartmentOutlined /> },
@@ -221,8 +221,8 @@ export const PORTALS: PortalDef[] = [
   {
     key: 'admin',
     icon: <SettingOutlined />,
-    gradient: 'linear-gradient(135deg, #d4380d 0%, #fa8c16 100%)',
-    accent: '#d4380d',
+    gradient: 'linear-gradient(135deg, #6f1820 0%, #a93435 100%)',
+    accent: '#821c24',
     modules: [
       { key: 'admin_m1', status: 'ready', icon: <TeamOutlined /> },
       { key: 'admin_m2', status: 'ready', icon: <SafetyCertificateOutlined /> },

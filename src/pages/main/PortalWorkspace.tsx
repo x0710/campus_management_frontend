@@ -191,7 +191,7 @@ function PortalWorkspaceContent() {
   const name = t(`portal.${portal.key}_name`)
 
   return (
-    <div className="workspace-page">
+    <div className={`workspace-page portal-${portal.key}`}>
       <PortalHeader
         left={isMobile ? <Button
           type="text"

@@ -2,7 +2,7 @@ import { CAMPUS_PATH } from '../config/routes'
 /**
  * 登录页：
  * 提供用户名密码登录、记住用户名、语言切换和主题切换。
- * 整屏以 login-background.jpg 作背景，登录表单收进靠右的卡片（登录小窗），避免遮挡背景主体。
+ * 整屏以 login-background.png 作背景，登录表单收进靠右的卡片（登录小窗），避免遮挡背景主体。
  * 登录成功后写入登录态，并跳转到 CAMPUS_PATH 角色解析页；
  * 已登录用户访问本页时直接重定向到 CAMPUS_PATH。
  * 由其他页面（如角色解析页在后端未启动时）跳转而来时，读取路由 state 中的 loginError
@@ -111,6 +111,9 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
+      {/* 左上角校名标识，叠在背景板之上 */}
+      <img className="login-brand" src={`${import.meta.env.BASE_URL}logo2.svg`} alt="井冈山大学" />
+
       <div className="login-top-actions">
         <Dropdown
           trigger={['click']}
@@ -133,7 +136,7 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* 登录小窗：靠右显示，留出背景板主体区域 */}
+      {/* 登录小窗：桌面端位于纪念碑右侧留白区，窄屏回归居中 */}
       <main className="login-panel">
         <div className="login-panel-inner">
           <div className="login-logo">

@@ -236,18 +236,38 @@ subscribeCacheInvalidation(() => {
 })
 
 /**
+ * 组织概览区域的可配置项（默认值对应学校端总览页内嵌的组织概览）
+ */
+interface SchoolOrgOverviewViewProps {
+  /** 组织树根组织 ID（默认学校端「学院党委」容器 ID=2）；二级党委端传入当前学院组织 */
+  rootOrgId?: number
+  /** 会话状态 key（记忆选中组织与树展开态），不同入口需使用不同的 key */
+  uiKey?: string
+  /** 「查看详细」跳转的目标模块 key（默认学校端组织成员管理） */
+  detailModuleKey?: string
+  /** 是否展示组织维护按钮（新建下级 / 编辑 / 删除）；只读场景传 false */
+  showOrgActions?: boolean
+  /** 当前组织没有下级组织时隐藏组织树（只展示空表），默认 false */
+  hideTreeWhenNoChildren?: boolean
+}
+
+/**
  * 党委学校端：组织概览（组织树 + 下级组织统计表）
+ * @param props 可配置项（可选，默认学校端总览页配置）
  * @returns 类型：Element
  */
-export default function SchoolOrgOverviewView() {
+export default function SchoolOrgOverviewView({
+  rootOrgId = SCHOOL_COLLEGE_PARENT_ORG_ID,
+  uiKey = SCHOOL_ORG_OVERVIEW_UI_KEY,
+  detailModuleKey = SCHOOL_ORG_ADMIN_MODULE_KEY,
+  showOrgActions = true,
+  hideTreeWhenNoChildren = false,
+}: SchoolOrgOverviewViewProps = {}) {
   const t = useT()
   const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const { portalKey } = usePortalParams<{ portalKey: string }>()
   const reportError = useErrorFeedback()
-
-  /** 会话状态 key：跨路由返回仍保留选中组织与树展开态 */
-  const uiKey = SCHOOL_ORG_OVERVIEW_UI_KEY
 
   const [orgs, setOrgs] = useState<OrganizationInfo[]>([])
   const [orgsLoading, setOrgsLoading] = useState(true)
@@ -336,15 +356,15 @@ export default function SchoolOrgOverviewView() {
     void loadReserveCodes()
   }, [loadReserveCodes])
 
-  /** 组织树展示范围：与组织成员管理一致，只展示「学院党委」容器及其全部下级 */
+  /** 组织树展示范围：与组织成员管理一致，只展示根组织及其全部下级 */
   const orgsInTree = useMemo(
-    () => collectOrgSubtree(orgs, SCHOOL_COLLEGE_PARENT_ORG_ID),
-    [orgs],
+    () => collectOrgSubtree(orgs, rootOrgId),
+    [orgs, rootOrgId],
   )
 
   const treeData = useMemo(
-    () => buildOrgTreeData(orgsInTree, orgSearch, SCHOOL_COLLEGE_PARENT_ORG_ID),
-    [orgsInTree, orgSearch],
+    () => buildOrgTreeData(orgsInTree, orgSearch, rootOrgId),
+    [orgsInTree, orgSearch, rootOrgId],
   )
 
   /** 当前选中的组织；进入「总览」时默认选中「学院党委」根组织，用户可继续切换 */
@@ -397,9 +417,9 @@ export default function SchoolOrgOverviewView() {
    * 同时重置展开态，避免沿用上次浏览过的深层组织展开记录。
    */
   useEffect(() => {
-    setSelectedId(uiKey, SCHOOL_COLLEGE_PARENT_ORG_ID)
-    setOrgTreeExpanded(uiKey, [SCHOOL_COLLEGE_PARENT_ORG_ID])
-  }, [setOrgTreeExpanded, setSelectedId, uiKey])
+    setSelectedId(uiKey, rootOrgId)
+    setOrgTreeExpanded(uiKey, [rootOrgId])
+  }, [rootOrgId, setOrgTreeExpanded, setSelectedId, uiKey])
 
   /** 右侧列表数据：当前选中组织的直接下级组织（按 ID 升序；未选择组织时为空，不查询） */
   const childOrgs = useMemo(
@@ -418,8 +438,9 @@ export default function SchoolOrgOverviewView() {
     [orgsInTree],
   )
 
-  /** 「学院党委」根容器不可删除，其余组织均可维护 */
-  const canDeleteOrg = activeOrg !== null && activeOrg.id !== SCHOOL_COLLEGE_PARENT_ORG_ID
+  /** 根容器与上级容器不可删除，其余组织均可维护 */
+  const canDeleteOrg =
+    showOrgActions && activeOrg !== null && activeOrg.id !== rootOrgId
 
   /** 弹窗中「上级组织」的可选项：与组织树同一范围，避免把组织挂到页面看不到的组织下 */
   const parentOptions = useMemo(
@@ -483,13 +504,13 @@ export default function SchoolOrgOverviewView() {
    * 「学院党委」根容器由按钮 disabled 拦截（见渲染处），避免误删学校端根节点。
    */
   const removeOrg = async () => {
-    if (!activeOrg || activeOrg.id === SCHOOL_COLLEGE_PARENT_ORG_ID) return
+    if (!activeOrg || activeOrg.id === rootOrgId) return
     setOrgDeleting(true)
     try {
       await deleteOrganization(activeOrg.id)
       message.success(t('adminOrg.deleteSuccess'))
       if (selectedId === activeOrg.id) {
-        setSelectedId(uiKey, activeOrg.parent_id ?? SCHOOL_COLLEGE_PARENT_ORG_ID)
+        setSelectedId(uiKey, activeOrg.parent_id ?? rootOrgId)
       }
       await loadOrgs(true)
     } catch (err) {
@@ -602,12 +623,12 @@ export default function SchoolOrgOverviewView() {
    */
   const openOrgMembers = useCallback(
     (orgId: number) => {
-      setSelectedId(SCHOOL_ORG_ADMIN_MODULE_KEY, orgId)
+      setSelectedId(detailModuleKey, orgId)
       // 组织成员管理首次加载会沿用记忆页码，这里先重置为第 1 页，确保能直接看到成员
-      setMemberPage(SCHOOL_ORG_ADMIN_MODULE_KEY, 1)
-      navigate(`${getPortalPath(portalKey ?? 'school')}/${SCHOOL_ORG_ADMIN_MODULE_KEY}`)
+      setMemberPage(detailModuleKey, 1)
+      navigate(`${getPortalPath(portalKey ?? 'school')}/${detailModuleKey}`)
     },
-    [navigate, portalKey, setMemberPage, setSelectedId],
+    [navigate, portalKey, setMemberPage, setSelectedId, detailModuleKey],
   )
 
   /** 手动刷新：绕过缓存重新拉取组织树、预备党员职位与全部统计（代码要求 5、25） */
@@ -766,8 +787,19 @@ export default function SchoolOrgOverviewView() {
     [t, statsLoading, openOrgMembers],
   )
 
+  /** 当前组织是否还有下级组织：没有下级组织时可隐藏组织树，只展示空表 */
+  const hasChildOrgs = childOrgs.length > 0
+  /**
+   * 是否隐藏组织树：仅二级党委端等入口在「组织加载完成且确实没有下级组织」时隐藏；
+   * 加载中或加载失败时仍展示组织树卡片（错误信息与重试入口在其中）。
+   */
+  const treeHidden =
+    hideTreeWhenNoChildren && !orgsLoading && orgsError === null && !hasChildOrgs
+
   return (
-    <div className={`admin-org-view${treeCollapsed ? ' is-tree-collapsed' : ''}`}>
+    <div
+      className={`admin-org-view${treeCollapsed || treeHidden ? ' is-tree-collapsed' : ''}`}
+    >
       <section className="panel-card org-tree-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('adminOrg.treeTitle')}</h3>
@@ -814,22 +846,24 @@ export default function SchoolOrgOverviewView() {
       <section className="panel-card org-members-card">
         <header className="panel-card-header org-member-header">
           <div className="org-members-title">
-            {/* 左侧组织树收起/展开 */}
-            <Tooltip
-              title={
-                treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
-              }
-            >
-              <Button
-                type="text"
-                size="small"
-                aria-label={
+            {/* 左侧组织树收起/展开（无下级组织时不展示组织树，也就无需收起按钮） */}
+            {!treeHidden && (
+              <Tooltip
+                title={
                   treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
                 }
-                icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setTreeCollapsed(uiKey, !treeCollapsed)}
-              />
-            </Tooltip>
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  aria-label={
+                    treeCollapsed ? t('memberDetail.expandTree') : t('memberDetail.collapseTree')
+                  }
+                  icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setTreeCollapsed(uiKey, !treeCollapsed)}
+                />
+              </Tooltip>
+            )}
             <h3 className="panel-card-title">
               {activeOrg
                 ? `${activeOrg.name}（${activeOrg.code}）`
@@ -851,52 +885,56 @@ export default function SchoolOrgOverviewView() {
             <Tooltip title={t('schoolOrgOverview.countHint')}>
               <span className="cell-sub">{t('schoolOrgOverview.listTitle')}</span>
             </Tooltip>
-            {/* 组织维护：与「组织成员管理」一致，操作对象为左侧当前选中的组织 */}
-            <Tooltip title={t('schoolOrgOverview.newSubOrgHint')}>
-              <Button
-                size="small"
-                icon={<PlusOutlined />}
-                disabled={!activeOrg}
-                onClick={openCreate}
-              >
-                {t('adminOrg.newSubOrg')}
-              </Button>
-            </Tooltip>
-            <Tooltip title={t('schoolOrgOverview.editOrgHint')}>
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                disabled={!activeOrg}
-                onClick={openEdit}
-              >
-                {t('adminOrg.editOrg')}
-              </Button>
-            </Tooltip>
-            <Tooltip
-              title={
-                activeOrg === null
-                  ? t('schoolOrgOverview.selectOrgFirstHint')
-                  : canDeleteOrg
-                    ? t('schoolOrgOverview.deleteOrgHint')
-                    : t('schoolOrgOverview.rootDeleteHint')
-              }
-            >
-              {/* 禁用按钮不派发鼠标事件，用 span 包裹以便根节点也能展示悬停提示 */}
-              <span>
-                <Popconfirm
-                  title={t('adminOrg.orgDeleteConfirm')}
-                  okText={t('adminOrg.delete')}
-                  cancelText={t('approval.cancel')}
-                  okButtonProps={{ danger: true, loading: orgDeleting }}
-                  disabled={!canDeleteOrg}
-                  onConfirm={() => void removeOrg()}
-                >
-                  <Button size="small" danger icon={<DeleteOutlined />} disabled={!canDeleteOrg}>
-                    {t('adminOrg.delete')}
+            {/* 组织维护：与「组织成员管理」一致，操作对象为左侧当前选中的组织；只读入口不展示 */}
+            {showOrgActions && (
+              <>
+                <Tooltip title={t('schoolOrgOverview.newSubOrgHint')}>
+                  <Button
+                    size="small"
+                    icon={<PlusOutlined />}
+                    disabled={!activeOrg}
+                    onClick={openCreate}
+                  >
+                    {t('adminOrg.newSubOrg')}
                   </Button>
-                </Popconfirm>
-              </span>
-            </Tooltip>
+                </Tooltip>
+                <Tooltip title={t('schoolOrgOverview.editOrgHint')}>
+                  <Button
+                    size="small"
+                    icon={<EditOutlined />}
+                    disabled={!activeOrg}
+                    onClick={openEdit}
+                  >
+                    {t('adminOrg.editOrg')}
+                  </Button>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    activeOrg === null
+                      ? t('schoolOrgOverview.selectOrgFirstHint')
+                      : canDeleteOrg
+                        ? t('schoolOrgOverview.deleteOrgHint')
+                        : t('schoolOrgOverview.rootDeleteHint')
+                  }
+                >
+                  {/* 禁用按钮不派发鼠标事件，用 span 包裹以便根节点也能展示悬停提示 */}
+                  <span>
+                    <Popconfirm
+                      title={t('adminOrg.orgDeleteConfirm')}
+                      okText={t('adminOrg.delete')}
+                      cancelText={t('approval.cancel')}
+                      okButtonProps={{ danger: true, loading: orgDeleting }}
+                      disabled={!canDeleteOrg}
+                      onConfirm={() => void removeOrg()}
+                    >
+                      <Button size="small" danger icon={<DeleteOutlined />} disabled={!canDeleteOrg}>
+                        {t('adminOrg.delete')}
+                      </Button>
+                    </Popconfirm>
+                  </span>
+                </Tooltip>
+              </>
+            )}
           </div>
         </header>
         <div className="panel-card-body">
