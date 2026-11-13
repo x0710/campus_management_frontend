@@ -7,6 +7,7 @@
 import { Image, Space, Typography, theme } from 'antd'
 import { useState } from 'react'
 import { useT } from '../i18n'
+import { isApiUrl, resolveApiUrl } from '../config/api'
 import { fileExtension, parseFileUrl } from '../utils/filePreview'
 import FilePreviewModal, { type PreviewFile } from './FilePreviewModal'
 
@@ -81,6 +82,7 @@ export default function AttachmentLinks({ urls, emptyText }: Props) {
   const t = useT()
   const [preview, setPreview] = useState<PreviewFile | null>(null)
   const list = (urls ?? []).filter((url) => url.trim())
+    .map((url) => isApiUrl(url) ? resolveApiUrl(url) : url)
 
   if (list.length === 0) {
     return <Text type="secondary">{emptyText}</Text>
@@ -93,7 +95,7 @@ export default function AttachmentLinks({ urls, emptyText }: Props) {
   const openPreview = (url: string, index: number) => {
     const { id, token } = parseFileUrl(url)
     // 非 /api/files/{id} 的静态地址无法走带 JWT 的 Blob 读取，直接新窗口打开
-    if (id === undefined && !url.startsWith('/api/')) {
+    if (id === undefined && !isApiUrl(url)) {
       window.open(url, '_blank', 'noopener,noreferrer')
       return
     }

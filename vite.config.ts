@@ -2,8 +2,9 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // 后端（campus-server）默认监听 [::]:8000，且未配置 CORS，
-// 开发环境通过 Vite 代理把 /api 请求转发到后端，保持同源访问。
+// 开发环境将部署用 API 前缀转发到后端 /api，保持同源访问。
 export default defineConfig({
+  base: '/campus/party/',
   plugins: [react()],
   resolve: {
     // react / react-dom 安装在 campus-ts/node_modules，antd 等安装在 frontend/node_modules，
@@ -13,6 +14,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/campus/party/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/campus\/party\/api(?=\/|$)/, '/api'),
+      },
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,

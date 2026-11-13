@@ -6,7 +6,7 @@
  * 只要该标记为 true，弹窗就强制显示且无法关闭（无取消按钮、遮罩不可点、禁用 ESC），
  * 用户必须改密成功（PATCH /api/credentials 返回成功）后才会解除拦截。
  *
- * 首次登录自动使用内存中暂存的登录密码作为 old_password；刷新后需补填旧密码。
+ * 旧密码栏默认填入内存中暂存的登录密码，用户可编辑；刷新后需补填旧密码。
  */
 import { LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { Alert, App as AntdApp, Button, Form, Input, Modal } from 'antd'
@@ -19,7 +19,7 @@ import { useAuthStore } from '../store/auth'
 
 /** 强制改密表单字段。 */
 interface ForcePasswordForm {
-  old_password?: string
+  old_password: string
   new_password: string
   confirm_password: string
 }
@@ -38,10 +38,13 @@ export default function ForcePasswordChangeModal() {
   const [form] = Form.useForm<ForcePasswordForm>()
   const [submitting, setSubmitting] = useState(false)
 
-  // 每次弹出时清空上次输入（例如上次改密失败后刷新页面重新进入）
+  // 每次弹出时重置表单，并默认填入本次登录密码。
   useEffect(() => {
-    if (mustChangePassword) form.resetFields()
-  }, [mustChangePassword, form])
+    if (mustChangePassword) {
+      form.resetFields()
+      form.setFieldsValue({ old_password: pendingPassword ?? '' })
+    }
+  }, [mustChangePassword, pendingPassword, form])
 
   /** 提交改密时携带登录密码，成功后解除强制弹窗并清除暂存密码。 */
   const submit = async () => {
@@ -55,7 +58,7 @@ export default function ForcePasswordChangeModal() {
     setSubmitting(true)
     try {
       const me = await getCurrentUser()
-      await changeMyPassword(me.uid, pendingPassword ?? values.old_password!, values.new_password)
+      await changeMyPassword(me.uid, values.old_password, values.new_password)
       message.success(t('password.forceSuccess'))
       finishPasswordChange()
     } catch (err) {
@@ -92,18 +95,16 @@ export default function ForcePasswordChangeModal() {
         style={{ marginBottom: 12 }}
       />
       <Form form={form} layout="vertical" autoComplete="off">
-        {!pendingPassword && (
-          <Form.Item
-            name="old_password"
-            label={t('password.oldLabel')}
-            rules={[{ required: true, message: t('password.oldRequired') }]}
-          >
-            <Input.Password
-              prefix={<LockOutlined className="field-icon" />}
-              autoComplete="current-password"
-            />
-          </Form.Item>
-        )}
+        <Form.Item
+          name="old_password"
+          label={t('password.oldLabel')}
+          rules={[{ required: true, message: t('password.oldRequired') }]}
+        >
+          <Input.Password
+            prefix={<LockOutlined className="field-icon" />}
+            autoComplete="current-password"
+          />
+        </Form.Item>
         <Form.Item
           name="new_password"
           label={t('password.newLabel')}

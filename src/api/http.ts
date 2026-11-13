@@ -1,6 +1,7 @@
 /** 全局 axios 实例与请求/响应拦截器（JWT 鉴权、401 处理、错误透传）。 */
 
 import axios from 'axios'
+import { API_BASE } from '../config/api'
 import { publishCacheInvalidation } from './cacheInvalidation'
 import { useAuthStore } from '../store/auth'
 import { activeImportPreview } from '../store/importPreview'
@@ -8,12 +9,12 @@ import { useSettingsStore } from '../store/settings'
 
 /**
  * 全局 axios 实例：
- * - baseURL 走相对路径 /api，开发环境由 Vite 代理转发到后端服务器（见 vite.config.ts）
+ * - baseURL 统一使用 API_BASE，通过 VITE_API_BASE 配置（默认 /campus/party/api）
  * - 请求拦截器自动附带 JWT（Bearer Token）
  * - 响应拦截器统一处理登录失效（401）：清除本地登录态，由 React Router 客户端跳转到登录页
  */
 export const http = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   timeout: 15_000,
 })
 

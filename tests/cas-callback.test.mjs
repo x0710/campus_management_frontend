@@ -10,14 +10,14 @@ import { CAS_CALLBACK_PATH, CAS_LOGIN_URL, CAS_SERVICE_URL } from '../src/config
 const response = { token: 'cas-token', user: 'cas-user', last_login_at: null }
 const ok = (config, data = response) => ({ config, status: 200, statusText: 'OK', headers: {}, data })
 
-test('CAS 直接登录携带前端回调地址，其他业务接口保留 /api 前缀', () => {
+test('CAS 直接登录携带前端回调地址，业务接口使用 Nginx API 前缀', () => {
   const login = new URL(CAS_LOGIN_URL)
   assert.equal(login.origin, 'https://authserver.jgsu.edu.cn')
   assert.equal(login.pathname, '/authserver/login')
   assert.equal(login.searchParams.get('service'), CAS_SERVICE_URL)
   assert.equal(new URL(CAS_SERVICE_URL).pathname, CAS_CALLBACK_PATH)
   assert.equal(CAS_CALLBACK_PATH, '/campus/api/auth/cas/callback')
-  assert.equal(http.getUri({ url: '/auth/cas/callback' }), '/api/auth/cas/callback')
+  assert.equal(http.getUri({ url: '/auth/cas/callback' }), '/campus/party/api/auth/cas/callback')
 })
 
 test('CAS 验票传递 ticket/state，保存返回 token 并用于后续请求；首次 CAS 登录不要求本地改密', async () => {

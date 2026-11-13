@@ -1,3 +1,4 @@
+import { isApiUrl, resolveApiUrl } from '../config/api'
 /** 请假详情弹窗（学生端 / 教师端共用，只读详情 + 可选操作插槽） */
 import { Descriptions, Modal, Skeleton, Tag, Typography } from 'antd'
 import axios from 'axios'
@@ -114,7 +115,7 @@ export default function LeaveDetailModal({
           </Descriptions.Item>
           <Descriptions.Item label={t('leaveDetail.attachment')}>
             {detail.attachment_url && detail.attachment_url.trim() ? (
-              <TypographyLink href={detail.attachment_url} target="_blank" rel="noreferrer">
+              <TypographyLink href={isApiUrl(detail.attachment_url) ? resolveApiUrl(detail.attachment_url) : detail.attachment_url} target="_blank" rel="noreferrer">
                 {detail.attachment_url}
               </TypographyLink>
             ) : (

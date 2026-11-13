@@ -3,6 +3,7 @@
  * 接口契约以后端 Swagger 为准。
  */
 import { http } from './http'
+import { resolveApiUrl } from '../config/api'
 import type { UploadedFileResponse } from './types/file'
 
 /**
@@ -100,9 +101,7 @@ export async function fetchFileBlob(id: number, token?: string): Promise<Blob> {
  * @returns Promise<Blob> 文件内容
  */
 export async function fetchFileBlobByUrl(url: string): Promise<Blob> {
-  // axios 实例的 baseURL 是 /api，避免把 /api/files/... 拼成 /api/api/files/...
-  const target = url.replace(/^\/?api(?=\/)/, '')
-  const res = await http.get<Blob>(target, { responseType: 'blob' })
+  const res = await http.get<Blob>(resolveApiUrl(url), { baseURL: '', responseType: 'blob' })
   return res.data
 }
 

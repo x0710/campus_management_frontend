@@ -342,7 +342,7 @@ export default function FeedbackView() {
           <div className="panel-card-body feedback-contact-body">
             <img
               className="feedback-contact-image"
-              src="/mmexport1793304431141.jpg"
+              src={`${import.meta.env.BASE_URL}mmexport1793304431141.jpg`}
               alt={t('feedback.contactImageAlt')}
               loading="lazy"
             />

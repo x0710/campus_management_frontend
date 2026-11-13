@@ -1,3 +1,4 @@
+import { isApiUrl, resolveApiUrl } from '../../../config/api'
 import CreatedDateFilter from '../../../components/CreatedDateFilter'
 import type { CreatedDateQuery } from '../../../api/types/common'
 /** 成员详情 - 党员积分页签：积分明细、汇总与扣分。 */
@@ -336,7 +337,7 @@ export default function PartyScoreTab({
                     children: (detail.file_urls ?? []).length ? (
                       <Space orientation="vertical" size={4}>
                         {(detail.file_urls ?? []).map((url, idx) => (
-                          <a key={`${url}-${idx}`} href={url} target="_blank" rel="noreferrer">
+                          <a key={`${url}-${idx}`} href={isApiUrl(url) ? resolveApiUrl(url) : url} target="_blank" rel="noreferrer">
                             {t('memberDetail.partyScoreFileItem', { n: idx + 1 })}
                           </a>
                         ))}

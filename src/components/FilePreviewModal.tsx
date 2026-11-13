@@ -1,3 +1,4 @@
+import { isApiUrl, resolveApiUrl } from '../config/api'
 /**
  * 附件在线预览弹窗（可复用）。
  *
@@ -228,7 +229,7 @@ export default function FilePreviewModal({ file, open, onClose }: Props) {
       if (id !== undefined) {
         await downloadFile(id, { filename: file.name, token })
       } else if (file.url) {
-        window.open(file.url, '_blank', 'noopener,noreferrer')
+        window.open(isApiUrl(file.url) ? resolveApiUrl(file.url) : file.url, '_blank', 'noopener,noreferrer')
       } else {
         message.error(t('common.previewUnavailable'))
       }
