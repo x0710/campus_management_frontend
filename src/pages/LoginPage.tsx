@@ -28,6 +28,11 @@ import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
 import { useLoginSuccess } from '../composables/useLoginSuccess'
+import {
+  clearRememberedPassword,
+  readRememberedPassword,
+  saveRememberedPassword,
+} from '../utils/rememberedPassword'
 
 interface LoginFormValues {
   username: string
@@ -46,6 +51,10 @@ export default function LoginPage() {
   const routeError = (location.state as { loginError?: string } | null)?.loginError ?? null
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(routeError)
+  // 仅读取仍在有效期内的密码（一天），用于首次渲染时预填。
+  const [rememberedPassword] = useState(() => readRememberedPassword())
+  // 预填的密码禁止明文展示；用户手动改动密码框后恢复「小眼睛」，方便核对自己输入的内容。
+  const [passwordEdited, setPasswordEdited] = useState(false)
 
   const token = useAuthStore((s) => s.token)
   const completeLogin = useLoginSuccess()
@@ -80,11 +89,15 @@ export default function LoginPage() {
       } catch {
         // 浏览器禁止本地存储时仍允许登录。
       }
+      // 登录成功后在有效期（一天）内预填密码，失败不影响登录。
+      saveRememberedPassword(values.password)
       completeLogin(res, 'password', values.password)
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status
         if (status === 401) {
+          // 已保存的旧密码可能在别处被修改，清除后由用户重新输入。
+          clearRememberedPassword()
           setErrorMsg(t('login.errBadCredentials'))
         } else if (status === 403) {
           setErrorMsg(t('login.errDisabled'))
@@ -157,10 +170,17 @@ export default function LoginPage() {
             layout="vertical"
             size="large"
             requiredMark={false}
-            initialValues={{ username: rememberedUser ?? '', password: '', remember: true }}
+            initialValues={{
+              username: rememberedUser ?? '',
+              password: rememberedPassword ?? '',
+              remember: true,
+            }}
             onFinish={onFinish}
             disabled={submitting}
-            onValuesChange={() => setErrorMsg(null)}
+            onValuesChange={(changed) => {
+              setErrorMsg(null)
+              if (Object.hasOwn(changed, 'password')) setPasswordEdited(true)
+            }}
           >
             <Form.Item
               name="username"
@@ -182,6 +202,10 @@ export default function LoginPage() {
                 prefix={<LockOutlined className="field-icon" />}
                 placeholder={t('login.password')}
                 autoComplete="current-password"
+                /* 自动预填的密码不提供明文切换；手动输入后允许查看，复制 / 剪切始终阻止。 */
+                visibilityToggle={passwordEdited || !rememberedPassword}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
               />
             </Form.Item>
 

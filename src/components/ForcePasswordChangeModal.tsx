@@ -16,6 +16,7 @@ import { changeMyPassword, getCurrentUser } from '../api/auth'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/auth'
+import { saveRememberedPassword } from '../utils/rememberedPassword'
 
 /** 强制改密表单字段。 */
 interface ForcePasswordForm {
@@ -59,6 +60,8 @@ export default function ForcePasswordChangeModal() {
     try {
       const me = await getCurrentUser()
       await changeMyPassword(me.uid, values.old_password, values.new_password)
+      // 同步本机预填密码，避免下次登录继续填入已失效的旧密码。
+      saveRememberedPassword(values.new_password)
       message.success(t('password.forceSuccess'))
       finishPasswordChange()
     } catch (err) {
