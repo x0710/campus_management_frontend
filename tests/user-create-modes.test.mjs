@@ -14,7 +14,7 @@ test('创建用户默认 insert，支持 ignore 和 replace，保留未提供密
     assert.equal(config.url, '/users')
     assert.equal(config.method, 'post')
     assert.equal(Object.hasOwn(JSON.parse(config.data)[0], 'password'), false)
-    return { config, data: config.params.mode === 'ignore' ? 0 : 1, status: 200, statusText: 'OK', headers: {} }
+    return { config, data: { count: config.params.mode === 'ignore' ? 0 : 1, results: [] }, status: 200, statusText: 'OK', headers: {} }
   }
   try {
     assert.equal(await createUsers(rows), 1)

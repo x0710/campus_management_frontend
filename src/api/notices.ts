@@ -28,10 +28,10 @@ import type {
 const NOTICE_CACHE_PREFIX = 'GET /notices'
 
 /** 先收集全部未读 ID，再标记，避免已读后分页位置变化导致漏项。 */
-export async function markAllNoticesRead(): Promise<void> {
+export async function markAllNoticesRead(isCurrent: () => boolean = () => true): Promise<void> {
   const token = useAuthStore.getState().token
   const assertSession = () => {
-    if (token !== useAuthStore.getState().token) throw new CanceledError('Session changed')
+    if (!isCurrent() || token !== useAuthStore.getState().token) throw new CanceledError('Notice operation expired')
   }
   const ids = new Set<number>()
   for (let page = 1; ; page++) {

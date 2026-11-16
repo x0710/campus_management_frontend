@@ -59,15 +59,15 @@ test('CAS 并发验票共用在途请求，完成后不缓存 token 或复用旧
       started()
       return new Promise((resolve) => { release = () => resolve(ok(config)) })
     }
-    const first = exchangeCasTicket('?ticket=ST-shared')
-    const second = exchangeCasTicket('?ticket=ST-shared')
+    const first = exchangeCasTicket('?ticket=ST-shared&state=browser-state')
+    const second = exchangeCasTicket('?ticket=ST-shared&state=browser-state')
     assert.equal(first, second)
     await waiting
     assert.equal(count, 1)
     release()
     assert.deepEqual(await first, response)
     http.defaults.adapter = async (config) => { count++; return ok(config) }
-    await exchangeCasTicket('?ticket=ST-shared')
+    await exchangeCasTicket('?ticket=ST-shared&state=browser-state')
     assert.equal(count, 2)
   } finally {
     http.defaults.adapter = adapter
@@ -81,17 +81,17 @@ test('缺少或重复票据不发送请求，验票失败或异常响应不会�
   try {
     useAuthStore.getState().setAuth({ token: 'keep-token', username: 'keep-user', lastLoginAt: '2026-01-01' })
     http.defaults.adapter = async (config) => { requests++; return ok(config, '<html>proxy fallback</html>') }
-    for (const query of ['', '?ticket=', '?ticket=ST-a&ticket=ST-b', '?ticket=ST-a&state=a&state=b', '?ticket=ST-a&state=']) {
+    for (const query of ['', '?ticket=', '?ticket=ST-no-state', '?ticket=ST-a&ticket=ST-b', '?ticket=ST-a&state=a&state=b', '?ticket=ST-a&state=']) {
       await assert.rejects(exchangeCasTicket(query), InvalidCasCallbackError)
     }
     assert.equal(requests, 0)
-    await assert.rejects(exchangeCasTicket('?ticket=ST-invalid-response'), /Invalid login response/)
+    await assert.rejects(exchangeCasTicket('?ticket=ST-invalid-response&state=browser-state'), /Invalid login response/)
     assert.equal(useAuthStore.getState().token, 'keep-token')
     http.defaults.adapter = async (config) => {
       const res = { ...ok(config, 'Invalid ticket'), status: 401 }
       throw new axios.AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, res)
     }
-    await assert.rejects(exchangeCasTicket('?ticket=ST-rejected'))
+    await assert.rejects(exchangeCasTicket('?ticket=ST-rejected&state=browser-state'))
     assert.equal(useAuthStore.getState().token, 'keep-token')
     for (const data of [null, {}, { ...response, token: '' }, { ...response, user: '' }, { ...response, last_login_at: 'invalid' }]) {
       assert.throws(() => saveLoginSession(data, 'cas'), /Invalid login response/)

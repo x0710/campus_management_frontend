@@ -5,7 +5,7 @@
  * 所有门户路径由 APP_BASE 派生。
  */
 
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import ForcePasswordChangeModal from './components/ForcePasswordChangeModal'
 import { CAS_CALLBACK_PATH } from './config/auth'
@@ -15,8 +15,10 @@ import LoginPage from './pages/LoginPage'
 import CasCallbackPage from './pages/CasCallbackPage'
 import PortalModuleRoute from './pages/main/PortalModuleRoute'
 import PortalRedirect from './pages/main/PortalRedirect'
-import PortalWorkspace from './pages/main/PortalWorkspace'
+import PageLoading from './components/PageLoading'
 import { useAuthStore } from './store/auth'
+
+const PortalWorkspace = lazy(() => import('./pages/main/PortalWorkspace'))
 
 const AnnouncementDetailPage = lazy(() => import('./pages/main/AnnouncementDetailPage'))
 const PartyScoreApprovalDetailPage = lazy(
@@ -67,6 +69,7 @@ export default function App() {
     <>
       {/* 首次登录强制改密：根级常驻，只要登录态要求改密就覆盖全站且不可关闭 */}
       {!isCasCallback && <ForcePasswordChangeModal />}
+      <Suspense fallback={<PageLoading />}>
       <Routes>
         <Route path={LOGIN_PATH} element={<LoginPage />} />
         <Route path={CAS_CALLBACK_PATH} element={<CasCallbackPage />} />
@@ -127,6 +130,7 @@ export default function App() {
           <Route path="*" element={<LegacyRouteRedirect />} />
         </Route>
       </Routes>
+      </Suspense>
     </>
   )
 }

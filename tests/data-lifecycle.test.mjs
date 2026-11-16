@@ -227,3 +227,29 @@ test('本地存储不可用或内容损坏时仍可正常请求和复用内存�
   assert.equal(await cache.get('/organizations'), 1)
   assert.equal(await cache.get('/organizations'), 1)
 })
+
+test('恢复缓存遵守容量限制并跳过无效条目', async () => {
+  const storage = {
+    read: () => JSON.stringify([
+      ['GET /invalid', null],
+      ['GET /expired', { data: 0, expiresAt: 1 }],
+      ['GET /a', { data: 1, expiresAt: 100 }],
+      ['GET /b', { data: 2, expiresAt: 100 }],
+      ['GET /c', { data: 3, expiresAt: 100 }],
+    ]),
+    write: () => {},
+  }
+  const cache = new GetRequestCache(async () => 'fetched', () => 10, 2, storage)
+  assert.equal(cache.size().resolved, 2)
+  assert.equal(await cache.get('/b'), 2)
+  assert.equal(await cache.get('/c'), 3)
+  assert.equal(await cache.get('/a'), 'fetched')
+})
+
+test('负数容量禁用结果缓存，仍可正常请求', async () => {
+  let calls = 0
+  const cache = new GetRequestCache(async () => ++calls, Date.now, -1)
+  assert.equal(await cache.get('/users'), 1)
+  assert.equal(await cache.get('/users'), 2)
+  assert.equal(cache.size().resolved, 0)
+})

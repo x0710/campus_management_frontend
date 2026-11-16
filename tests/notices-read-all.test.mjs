@@ -36,3 +36,29 @@ test('查询期间切换账号后，不向新账号发送标记已读请求', as
   try { await assert.rejects(markAllNoticesRead(), (error) => error.code === 'ERR_CANCELED') }
   finally { http.defaults.adapter = previous; useAuthStore.getState().clearAuth() }
 })
+
+test('关闭通知弹层后停止后续标记批次', async () => {
+  const previous = http.defaults.adapter
+  let current = true
+  let writes = 0
+  http.defaults.adapter = async (config) => {
+    if (config.method === 'put') { writes++; current = false }
+    return { config, data: config.method === 'get' ? {
+      data: Array.from({ length: 25 }, (_, id) => ({ id })), total_pages: 1,
+    } : undefined, status: 200, statusText: 'OK', headers: {} }
+  }
+  try {
+    await assert.rejects(markAllNoticesRead(() => current), (error) => error.code === 'ERR_CANCELED')
+    assert.equal(writes, 10)
+  } finally { http.defaults.adapter = previous }
+})
+
+test('已关闭的通知操作不会发起查询', async () => {
+  const previous = http.defaults.adapter
+  let calls = 0
+  http.defaults.adapter = async () => { calls++; throw new Error('unexpected request') }
+  try {
+    await assert.rejects(markAllNoticesRead(() => false), (error) => error.code === 'ERR_CANCELED')
+    assert.equal(calls, 0)
+  } finally { http.defaults.adapter = previous }
+})

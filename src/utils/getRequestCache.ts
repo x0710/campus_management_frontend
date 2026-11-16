@@ -41,13 +41,16 @@ export class GetRequestCache {
   constructor(fetch: (url: string, params: Params) => Promise<unknown>, now = Date.now, capacity = 500, storage?: { read: () => string | null; write: (value: string) => void }) {
     this.fetch = fetch
     this.now = now
-    this.capacity = capacity
+    this.capacity = Number.isFinite(capacity) ? Math.max(0, Math.floor(capacity)) : 500
     this.storage = storage
     try {
       const entries = JSON.parse(storage?.read() ?? '[]') as [string, { data: unknown; expiresAt: number }][]
       for (const [key, entry] of entries) {
-        if (Number.isFinite(entry.expiresAt) && entry.expiresAt > now()) {
+        if (typeof key === 'string' && entry && Number.isFinite(entry.expiresAt) && entry.expiresAt > now()) {
           this.resolved.set(key, entry)
+          while (this.resolved.size > this.capacity) {
+            this.resolved.delete(this.resolved.keys().next().value!)
+          }
         }
       }
     } catch { /* 本地缓存不可用时仍正常请求。 */ }

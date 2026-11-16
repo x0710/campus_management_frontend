@@ -9,10 +9,10 @@
 import { BellOutlined } from '@ant-design/icons'
 import { App as AntdApp, Badge, Button, Empty, List, Popover, Spin, Tag, Tooltip } from 'antd'
 import axios from 'axios'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { extractErrorReason } from '../api/common'
 import { getUnreadNoticeCount, markAllNoticesRead, markNoticeRead, queryNotices } from '../api/notices'
-import { useAuthStore } from '../store/auth'
+import { useRequestSequence } from '../composables/useRequestSequence'
 import type { Notice } from '../api/types/notices'
 import { NOTICE_CATEGORY_LABEL_KEYS } from '../config/notices'
 import { useT } from '../i18n'
@@ -38,30 +38,31 @@ export default function PortalNoticeBell() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
-  const unreadSequence = useRef(0)
+  const unreadRequests = useRequestSequence()
+  const panelRequests = useRequestSequence()
 
   /** 查询未读数量；失败静默保留原值，不打断顶栏使用 */
   const refreshUnread = useCallback(async () => {
-    const sequence = ++unreadSequence.current
+    const isCurrent = unreadRequests.begin()
     try {
       const count = await getUnreadNoticeCount()
-      if (sequence === unreadSequence.current) setUnread(count)
+      if (isCurrent()) setUnread(count)
     } catch {
       // 未读数获取失败保留原值（401 由全局拦截器处理登录态）
     }
-  }, [])
+  }, [unreadRequests])
 
   useEffect(() => {
     void refreshUnread()
     return () => {
-      unreadSequence.current++
+      unreadRequests.invalidate()
     }
-  }, [refreshUnread])
+  }, [refreshUnread, unreadRequests])
 
   /** 展开弹层：先拉取未读通知用于展示，再将全部未读通知标记已读 */
   const openPanel = async () => {
-    const token = useAuthStore.getState().token
-    unreadSequence.current++
+    const isCurrent = panelRequests.begin()
+    unreadRequests.invalidate()
     setOpen(true)
     setLoading(true)
     setLoadFailed(false)
@@ -70,26 +71,29 @@ export default function PortalNoticeBell() {
         { page: 1, page_size: NOTICE_POPOVER_PAGE_SIZE, is_read: false },
         true,
       )
-      if (token !== useAuthStore.getState().token) return
+      if (!isCurrent()) return
       setNotices(res.data)
     } catch {
-      setLoadFailed(true)
+      if (isCurrent()) setLoadFailed(true)
+      return
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
     try {
-      await markAllNoticesRead()
+      await markAllNoticesRead(isCurrent)
+      if (isCurrent()) setNotices((prev) => prev.map((item) => ({ ...item, is_read: true })))
     } catch (err) {
-      if (!axios.isCancel(err) && !(axios.isAxiosError(err) && err.response?.status === 401)) {
+      if (isCurrent() && !axios.isCancel(err) && !(axios.isAxiosError(err) && err.response?.status === 401)) {
         message.error(extractErrorReason(err, t))
       }
     }
-    if (token !== useAuthStore.getState().token) return
+    if (!isCurrent()) return
     void refreshUnread()
   }
 
   /** 关闭弹层：刷新未读数量，让弹层内标记已读后的徽标与后端一致 */
   const closePanel = () => {
+    panelRequests.invalidate()
     setOpen(false)
     void refreshUnread()
   }
@@ -97,8 +101,10 @@ export default function PortalNoticeBell() {
   /** 点击未读通知标记已读，并同步本地列表与徽标 */
   const handleRead = async (notice: Notice) => {
     if (notice.is_read) return
+    const isCurrent = unreadRequests.begin()
     try {
       await markNoticeRead(notice.id)
+      if (!isCurrent()) return
       setNotices((prev) =>
         prev.map((item) => (item.id === notice.id ? { ...item, is_read: true } : item)),
       )
@@ -172,7 +178,7 @@ export default function PortalNoticeBell() {
     >
       <Badge count={unread} size="small" offset={[-4, 4]}>
         <Tooltip title={t('notice.title')}>
-          <Button type="text" className="header-icon-btn" icon={<BellOutlined />} />
+          <Button type="text" className="header-icon-btn" aria-label={t('notice.title')} icon={<BellOutlined />} />
         </Tooltip>
       </Badge>
     </Popover>
