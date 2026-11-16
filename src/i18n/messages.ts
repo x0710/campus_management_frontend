@@ -637,6 +637,10 @@ const messages = {
       rowClickHint: '双击查看请假详情',
     },
     partyScoreApproval: {
+      batch_approve: '批量同意', batch_reject: '批量拒绝',
+      batchSelected: '当前页已选 {n} 条', batchConfirm: '确认提交', batchRetry: '重试未成功项',
+      batchQueued: '待提交', batchHint: '共 {n} 条审批。请核对所选申请；同意时可逐条修改核定分数，审批意见应用于全部所选项。结果逐条显示，成功项不会重复提交。',
+
       title: '党建活动加分审核',
       filterStatusPlaceholder: '选择审批状态（可多选）',
       filterApplicantPlaceholder: '搜索申请人',
@@ -2496,6 +2500,10 @@ const messages = {
       rowClickHint: 'Double-click to view leave details',
     },
     partyScoreApproval: {
+      batch_approve: 'Batch approve', batch_reject: 'Batch reject',
+      batchSelected: '{n} selected on this page', batchConfirm: 'Confirm submission', batchRetry: 'Retry unsuccessful items',
+      batchQueued: 'Not submitted', batchHint: '{n} approvals. Review the selected applications and adjust each approved score if needed. The comment applies to all items. Results are shown individually; successful items will not be resubmitted.',
+
       title: 'Party Score Approval',
       filterStatusPlaceholder: 'Select approval status (multi-select)',
       filterApplicantPlaceholder: 'Search applicant',

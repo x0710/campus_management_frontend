@@ -99,7 +99,7 @@ export class GetRequestCache {
   invalidate(prefix?: string) {
     // 匹配资源本身、查询和子路径，避免 /users/1 误伤 /users/10。
     const matches = (key: string) => !prefix || key === prefix ||
-      (key.startsWith(prefix) && (prefix.endsWith('/') || ['/', '?'].includes(key.charAt(prefix.length))))
+      (key.startsWith(prefix) && (prefix.endsWith('/') || prefix.endsWith('?') || ['/', '?'].includes(key.charAt(prefix.length))))
     for (const key of this.resolved.keys()) {
       if (matches(key)) this.resolved.delete(key)
     }

@@ -266,3 +266,15 @@ test('失效按路径边界匹配，保留相似 ID 与相似资源的缓存', a
   assert.equal(await cache.get('/users/1/roles'), 7)
   assert.equal(await cache.get('/users/1', { details: true }), 8)
 })
+
+test('带问号的失效前缀清除审批列表查询，但保留详情', async () => {
+  let calls = 0
+  const cache = new GetRequestCache(async () => ++calls)
+  await cache.get('/approvals', { page: 1 })
+  await cache.get('/approvals', { page: 2 })
+  await cache.get('/approvals/1')
+  cache.invalidate('GET /approvals?')
+  assert.equal(await cache.get('/approvals/1'), 3)
+  assert.equal(await cache.get('/approvals', { page: 1 }), 4)
+  assert.equal(await cache.get('/approvals', { page: 2 }), 5)
+})

@@ -1,3 +1,5 @@
+import BatchPartyApprovalModal, { type BatchApprovalItem } from '../../components/BatchPartyApprovalModal'
+import { isPartyScoreStepActionable } from '../../config/partyScoreApproval'
 import { useRequestSequence } from '../../composables/useRequestSequence'
 import CreatedDateFilter from '../../components/CreatedDateFilter'
 import type { CreatedDateQuery } from '../../api/types/common'
@@ -21,13 +23,14 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
  *   - 审批通过前必须填写「核定分数」，详情页已按后端最新契约设为必填并提交字符串分数。
  * 判定步骤归属时必须按实例精确查询，不能改成「拉全部加分申请再取交集」——
  * 后者会受调用者数据范围与分页影响，导致别人的申请被静默过滤掉。
+ * 批量操作仅选择当前页可操作步骤，在确认弹窗逐条核定分数并填写统一意见。
  * 所有 GET 均走会话缓存，写操作后自动失效缓存并刷新表格。
  */
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type Key } from 'react'
 import { useNavigate } from 'react-router'
 import { getCurrentUser } from '../../api/auth'
 import { extractErrorReason } from '../../api/common'
@@ -103,6 +106,8 @@ export default function PartyScoreApprovalView() {
     moduleKey: string
   }>()
 
+  const [selected, setSelected] = useState<Key[]>([])
+  const [batch, setBatch] = useState<{ action: 'approve' | 'reject'; items: BatchApprovalItem[] } | null>(null)
   const [rows, setRows] = useState<ApprovalRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -177,6 +182,7 @@ export default function PartyScoreApprovalView() {
   const load = useCallback(
     async (force = false) => {
       const isCurrent = requests.begin()
+      setSelected([])
       setLoading(true)
       setError(null)
       try {
@@ -278,6 +284,12 @@ export default function PartyScoreApprovalView() {
     [filteredRows],
   )
   const userNames = useUserNames(applicantIds)
+
+  const selectedRows = filteredRows.filter((row) => selected.includes(row.step.id) && row.score && isPartyScoreStepActionable(row.step.status))
+  const openBatch = (action: 'approve' | 'reject') => setBatch({ action, items: selectedRows.map((row) => ({
+    id: row.step.id, applicationId: row.score!.id,
+    applicant: userNames.get(row.score!.user_id) || String(row.score!.user_id), score: row.score!.requested_score,
+  })) })
 
   const columns = useMemo<ColumnsType<ApprovalRow>>(
     () => [
@@ -450,11 +462,18 @@ export default function PartyScoreApprovalView() {
           </div>
         </header>
         <div className="panel-card-body">
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <span>{t('partyScoreApproval.batchSelected', { n: selectedRows.length })}</span>
+            <Button disabled={loading || !!error || !selectedRows.length} onClick={() => openBatch('approve')}>{t('partyScoreApproval.batch_approve')}</Button>
+            <Button danger disabled={loading || !!error || !selectedRows.length} onClick={() => openBatch('reject')}>{t('partyScoreApproval.batch_reject')}</Button>
+          </div>
           {error ? (
             <ErrorState message={error} onRetry={() => void load(true)} />
           ) : (
             <Table<ApprovalRow>
               rowKey={(row) => row.step.id}
+              rowSelection={{ selectedRowKeys: selectedRows.map((row) => row.step.id), onChange: setSelected,
+                getCheckboxProps: (row) => ({ disabled: loading || !row.score || !isPartyScoreStepActionable(row.step.status) }) }}
               loading={loading}
               columns={columns}
               dataSource={filteredRows}
@@ -501,6 +520,7 @@ export default function PartyScoreApprovalView() {
           )}
         </div>
       </section>
+      {batch && <BatchPartyApprovalModal items={batch.items} action={batch.action} onClose={() => setBatch(null)} onUpdated={() => void load(true)} />}
     </div>
   )
 }
