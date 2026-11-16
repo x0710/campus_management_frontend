@@ -281,10 +281,11 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             {t('common.reportIssue')}
           </Button>
         </Tooltip>
-        <Tooltip title={theme === 'dark' ? 'Light' : 'Dark'}>
+        <Tooltip title={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}>
           <Button
             type="text"
             className="header-icon-btn"
+            aria-label={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}
             icon={theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
             onClick={toggleTheme}
           />

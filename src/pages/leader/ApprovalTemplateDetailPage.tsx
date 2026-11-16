@@ -13,7 +13,7 @@ import { usePositionLabel } from '../../composables/usePositionLabel'
  * 页面空间分配：
  *   - 左栏「指标信息」：编码、名称、业务类型、启用状态、创建/更新时间，
  *     以及整块展示的「加分细则」（模板 description 字段）；
- *   - 右栏「审批步骤」：步骤表格（编号 / 审批人角色 / 审批人参数 / 步骤说明 / 操作），
+ *   - 右栏「审批步骤」：步骤表格（编号 / 审批人角色 / 审批人工号 / 审批人姓名 / 步骤说明 / 操作），
  *     支持新增、编辑、删除步骤；编辑指标基础信息沿用原有编辑弹窗。
  *
  * 接口：
@@ -64,6 +64,7 @@ import { PARTY_TEMPLATE_BUSINESS_TYPE } from '../../config/partyDeclaration'
 import ErrorState from '../../components/ErrorState'
 import OrganizationName from '../../components/OrganizationName'
 import { useErrorFeedback } from '../../composables/useErrorFeedback'
+import { useUserNames } from '../../composables/useUserNames'
 import {
   APPROVAL_POSITION_FETCH_SIZE,
   APPROVAL_TEMPLATE_DESC_MAX_LENGTH,
@@ -195,6 +196,17 @@ export default function ApprovalTemplateDetailPage() {
     [detail],
   )
 
+  /** 审批步骤中「指定审批人工号」对应的用户 ID（批量解析姓名用） */
+  const assigneeIds = useMemo(
+    () =>
+      steps
+        .map((step) => step.assignee_value)
+        .filter((value): value is number => value != null && value > 0),
+    [steps],
+  )
+  /** 工号 → 用户姓名；Map 中不存在表示仍在解析 */
+  const assigneeNames = useUserNames(assigneeIds)
+
   /** 返回指标列表；没有来源模块信息时回退门户首页 */
   const backToList = useCallback(() => {
     if (portalKey && fromModuleKey) {
@@ -274,35 +286,67 @@ export default function ApprovalTemplateDetailPage() {
         title: t('approvalTemplate.colStepNo'),
         dataIndex: 'step_no',
         key: 'step_no',
-        width: 90,
+        width: 72,
+        align: 'center',
       },
       {
         title: t('approvalTemplate.colStepPosition'),
         dataIndex: 'position',
         key: 'position',
-        width: 130,
-        render: (value: string | null) =>
-          value ? positionLabel(value, positionNameMap.get(value)) : <span className="cell-sub">—</span>,
+        width: 150,
+        render: (value: string | null) => {
+          if (!value) return <span className="cell-sub">—</span>
+          const name = positionNameMap.get(value)
+          return (
+            <div className="step-position">
+              <span>{name ?? positionLabel(value, undefined)}</span>
+              {/* 名称解析成功时附上编码，便于核对；仅有编码时不重复展示 */}
+              {name ? <span className="cell-sub">{value}</span> : null}
+            </div>
+          )
+        },
       },
       {
-        title: t('approvalTemplate.colStepAssignee'),
-        dataIndex: 'assignee_value',
-        key: 'assignee_value',
-        width: 130,
-        render: (value: string | null) =>
-          value == null || value === '' ? <span className="cell-sub">—</span> : String(value),
+        // 工号与姓名合并为「指定审批人」分组表头，节省窄栏宽度
+        title: t('approvalTemplate.colAssigneeGroup'),
+        key: 'assignee',
+        children: [
+          {
+            title: t('approvalTemplate.colAssigneeId'),
+            dataIndex: 'assignee_value',
+            key: 'assignee_value',
+            width: 90,
+            render: (value: string | null) =>
+              value == null || value === '' ? <span className="cell-sub">—</span> : String(value),
+          },
+          {
+            title: t('approvalTemplate.colAssigneeName'),
+            key: 'assignee_name',
+            width: 90,
+            render: (_, record) => {
+              const uid = record.assignee_value
+              if (uid == null || uid <= 0) return <span className="cell-sub">—</span>
+              // Map 中不存在表示姓名仍在解析，存在空值表示解析失败
+              if (!assigneeNames.has(uid)) {
+                return <span className="cell-sub">{t('common.loading')}</span>
+              }
+              return assigneeNames.get(uid) || <span className="cell-sub">—</span>
+            },
+          },
+        ],
       },
       {
         title: t('approvalTemplate.colStepDescription'),
         dataIndex: 'description',
         key: 'description',
         render: (value: string | null) =>
-          value || <span className="cell-sub">—</span>,
+          value ? <div className="step-description">{value}</div> : <span className="cell-sub">—</span>,
       },
       {
         title: t('approvalTemplate.colStepActions'),
         key: 'action',
-        width: 170,
+        width: 88,
+        align: 'center',
         render: (_, record) => (
           <div className="approval-actions">
             <Tooltip title={t('approvalTemplate.editStepHint')}>
@@ -310,10 +354,9 @@ export default function ApprovalTemplateDetailPage() {
                 type="link"
                 size="small"
                 icon={<EditOutlined />}
+                aria-label={t('approvalTemplate.editStep')}
                 onClick={() => setStepModal({ mode: 'edit', step: record })}
-              >
-                {t('approvalTemplate.editStep')}
-              </Button>
+              />
             </Tooltip>
             <Popconfirm
               title={t('approvalTemplate.stepDeleteConfirm')}
@@ -328,17 +371,16 @@ export default function ApprovalTemplateDetailPage() {
                   size="small"
                   danger
                   icon={<DeleteOutlined />}
+                  aria-label={t('approvalTemplate.deleteStep')}
                   loading={deletingStepId === record.id}
-                >
-                  {t('approvalTemplate.deleteStep')}
-                </Button>
+                />
               </Tooltip>
             </Popconfirm>
           </div>
         ),
       },
     ],
-    [t, positionNameMap, positionLabel, deletingStepId, doDeleteStep],
+    [t, positionNameMap, positionLabel, deletingStepId, doDeleteStep, assigneeNames],
   )
 
   return (
@@ -517,6 +559,9 @@ export default function ApprovalTemplateDetailPage() {
               <Table<ApprovalStep>
                 rowKey="id"
                 size="small"
+                className="approval-step-table"
+                tableLayout="fixed"
+                scroll={{ x: 640 }}
                 columns={stepColumns}
                 dataSource={steps}
                 pagination={false}

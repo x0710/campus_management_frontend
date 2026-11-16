@@ -1,9 +1,9 @@
 /**
  * 界面壳顶栏「消息通知」按钮：
  * - 挂载与弹层关闭时查询未读数量 GET /api/notices/unread-count（直连不缓存，展示最新值）；
- * - 点击展开 Popover 时标记全部未读通知已读，再刷新最近通知（单页 20 条）；
+ * - 点击展开 Popover 时先拉取未读通知（单页 20 条）用于展示，再将全部未读通知标记已读；
+ *   因此关闭后再次打开时，已读通知不再出现在弹层中；
  * - 点击未读通知调用 PUT /api/notices/{id}/read 标记已读，并本地同步未读徽标；
- * - 已读通知可「设为未读」（DELETE /api/notices/{id}/read），不展示删除入口；
  * - 失败静默降级（保留原值 / 展示加载失败文案），401 由全局拦截器统一处理登录态。
  */
 import { BellOutlined } from '@ant-design/icons'
@@ -11,7 +11,7 @@ import { App as AntdApp, Badge, Button, Empty, List, Popover, Spin, Tag, Tooltip
 import axios from 'axios'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { extractErrorReason } from '../api/common'
-import { getUnreadNoticeCount, markAllNoticesRead, markNoticeRead, markNoticeUnread, queryNotices } from '../api/notices'
+import { getUnreadNoticeCount, markAllNoticesRead, markNoticeRead, queryNotices } from '../api/notices'
 import { useAuthStore } from '../store/auth'
 import type { Notice } from '../api/types/notices'
 import { NOTICE_CATEGORY_LABEL_KEYS } from '../config/notices'
@@ -58,13 +58,25 @@ export default function PortalNoticeBell() {
     }
   }, [refreshUnread])
 
-  /** 展开弹层时标记全部通知已读，再获取列表与真实未读数。 */
+  /** 展开弹层：先拉取未读通知用于展示，再将全部未读通知标记已读 */
   const openPanel = async () => {
     const token = useAuthStore.getState().token
     unreadSequence.current++
     setOpen(true)
     setLoading(true)
     setLoadFailed(false)
+    try {
+      const res = await queryNotices(
+        { page: 1, page_size: NOTICE_POPOVER_PAGE_SIZE, is_read: false },
+        true,
+      )
+      if (token !== useAuthStore.getState().token) return
+      setNotices(res.data)
+    } catch {
+      setLoadFailed(true)
+    } finally {
+      setLoading(false)
+    }
     try {
       await markAllNoticesRead()
     } catch (err) {
@@ -73,16 +85,7 @@ export default function PortalNoticeBell() {
       }
     }
     if (token !== useAuthStore.getState().token) return
-    try {
-      const res = await queryNotices({ page: 1, page_size: NOTICE_POPOVER_PAGE_SIZE }, true)
-      if (token !== useAuthStore.getState().token) return
-      setNotices(res.data)
-    } catch {
-      setLoadFailed(true)
-    } finally {
-      setLoading(false)
-      void refreshUnread()
-    }
+    void refreshUnread()
   }
 
   /** 关闭弹层：刷新未读数量，让弹层内标记已读后的徽标与后端一致 */
@@ -102,23 +105,6 @@ export default function PortalNoticeBell() {
       setUnread((prev) => Math.max(0, prev - 1))
     } catch {
       // 标记失败保持现状，关闭弹层时刷新未读数兜底
-    }
-  }
-
-  /** 已读通知设为未读，并同步列表与徽标 */
-  const handleMarkUnread = async (notice: Notice) => {
-    if (!notice.is_read) return
-    try {
-      await markNoticeUnread(notice.id)
-      setNotices((prev) =>
-        prev.map((item) => (item.id === notice.id ? { ...item, is_read: false } : item)),
-      )
-      setUnread((prev) => prev + 1)
-    } catch (err) {
-      // 401 由 http 拦截器统一处理登录态，其余按状态码提示（代码要求 9）
-      if (!(axios.isAxiosError(err) && err.response?.status === 401)) {
-        message.error(extractErrorReason(err, t))
-      }
     }
   }
 
@@ -163,18 +149,6 @@ export default function PortalNoticeBell() {
                     closePanel()
                     void openApproval(item)
                   }}>{t('portal.party_m5')}</Button>}
-                  {item.is_read ? (
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void handleMarkUnread(item)
-                      }}
-                    >
-                      {t('notice.markUnread')}
-                    </Button>
-                  ) : null}
                 </div>
               </div>
               {!item.is_read ? <span className="notice-item-dot" /> : null}

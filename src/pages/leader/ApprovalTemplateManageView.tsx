@@ -14,16 +14,31 @@ import { isEntryActionTarget } from '../../utils/entryInteraction'
  * 说明：后端 business_type 筛选仅支持单值，无法承载代码要求 18 的「类型多选」，
  * 因此本页一次性取回（page_size = APPROVAL_TEMPLATE_FETCH_SIZE）后在前端完成多选筛选与分页；
  * 列表查询走会话缓存，手动刷新与增删改后使用 force 强制刷新（代码要求 5、13）。
- * 交互：工具栏可按名称、启用状态筛选；双击表格任意一行或「详情」按钮进入独立详情页
+ * 交互：工具栏保留名称搜索、导出、刷新/新增；启用状态筛选与更新时间排序放在表头，
+ * 操作列提供启用/停用按钮；双击表格任意一行或「详情」按钮进入独立详情页
  * （<门户路径>/approval-templates/:id?from=<moduleKey>），不再弹窗；新增仍使用弹窗。
+ * 搜索/筛选/排序/页码保存在 sessionStorage，从详情页返回后仍保持原列表视图。
  */
-import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { App as AntdApp, Button, Input, Popconfirm, Select, Table, Tag, Tooltip } from 'antd'
+import {
+  CheckCircleOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  EyeOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
+import { App as AntdApp, Button, Input, Popconfirm, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { deleteApprovalTemplate, queryApprovalTemplates } from '../../api/approvalmodel'
+import {
+  deleteApprovalTemplate,
+  listAllApprovalTemplates,
+  queryApprovalTemplates,
+  updateApprovalTemplate,
+} from '../../api/approvalmodel'
 import type { ApprovalTemplate } from '../../api/types/approvalmodel'
 import { extractErrorReason } from '../../api/common'
 import ApprovalTemplateFormModal from '../../components/ApprovalTemplateFormModal'
@@ -36,10 +51,25 @@ import {
 } from '../../config/approvalTemplate'
 import { useT } from '../../i18n'
 import { useSettingsStore } from '../../store/settings'
+import { exportApprovalTemplatesXlsx } from '../../utils/approvalTemplateExport'
 import { formatDateTime } from '../../utils/datetime'
 
-/** 启用状态筛选值：'all' 表示不限状态 */
-type EnabledFilter = 'all' | 'on' | 'off'
+/** 表头启用状态筛选值：'on' 启用 / 'off' 停用（可多选） */
+type EnabledFilterValue = 'on' | 'off'
+
+/** 表头排序方向：'ascend' 正序 / 'descend' 逆序 / null 不排序 */
+type UpdatedAtSortOrder = 'ascend' | 'descend' | null
+
+/** 列表筛选状态：会话内保存，从详情页返回或刷新后恢复 */
+interface ListFilterState {
+  keyword: string
+  enabledFilter: EnabledFilterValue[] | null
+  sortOrder: UpdatedAtSortOrder
+  page: number
+}
+
+/** sessionStorage 中列表筛选状态的键前缀（按门户 + 模块区分） */
+const LIST_FILTER_STATE_PREFIX = 'approval-templates:filter-state:'
 
 /** ApprovalTemplateManageView 组件。
  * @returns 类型：Element
@@ -54,12 +84,33 @@ export default function ApprovalTemplateManageView() {
     moduleKey?: string
   }>()
 
+  /** 上次保存的筛选状态：用于初始化列表，保证搜索后进入详情再返回仍是搜索结果 */
+  const [initialFilterState] = useState<ListFilterState | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(
+        `${LIST_FILTER_STATE_PREFIX}${portalKey ?? ''}:${moduleKey ?? ''}`,
+      )
+      return raw ? (JSON.parse(raw) as ListFilterState) : null
+    } catch {
+      return null
+    }
+  })
+
   const [allRows, setAllRows] = useState<ApprovalTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [keyword, setKeyword] = useState('')
-  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all')
+  const [page, setPage] = useState(initialFilterState?.page ?? 1)
+  const [keyword, setKeyword] = useState(initialFilterState?.keyword ?? '')
+  const [enabledFilter, setEnabledFilter] = useState<EnabledFilterValue[] | null>(
+    initialFilterState?.enabledFilter ?? null,
+  )
+  const [sortOrder, setSortOrder] = useState<UpdatedAtSortOrder>(
+    initialFilterState?.sortOrder ?? null,
+  )
+  /** 正在切换启用状态的行 ID（避免重复点击，按钮显示 loading） */
+  const [togglingId, setTogglingId] = useState<number | null>(null)
+  /** 导出进行中（导出需要拉取全量数据与逐条详情，按钮显示 loading） */
+  const [exporting, setExporting] = useState(false)
   // 列表重载令牌：seq 变化触发重新加载，force=true 时绕过会话缓存（手动刷新）
   const [reload, setReload] = useState<{ seq: number; force: boolean }>({
     seq: 0,
@@ -107,32 +158,60 @@ export default function ApprovalTemplateManageView() {
     void load()
   }, [load])
 
-  /** 前端筛选：关键词 + 启用状态（代码要求 18） */
-  const filtered = useMemo(() => {
-    const kw = keyword.trim().toLowerCase()
-    return allRows.filter((row) => {
-      if (
-        kw &&
-        !row.name.toLowerCase().includes(kw)
-      ) {
-        return false
-      }
-      const enabled = row.enabled
-      if (enabledFilter === 'on' && !enabled) return false
-      if (enabledFilter === 'off' && enabled) return false
-      return true
-    })
-  }, [allRows, keyword, enabledFilter])
+  /** 保存筛选状态：从详情页返回或刷新后恢复搜索/筛选/排序/页码 */
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        `${LIST_FILTER_STATE_PREFIX}${portalKey ?? ''}:${moduleKey ?? ''}`,
+        JSON.stringify({ keyword, enabledFilter, sortOrder, page }),
+      )
+    } catch {
+      // sessionStorage 不可用时忽略，列表仍可正常使用
+    }
+  }, [portalKey, moduleKey, keyword, enabledFilter, sortOrder, page])
+
+  /** 按关键词 + 表头启用状态筛选（列表展示与导出共用） */
+  const applyFilters = useCallback(
+    (source: ApprovalTemplate[]) => {
+      const kw = keyword.trim().toLowerCase()
+      return source.filter((row) => {
+        if (kw && !row.name.toLowerCase().includes(kw)) return false
+        if (enabledFilter?.length) {
+          const enabled = Boolean(row.enabled)
+          if (enabledFilter.includes('on') && !enabled) return false
+          if (enabledFilter.includes('off') && enabled) return false
+        }
+        return true
+      })
+    },
+    [keyword, enabledFilter],
+  )
+
+  const filtered = useMemo(() => applyFilters(allRows), [applyFilters, allRows])
+
+  /** 按更新时间正序/逆序（表头排序，作用于全部筛选结果而非当前页） */
+  const applySort = useCallback(
+    (source: ApprovalTemplate[]) => {
+      if (!sortOrder) return source
+      const direction = sortOrder === 'ascend' ? 1 : -1
+      return [...source].sort(
+        (a, b) => (Date.parse(a.updated_at) - Date.parse(b.updated_at)) * direction,
+      )
+    },
+    [sortOrder],
+  )
+
+  const sorted = useMemo(() => applySort(filtered), [applySort, filtered])
 
   /** 前端分页切片（代码要求 12：每页最多 20 行） */
-  const totalPages = Math.max(1, Math.ceil(filtered.length / APPROVAL_TEMPLATE_PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(sorted.length / APPROVAL_TEMPLATE_PAGE_SIZE))
   const paged = useMemo(
     () =>
-      filtered.slice(
+      sorted.slice(
         (page - 1) * APPROVAL_TEMPLATE_PAGE_SIZE,
         page * APPROVAL_TEMPLATE_PAGE_SIZE,
       ),
-    [filtered, page],
+    [sorted, page],
   )
 
   /** 删除模板：成功后失效模板缓存并重新加载列表（代码要求 13） */
@@ -152,6 +231,51 @@ export default function ApprovalTemplateManageView() {
     [message, t, reportError],
   )
 
+  /** 启用/停用指标：PATCH 后重新加载列表（写操作已失效列表缓存） */
+  const doToggleEnabled = useCallback(
+    async (record: ApprovalTemplate) => {
+      setTogglingId(record.id)
+      try {
+        await updateApprovalTemplate(record.id, { enabled: !record.enabled })
+        message.success(
+          t(record.enabled ? 'approvalTemplate.disableSuccess' : 'approvalTemplate.enableSuccess'),
+        )
+        setReload((r) => ({ seq: r.seq + 1, force: false }))
+      } catch (err) {
+        reportError(err)
+      } finally {
+        setTogglingId(null)
+      }
+    },
+    [message, t, reportError],
+  )
+
+  /**
+   * 导出当前筛选条件下的全部指标（含审批步骤）。
+   * 后端无按 ID 批量查询与批量详情接口：列表按页取全，步骤逐条拉取（由导出工具限并发）。
+   */
+  const handleExport = useCallback(async () => {
+    setExporting(true)
+    try {
+      const all = await listAllApprovalTemplates(true)
+      const rows = applySort(applyFilters(all))
+      if (rows.length === 0) {
+        message.warning(t('approvalTemplate.exportEmpty'))
+        return
+      }
+      await exportApprovalTemplatesXlsx(rows, {
+        locale,
+        t,
+        fileName: `${t('approvalTemplate.exportFileName')}.xlsx`,
+      })
+      message.success(t('approvalTemplate.exportSuccess', { count: rows.length }))
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setExporting(false)
+    }
+  }, [applyFilters, applySort, locale, t, message, reportError])
+
   const columns = useMemo<ColumnsType<ApprovalTemplate>>(
     () => [
       {
@@ -170,6 +294,12 @@ export default function ApprovalTemplateManageView() {
         dataIndex: 'enabled',
         key: 'enabled',
         width: 100,
+        /** 表头筛选启用/停用（可多选；配合前端过滤，作用于全部数据） */
+        filters: [
+          { text: t('approvalTemplate.enabled_yes'), value: 'on' },
+          { text: t('approvalTemplate.enabled_no'), value: 'off' },
+        ],
+        filteredValue: enabledFilter,
         // 后端 enabled 为 i8（1/0），按真值渲染
         render: (enabled: number) => (
           <Tag color={enabled ? 'green' : 'default'}>
@@ -184,12 +314,16 @@ export default function ApprovalTemplateManageView() {
         dataIndex: 'updated_at',
         key: 'updated_at',
         width: 170,
+        // 表头排序作用于全部筛选结果（在 sorted 中实现，而非仅当前页）
+        sorter: true,
+        sortOrder,
+        sortDirections: ['descend', 'ascend'],
         render: (v: string) => formatDateTime(v, locale),
       },
       {
         title: t('approvalTemplate.colActions'),
         key: 'action',
-        width: 190,
+        width: 260,
         render: (_, record) => (
           <div className="approval-actions">
             <Tooltip title={t('approvalTemplate.view')}>
@@ -200,6 +334,26 @@ export default function ApprovalTemplateManageView() {
                 onClick={() => openDetail(record.id)}
               >
                 {t('approvalTemplate.view')}
+              </Button>
+            </Tooltip>
+            <Tooltip
+              title={
+                record.enabled
+                  ? t('approvalTemplate.disableHint')
+                  : t('approvalTemplate.enableHint')
+              }
+            >
+              <Button
+                type="link"
+                size="small"
+                danger={Boolean(record.enabled)}
+                icon={record.enabled ? <StopOutlined /> : <CheckCircleOutlined />}
+                loading={togglingId === record.id}
+                onClick={() => void doToggleEnabled(record)}
+              >
+                {record.enabled
+                  ? t('approvalTemplate.disableAction')
+                  : t('approvalTemplate.enableAction')}
               </Button>
             </Tooltip>
             <Popconfirm
@@ -225,7 +379,17 @@ export default function ApprovalTemplateManageView() {
         ),
       },
     ],
-    [t, locale, deletingId, doDelete, openDetail],
+    [
+      t,
+      locale,
+      enabledFilter,
+      sortOrder,
+      togglingId,
+      deletingId,
+      doDelete,
+      doToggleEnabled,
+      openDetail,
+    ],
   )
 
   return (
@@ -238,24 +402,21 @@ export default function ApprovalTemplateManageView() {
               allowClear
               className="admin-search"
               placeholder={t('approvalTemplate.searchPlaceholder')}
+              defaultValue={keyword}
               onSearch={(v: string) => {
                 setPage(1)
                 setKeyword(v)
               }}
             />
-            <Select<EnabledFilter>
-              value={enabledFilter}
-              style={{ width: 140 }}
-              options={[
-                { value: 'all', label: t('approvalTemplate.filterEnabledAll') },
-                { value: 'on', label: t('approvalTemplate.filterEnabledOn') },
-                { value: 'off', label: t('approvalTemplate.filterEnabledOff') },
-              ]}
-              onChange={(v: EnabledFilter) => {
-                setPage(1)
-                setEnabledFilter(v)
-              }}
-            />
+            <Tooltip title={t('approvalTemplate.exportHint')}>
+              <Button
+                icon={<DownloadOutlined />}
+                loading={exporting}
+                onClick={() => void handleExport()}
+              >
+                {t('approvalTemplate.exportButton')}
+              </Button>
+            </Tooltip>
             <Tooltip title={t('approvalTemplate.refreshHint')}>
               <Button
                 icon={<ReloadOutlined />}
@@ -288,6 +449,10 @@ export default function ApprovalTemplateManageView() {
               columns={columns}
               dataSource={paged}
               locale={{ emptyText: t('common.noData') }}
+              /** 已停用的指标整行灰显，便于与启用项快速区分 */
+              rowClassName={(record: ApprovalTemplate) =>
+                record.enabled ? '' : 'approval-row-disabled'
+              }
               onRow={(record: ApprovalTemplate) => ({
                 onDoubleClick: (e: React.MouseEvent) => {
                   if (isEntryActionTarget(e.target)) return
@@ -299,10 +464,22 @@ export default function ApprovalTemplateManageView() {
                 title: t('approvalTemplate.rowClickHint'),
                 style: { cursor: 'pointer' },
               })}
+              /** 表头筛选/排序变化：回到第一页，并同步受控状态 */
+              onChange={(_, filters, sorter, extra) => {
+                if (extra.action === 'filter') {
+                  setPage(1)
+                  const values = filters.enabled as EnabledFilterValue[] | null | undefined
+                  setEnabledFilter(values?.length ? values : null)
+                } else if (extra.action === 'sort') {
+                  setPage(1)
+                  const order = Array.isArray(sorter) ? sorter[0]?.order : sorter.order
+                  setSortOrder(order ?? null)
+                }
+              }}
               pagination={{
                 current: page,
                 pageSize: APPROVAL_TEMPLATE_PAGE_SIZE,
-                total: filtered.length,
+                total: sorted.length,
                 showSizeChanger: false,
                 showQuickJumper: true,
                 showTotal: (n: number) =>

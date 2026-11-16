@@ -18,6 +18,9 @@
   /* 组织成员「按 ID 搜索命中」行的高亮底色与文字色（夜间单独配色，避免刺眼） */
   --member-hit-bg: #fff3cd;
   --member-hit-ink: #874d00;
+  /* 已停用的审批指标行：灰显底色与文字色（夜间单独配色） */
+  --row-disabled-bg: #f5f2ef;
+  --row-disabled-ink: #9c938f;
 }
 
 :root[data-theme='dark'] {
@@ -32,6 +35,9 @@
   /* 搜索命中行：夜间改为深琥珀底 + 浅金光文字，避免亮黄底在暗环境下刺眼 */
   --member-hit-bg: #3a2f10;
   --member-hit-ink: #f2d478;
+  /* 已停用的审批指标行：夜间使用更暗的底色与灰化文字 */
+  --row-disabled-bg: #1d1818;
+  --row-disabled-ink: #6f6a72;
   /* 原生滚动条滑块（不受 antd 主题影响，暗色下需单独配色） */
   --scrollbar-thumb: #3a3f52;
   --scrollbar-thumb-hover: #4a5064;
@@ -1348,6 +1354,28 @@ h3 {
   gap: 4px;
 }
 
+/*
+ * 已停用的审批指标行：整行灰显（含状态标签与操作按钮）。
+ * 复合选择器 + !important 避免被 antd 表格的悬停/斑马纹底色覆盖。
+ */
+.approval-row-disabled > td,
+.approval-row-disabled:hover > td {
+  background: var(--row-disabled-bg) !important;
+  color: var(--row-disabled-ink) !important;
+}
+
+/* 标签与链接按钮有独立配色，需同步灰化 */
+.approval-row-disabled > td .ant-tag {
+  border-color: var(--line) !important;
+  background: transparent !important;
+  color: var(--row-disabled-ink) !important;
+}
+
+.approval-row-disabled > td .ant-btn-link,
+.approval-row-disabled > td .ant-btn-link:hover {
+  color: var(--row-disabled-ink) !important;
+}
+
 /* 审批列表右侧「操作」占位列：仅提示双击进入详情，单击无行为 */
 .approval-row-action-label {
   color: var(--ink-secondary);
@@ -1462,6 +1490,24 @@ h3 {
   .approval-template-detail-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* 审批步骤表：审批人身份两行展示（名称 + 编码），说明列自适应，避免窄栏内逐字换行 */
+.approval-step-table .ant-table-thead > tr > th {
+  white-space: nowrap;
+}
+
+.step-position {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.45;
+}
+
+.step-description {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
 }
 
 /* 指标信息卡片内联编辑：最后一项贴底，加分细则文本域允许纵向拉伸 */

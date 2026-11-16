@@ -50,6 +50,23 @@ export function queryApprovalTemplates(
 }
 
 /**
+ * 分页循环拉取全部审批模板（供导出等需要全量数据的场景使用）。
+ * 后端没有按 ID 批量查询接口，单页最大 100 条，因此按 total 翻页取完。
+ * @param force 是否绕过会话缓存（可选，默认 false；导出时传 true 取最新数据）
+ * @returns Promise<ApprovalTemplate[]> 全量模板列表（必返回）
+ */
+export async function listAllApprovalTemplates(force?: boolean): Promise<ApprovalTemplate[]> {
+  const pageSize = 100
+  const all: ApprovalTemplate[] = []
+  for (let page = 1; ; page += 1) {
+    const res = await queryApprovalTemplates({ page, page_size: pageSize }, force)
+    all.push(...res.data)
+    if (res.data.length === 0 || page * pageSize >= res.total) break
+  }
+  return all
+}
+
+/**
  * POST /api/approvals/templates 创建审批模板
  * @param body 创建参数（必填）：code/name/business_type 必填，enabled/description/steps 可选
  * @returns Promise<number> 新建模板 ID（必返回）
