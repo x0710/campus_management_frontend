@@ -22,12 +22,19 @@ export async function fetchAllPages<T>(
   maxPages = 100,
   isCurrent: () => boolean = () => true,
 ): Promise<T[]> {
+  if (!Number.isInteger(pageSize) || pageSize < 1 || !Number.isInteger(maxPages) || maxPages < 1) {
+    throw new RangeError('Invalid pagination limits')
+  }
   const check = () => { if (!isCurrent()) throw new PageLoadCancelled() }
   check()
   const first = await fetchPage(1)
   check()
   const rows = [...first.data]
-  const pages = Math.max(1, Math.ceil(first.total_pages || Math.ceil(first.total / Math.max(1, pageSize))))
+  const reportedPages = first.total_pages
+  const validTotal = Number.isSafeInteger(first.total) && first.total >= 0
+  const validPages = Number.isSafeInteger(reportedPages) && reportedPages > 0
+  if (!validPages && !validTotal) throw new Error('Invalid pagination response')
+  const pages = validPages ? reportedPages : Math.max(1, Math.ceil(first.total / pageSize))
   if (pages > maxPages) throw new PageLimitError(maxPages * pageSize)
   for (let page = 2; page <= pages; page += 1) {
     check()

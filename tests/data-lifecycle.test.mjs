@@ -253,3 +253,16 @@ test('负数容量禁用结果缓存，仍可正常请求', async () => {
   assert.equal(await cache.get('/users'), 2)
   assert.equal(cache.size().resolved, 0)
 })
+
+test('失效按路径边界匹配，保留相似 ID 与相似资源的缓存', async () => {
+  let calls = 0
+  const cache = new GetRequestCache(async () => ++calls)
+  for (const path of ['/users/1', '/users/10', '/users/1/roles', '/users-extra']) await cache.get(path)
+  await cache.get('/users/1', { details: true })
+  cache.invalidate('GET /users/1')
+  assert.equal(await cache.get('/users/10'), 2)
+  assert.equal(await cache.get('/users-extra'), 4)
+  assert.equal(await cache.get('/users/1'), 6)
+  assert.equal(await cache.get('/users/1/roles'), 7)
+  assert.equal(await cache.get('/users/1', { details: true }), 8)
+})
