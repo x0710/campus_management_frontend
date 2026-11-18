@@ -52,6 +52,8 @@ VITE_API_BASE=
 
 Vite 的 `base` 与运行时的 `APP_BASE` 共用这项配置；页面路由、JS/CSS、公共图片、
 登录跳转和 CAS 前端回调均从基础路径派生。修改后需重启开发服务，生产环境需重新构建。
+管理端入口不继承 party 前缀，固定为与基础路径同级的 `/admin`（默认 `/campus/admin`），
+开发服务器会自动回退到同一份页面，生产环境需按下方 Nginx 配置回退到 `index.html`。
 `API_BASE` 默认跟随站点基础路径，也可用 `VITE_API_BASE` 单独覆盖。
 同源部署需配置 Nginx 静态文件映射与页面回退，跨域 API 需由后端允许前端来源的 CORS 请求。
 本地 Vite 代理将配置的 API 路径转发到 `http://localhost:8000/api`。
@@ -64,11 +66,12 @@ Vite 的 `base` 与运行时的 `APP_BASE` 共用这项配置；页面路由、J
 | 登录 | `/campus/party/login` |
 | 党员个人端 | `/campus/party/member` |
 | 支部、学院、学校端 | `/campus/party/branch`、`/campus/party/academy`、`/campus/party/school` |
-| 管理、学生、教师、领导端 | `/campus/party/admin`、`/campus/party/student`、`/campus/party/teacher`、`/campus/party/leader` |
+| 管理端 | `/campus/admin`（与站点基础路径同级，不带 party 前缀） |
+| 学生、教师、领导端 | `/campus/party/student`、`/campus/party/teacher`、`/campus/party/leader` |
 | 静态资源 | `/campus/party/assets/...` |
 | API | `/campus/party/api/...` |
 
-旧 `/campus/login`、`/campus/admin/...`、`/portal/...` 等地址进入前端后会迁移并保留参数和锚点。
+旧 `/campus/login`、`/campus/admin/...`、`/campus/party/admin/...`、`/portal/...` 等地址进入前端后会迁移并保留参数和锚点。
 多应用共用域名时，Nginx 是否继续把旧地址交给本应用需单独配置；新链接始终使用站点基础路径。
 修改部署基础路径后，后端 `CAS_SERVICE_URL` 和 Nginx 映射也需同步调整。
 
@@ -102,6 +105,12 @@ location /campus/party/api/ {
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# 管理端 URL 不带 party 前缀，但复用同一份前端构建产物
+location /campus/admin {
+    root /var/www/html;
+    try_files /campus/party/index.html =404;
 }
 
 location = /campus/party/auth/cas/callback {

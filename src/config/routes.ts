@@ -1,5 +1,6 @@
 import type { PortalKey } from './portals'
-import { appPath } from './appBase'
+import { appPath, APP_BASE } from './appBase'
+import { adminBaseOf } from './deployment'
 
 export const CAMPUS_PATH = appPath()
 export const LOGIN_PATH = appPath('login')
@@ -10,7 +11,8 @@ export const PORTAL_PATHS: Record<PortalKey, string> = {
   branch: appPath('branch'),
   academy: appPath('academy'),
   school: appPath('school'),
-  admin: appPath('admin'),
+  // 管理端独立于 party 前缀：/campus/party/admin -> /campus/admin
+  admin: adminBaseOf(APP_BASE),
   student: appPath('student'),
   teacher: appPath('teacher'),
   leader: appPath('leader'),
@@ -41,7 +43,8 @@ export function migrateLegacyPath(path: string): string {
   // 历史部署路径仅在兼容入口保留，不用于生成新链接。
   const oldPortals: [string, PortalKey][] = [
     ['/campus/party/branch', 'branch'], ['/campus/party/academy', 'academy'],
-    ['/campus/party/school', 'school'], ['/campus/admin', 'admin'],
+    ['/campus/party/school', 'school'], ['/campus/party/admin', 'admin'],
+    ['/campus/admin', 'admin'],
     ['/campus/student', 'student'], ['/campus/teacher', 'teacher'], ['/campus/leader', 'leader'],
   ]
   for (const [oldBase, key] of oldPortals) {
