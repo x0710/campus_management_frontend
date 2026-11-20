@@ -20,8 +20,8 @@ dist-ssr
 代码要求
 后端接口
 
-# 本地开发配置，不纳入版本库（代码要求 24）
-vite.config.ts
+# 说明：本机专属配置（后端地址等）写在 .env.local，已被上面的 *.local 覆盖；
+# vite.config.ts 属于仓库配置，正常纳入版本库，不要靠忽略文件来藏密钥。
 
 # Editor directories and files
 .vscode/*

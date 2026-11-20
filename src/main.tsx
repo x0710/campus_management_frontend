@@ -12,6 +12,7 @@ import { BrowserRouter } from 'react-router'
 import App from './App'
 import './index.css'
 import { useClearButtonTabOrder } from './hooks/useClearButtonTabOrder'
+import { PROJECT } from './projects'
 import { useSettingsStore } from './store/settings'
 
 // antd 的 locale 入口在 Vite 预构建后可能仍带一层 CJS 的 `default` 包装；
@@ -65,9 +66,10 @@ function RootProviders() {
       theme={{
         algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: {
-          colorPrimary: '#b4232b',
-          colorLink: '#a61f27',
-          colorInfo: '#b4232b',
+          // 主色随项目变化：党建项目为党建红，校园平台为校园蓝（见 src/projects/）
+          colorPrimary: PROJECT.brand.primary,
+          colorLink: PROJECT.brand.link,
+          colorInfo: PROJECT.brand.primary,
           borderRadius: 6,
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",

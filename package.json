@@ -5,10 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:party": "vite --mode party",
+    "dev:campus": "vite --mode campus",
     "build": "tsc -b && vite build",
+    "build:party": "tsc -b && vite build --mode party",
+    "build:campus": "tsc -b && vite build --mode campus",
     "lint": "oxlint",
     "test": "node --import ./tests/register-typescript.mjs --test --test-isolation=none tests/*.test.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:campus": "vite preview --mode campus"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",

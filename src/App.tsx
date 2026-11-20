@@ -9,7 +9,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation, Outlet } from 'react-router'
 import ForcePasswordChangeModal from './components/ForcePasswordChangeModal'
 import { CAS_CALLBACK_PATH } from './config/auth'
-import { CAMPUS_PATH, LOGIN_PATH, PORTAL_PATHS, migrateLegacyPath } from './config/routes'
+import { CAMPUS_PATH, ENABLED_PORTAL_PATHS, LOGIN_PATH, PORTAL_PATHS, migrateLegacyPath } from './config/routes'
 import { BULK_ADD_MEMBERS_ROUTE } from './config/bulkMembers'
 import LoginPage from './pages/LoginPage'
 import CasCallbackPage from './pages/CasCallbackPage'
@@ -82,12 +82,11 @@ export default function App() {
           {/* 登录后默认入口：根据角色跳转对应门户 */}
           <Route path={CAMPUS_PATH} element={<PortalRedirect />} />
 
-          {/*
-            工作端布局：以 PortalWorkspace 作为「界面壳」（顶栏 + 侧栏 + 内容区），
-            其下子路由共享同一侧栏菜单——切换模块或进入公告详情时侧栏不变，
-            仅内容区替换。不同 portalKey 渲染对应门户的菜单。
-          */}
-          {Object.values(PORTAL_PATHS).map((path) => (
+          {/* 工作端布局：以 PortalWorkspace 作为「界面壳」（顶栏 + 侧栏 + 内容区），
+              其下子路由共享同一侧栏菜单——切换模块或进入公告详情时侧栏不变，
+              仅内容区替换。不同 portalKey 渲染对应门户的菜单。
+              只注册当前项目提供的门户：不属于本项目的门户连路由都不存在。 */}
+          {ENABLED_PORTAL_PATHS.map((path) => (
             <Route key={path} path={path} element={<PortalWorkspace />}>
               {/* 门户入口跳转到首个已开通模块 */}
               <Route index element={<PortalModuleRoute />} />
