@@ -1664,7 +1664,7 @@ const messages = {
       fieldStatus: '审核状态',
       fieldProgress: '审批进度',
       applicationStatus_pending: '审核中',
-      applicationStatus_approved: '申请成功',
+      applicationStatus_approved: '审核通过',
       applicationStatus_rejected: '被驳回',
       applicationStatus_cancelled: '已取消',
       reviewHint_cancelled: '此加分申请已取消。',

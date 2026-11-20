@@ -30,6 +30,8 @@ export interface StudentInfo {
   name: string | null
   gender: string | null
   status: StudentStatus
+  /** 创建时间（RFC3339） */
+  created_at: string
 }
 
 /** 学生详情（api.json: StudentDetail） */
@@ -43,6 +45,8 @@ export interface StudentDetail {
   /** 入学年份 */
   enrollment_year: number
   status: StudentStatus
+  /** 创建时间（RFC3339） */
+  created_at: string
 }
 
 /** GET /api/students 分页查询参数（api.json: StudentQueryParams） */

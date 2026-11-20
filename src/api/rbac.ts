@@ -4,6 +4,7 @@ import { http } from './http'
 import { BATCH_REQUEST_TIMEOUT_MS } from '../config/http'
 import type { PaginatedResponse } from './types/common'
 import type {
+  CurrentUserPermissionsResponse,
   Permission,
   PermissionCreateRequest,
   PermissionQuery,
@@ -163,6 +164,25 @@ export async function updatePermission(
 export async function deletePermission(id: number): Promise<void> {
   await http.delete(`/rbac/permissions/${id}`)
   invalidate('GET /rbac/permissions')
+}
+
+// ==================== 当前用户授权 ====================
+
+/**
+ * GET /api/rbac/permissons/me 获取当前登录用户的权限码（仅需登录，无需额外权限；会话内缓存）。
+ * 注意：接口路径中的 permissons 为后端契约拼写，不能改为 permissions。
+ * 返回所有角色（含默认角色）授予的权限码，去重并按字典序排序；通配符原样返回，不展开。
+ * @param force 类型：boolean；默认值：false；是否必填：可选（true 时绕过缓存）
+ * @returns 类型：Promise<CurrentUserPermissionsResponse>
+ */
+export function getCurrentUserPermissions(
+  force?: boolean,
+): Promise<CurrentUserPermissionsResponse> {
+  return cachedGet<CurrentUserPermissionsResponse>(
+    '/rbac/permissons/me',
+    undefined,
+    { force, preview: false },
+  )
 }
 
 // ==================== 角色-权限关联 ====================

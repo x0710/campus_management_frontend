@@ -107,3 +107,16 @@ export interface RoleDataScopeRequest {
   /** 仅 scope='custom' 时生效：逗号分隔的组织 ID 白名单；其余情况提交 null */
   scope_value?: string | null
 }
+
+/**
+ * 当前登录用户的授权信息（api.json: CurrentUserPermissionsResponse，
+ * GET /api/rbac/permissons/me 响应；该路径拼写以接口契约为准）。
+ */
+export interface CurrentUserPermissionsResponse {
+  /** 当前登录用户 ID */
+  user_id: number
+  /** 所有角色（含默认角色）授予的权限码，去重并按字典序排序；通配符原样返回不展开 */
+  permissions: string[]
+  /** 是否具有 super_admin 角色；RBAC 管理接口仍要求显式权限授权 */
+  is_super_admin: boolean
+}

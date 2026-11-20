@@ -10,10 +10,12 @@ export type UserStatus = 'enabled' | 'disabled'
 /** 性别 */
 export type Gender = 'male' | 'female'
 
-/** GET /api/users 列表项（后端仅返回 uid/name） */
+/** GET /api/users 列表项（后端返回 uid/name/created_at） */
 export interface UserInfo {
   uid: number
   name: string | null
+  /** 创建时间（RFC3339） */
+  created_at: string
 }
 
 /** GET /api/users/{id} 用户详情 */

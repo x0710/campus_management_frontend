@@ -21,6 +21,8 @@ export interface ApprovalInstanceStep {
   status: ApprovalStepStatus
   started_at: string
   finished_at: string | null
+  /** 创建时间（RFC3339） */
+  created_at: string
 }
 
 /** 审批意见记录（api.json: ApprovalRecordItem） */

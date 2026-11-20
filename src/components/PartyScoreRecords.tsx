@@ -8,14 +8,16 @@ import { isEntryActionTarget } from '../utils/entryInteraction'
  * 展示申报编号 / 申报类型 / 申请加分 / 核定分数 / 创建时间，双击行打开详情弹窗。
  */
 import { isPartyScoreDeduction } from '../utils/partyScore'
-import { Table } from 'antd'
+import { Spin, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useMemo, useState } from 'react'
 import { queryApprovalTemplates } from '../api/approvalmodel'
 import type { PartyScore } from '../api/types/partyScores'
 import { useMyPartyScores } from '../composables/useMyPartyScores'
+import { usePartyScoreApplicationStatuses } from '../composables/usePartyScoreApplicationStatuses'
 import {
   PARTY_DECLARATION_PAGE_SIZE,
+  PARTY_SCORE_APPLICATION_STATUS_COLOR,
   PARTY_TEMPLATE_BUSINESS_TYPE,
 } from '../config/partyDeclaration'
 import { useT } from '../i18n'
@@ -35,6 +37,8 @@ export default function PartyScoreRecords() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const { records, loading, error, refresh } = useMyPartyScores(createdDates)
+  // 审核状态：核定分数只有在审批全部通过后才有效，驳回 / 审核中不能显示为 0 分
+  const { statuses } = usePartyScoreApplicationStatuses(records)
   const [templateNames, setTemplateNames] = useState<Map<number, string>>(new Map())
   const [detail, setDetail] = useState<PartyScore | null>(null)
 
@@ -95,11 +99,37 @@ export default function PartyScoreRecords() {
         key: 'approved_score',
         width: 120,
         align: 'center',
-        render: (score: string | null) => (
-          <span className={isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'}>
-            {formatPartyScore(score)}
-          </span>
-        ),
+        // 只有审批通过（或直接扣分已生效）才展示分数；驳回/审核中统一展示「-」，
+        // 避免后端返回 0 时被误认为已核定 0 分
+        render: (score: string | null, row) => {
+          const effective =
+            isPartyScoreDeduction(row) || statuses.get(row.id) === 'approved'
+          if (!effective) return '-'
+          return (
+            <span className={isNegativePartyScore(score) ? 'party-score-minus' : 'party-score-plus'}>
+              {formatPartyScore(score)}
+            </span>
+          )
+        },
+      },
+      {
+        // 审核进度：审核中 / 审核通过 / 被驳回（直接扣分展示扣分成功）
+        title: t('partyDeclaration.colReviewStatus'),
+        key: 'review_status',
+        width: 120,
+        align: 'center',
+        render: (_, record) => {
+          if (isPartyScoreDeduction(record)) {
+            return <Tag color="error">{t('partyDeduction.success')}</Tag>
+          }
+          const status = statuses.get(record.id)
+          if (!status) return <Spin size="small" />
+          return (
+            <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
+              {t(`partyDeclaration.applicationStatus_${status}`)}
+            </Tag>
+          )
+        },
       },
       {
         title: t('partyDeclaration.colCreatedAt'),
@@ -109,7 +139,7 @@ export default function PartyScoreRecords() {
         render: (value: string) => formatDateTime(value, locale),
       },
     ],
-    [t, locale, templateNames],
+    [t, locale, templateNames, statuses],
   )
 
   return (
@@ -120,7 +150,7 @@ export default function PartyScoreRecords() {
         loading={loading}
         columns={columns}
         dataSource={records}
-        scroll={{ x: 760 }}
+        scroll={{ x: 880 }}
         onRow={(record) => ({
           onDoubleClick: (event) => {
             if (isEntryActionTarget(event.target)) return

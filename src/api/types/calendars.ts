@@ -14,12 +14,13 @@ export interface CalendarEventInfo {
   end_date: string
   title: string
   event_type: EventType
+  /** 创建时间（RFC3339） */
+  created_at: string
 }
 
 /** 日历事件详情（api.json: CalendarEventDetail） */
 export interface CalendarEventDetail extends CalendarEventInfo {
   description: string | null
-  created_at: string
 }
 
 /** 日历事件分页查询参数 */
