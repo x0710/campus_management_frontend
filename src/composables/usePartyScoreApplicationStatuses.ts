@@ -15,7 +15,7 @@
  * 审批记录 / 模板步骤 / 自动通过环节均尽量并行读取；任一辅助数据取不到时
  * 按其余数据降级判定，保证旧数据仍可展示。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getApprovalTemplateDetail } from '../api/approvalmodel'
 import { getApprovalRecords, queryMyApprovalSteps } from '../api/approvals'
 import type { ApprovalInstanceStep, ApprovalRecordItem } from '../api/types/approvals'
@@ -40,9 +40,10 @@ export interface PartyScoreApplicationStatusesState {
  *   - statuses：Map<申报记录 ID, 审核状态>，未解析完成的记录不包含在内
  */
 export function usePartyScoreApplicationStatuses(
-  records: PartyScore[],
+  allRecords: PartyScore[],
 ): PartyScoreApplicationStatusesState {
-  const [statuses, setStatuses] = useState<Map<number, PartyScoreApplicationStatus>>(
+  const records = useMemo(() => allRecords.filter((record) => record.approval_status == null), [allRecords])
+  const [legacyStatuses, setStatuses] = useState<Map<number, PartyScoreApplicationStatus>>(
     new Map(),
   )
 
@@ -124,5 +125,9 @@ export function usePartyScoreApplicationStatuses(
     }
   }, [records])
 
+  const statuses = new Map(legacyStatuses)
+  for (const record of allRecords) {
+    if (record.approval_status) statuses.set(record.id, record.approval_status)
+  }
   return { statuses }
 }

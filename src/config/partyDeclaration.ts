@@ -33,7 +33,7 @@ export const PARTY_RECENT_RECORD_LIMIT = 5
  * - approved：申请成功（已核定分数）
  * - rejected：被驳回（审批记录中存在驳回决定）
  */
-export type PartyScoreApplicationStatus = 'pending' | 'approved' | 'rejected'
+export type PartyScoreApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 /** 成绩申报审核状态 → antd Tag 配色（亮色 / 夜间模式均使用预设语义色） */
 export const PARTY_SCORE_APPLICATION_STATUS_COLOR: Record<
@@ -43,6 +43,7 @@ export const PARTY_SCORE_APPLICATION_STATUS_COLOR: Record<
   pending: 'processing',
   approved: 'success',
   rejected: 'error',
+  cancelled: 'default',
 }
 
 /** 「我的-消息通知」单页条数（代码要求 12：单页最多 100 条） */

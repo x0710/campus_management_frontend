@@ -61,6 +61,10 @@ interface ApprovalRow {
   score: PartyScore | null
 }
 
+function displayStatus(row: ApprovalRow): ApprovalStepStatus {
+  return row.score?.approval_status === 'rejected' ? 'rejected' : row.step.status
+}
+
 /**
  * 按审批实例 ID 批量反查加分申请。
  * @param instanceIds 审批实例 ID 数组（可为空；内部去重）
@@ -267,7 +271,7 @@ export default function PartyScoreApprovalView() {
   const filteredRows = useMemo(
     () =>
       rows.filter((row) => {
-        const statusOk = statusFilter.length === 0 || statusFilter.includes(row.step.status)
+        const statusOk = statusFilter.length === 0 || statusFilter.includes(displayStatus(row))
         const applicantOk = applicantFilter === null || row.score?.user_id === applicantFilter
         const organizationOk =
           organizationFilter === null || row.step.organization_id === organizationFilter
@@ -355,18 +359,16 @@ export default function PartyScoreApprovalView() {
       },
       {
         title: t('partyScoreApproval.colStatus'),
-        dataIndex: ['step', 'status'],
         key: 'status',
         width: 110,
         filters: statusOptions.map(({ value, label }) => ({ text: label, value })),
         filteredValue: statusFilter,
         filterMultiple: true,
-        onFilter: (value, row) => row.step.status === value,
-        render: (status: ApprovalStepStatus) => (
-          <Tag color={PARTY_SCORE_APPROVAL_STATUS_COLOR[status]}>
-            {t(`partyScoreApproval.status_${status}`)}
-          </Tag>
-        ),
+        onFilter: (value, row) => displayStatus(row) === value,
+        render: (_, row) => {
+          const status = displayStatus(row)
+          return <Tag color={PARTY_SCORE_APPROVAL_STATUS_COLOR[status]}>{t(`partyScoreApproval.status_${status}`)}</Tag>
+        },
       },
       {
         title: t('partyScoreApproval.colStartedAt'),

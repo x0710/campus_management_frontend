@@ -65,6 +65,7 @@ const STATUS_ALERT_TYPE: Record<
   pending: 'info',
   approved: 'success',
   rejected: 'error',
+  cancelled: 'info',
 }
 
 /** PartyScoreDetailPage 组件。
@@ -222,6 +223,7 @@ export default function PartyScoreDetailPage() {
    */
   const applicationStatus = useMemo<PartyScoreApplicationStatus | null>(() => {
     if (!detail) return null
+    if (detail.approval_status) return detail.approval_status
     if (isPartyScoreDeduction(detail)) return 'approved'
     if (
       approvalRecords === null ||

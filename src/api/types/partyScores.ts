@@ -21,6 +21,8 @@ import type { PageQuery, CreatedDateQuery } from './common'
 
 /** 党建活动加分申请记录（api.json: PartyScoreInfo，列表项不含 template_id） */
 export interface PartyScore {
+  /** 整条加分申请的审批结果；直接扣分为空。 */
+  approval_status?: 'pending' | 'approved' | 'rejected' | 'cancelled' | null
   /** 加分申请 ID */
   id: number
   /** 审批模板 ID（仅详情接口返回；列表项可能不含） */

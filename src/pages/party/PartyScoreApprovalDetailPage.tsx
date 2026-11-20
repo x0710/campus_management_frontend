@@ -449,6 +449,7 @@ function PartyScoreApprovalDetail() {
     }
   }
 
+  const displayStatus = score?.approval_status === 'rejected' ? 'rejected' : step?.status
   const actionable = step !== null && isPartyScoreStepActionable(step.status)
   const applicantName = score ? userNames.get(score.user_id) : undefined
   const busy = submittingAction !== null
@@ -478,8 +479,8 @@ function PartyScoreApprovalDetail() {
         <div className="party-approval-detail-title">
           <h3>{t('partyScoreApproval.detailPageTitle')}</h3>
           {step ? (
-            <Tag color={PARTY_SCORE_APPROVAL_STATUS_COLOR[step.status]}>
-              {t(`partyScoreApproval.status_${step.status}`)}
+            <Tag color={PARTY_SCORE_APPROVAL_STATUS_COLOR[displayStatus ?? step.status]}>
+              {t(`partyScoreApproval.status_${displayStatus ?? step.status}`)}
             </Tag>
           ) : null}
         </div>
