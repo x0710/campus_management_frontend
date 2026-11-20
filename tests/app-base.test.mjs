@@ -27,10 +27,14 @@ test('实际 Vite 环境下，替换 BASE 会同步改变页面、CAS、API 与�
       assert.equal(auth.CAS_CALLBACK_PATH, `${prefix}/auth/cas/callback`)
       assert.equal(api.API_BASE, `${prefix}/api`)
       assert.equal(auth.CAS_LOGIN_URL, `${prefix}/api/auth/cas/login`)
-      for (const path of Object.values(routes.PORTAL_PATHS)) {
-        assert.equal(path.startsWith(`${prefix}/`), true)
+      // 管理端与站点基础路径同级，不继承 party 前缀
+      const adminBase = `${prefix.slice(0, prefix.lastIndexOf('/'))}/admin`
+      assert.equal(routes.getPortalPath('admin'), adminBase)
+      for (const [key, path] of Object.entries(routes.PORTAL_PATHS)) {
+        if (key !== 'admin') assert.equal(path.startsWith(`${prefix}/`), true)
       }
-      assert.equal(routes.migrateLegacyPath('/campus/admin/admin_m1?q=1#users'), `${prefix}/admin/admin_m1?q=1#users`)
+      assert.equal(routes.migrateLegacyPath('/campus/admin/admin_m1?q=1#users'), `${adminBase}/admin_m1?q=1#users`)
+      assert.equal(routes.migrateLegacyPath('/campus/party/admin/admin_m1?q=1#users'), `${adminBase}/admin_m1?q=1#users`)
     } finally {
       await server.close()
     }

@@ -1808,7 +1808,7 @@ const messages = {
       femaleProbationaryMembers: '女中共预备党员人数',
     },
     school: {
-      cockpitTitle: '全校党建考评概览',
+      cockpitTitle: '全校先锋指数数据',
       statOrgMembers: '组织人数',
       statMinorityMembers: '少数民族人数',
       statFullMembers: '中共党员人数',
