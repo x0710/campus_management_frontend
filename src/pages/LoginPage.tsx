@@ -2,7 +2,9 @@ import { CAMPUS_PATH } from '../config/routes'
 /**
  * 登录页：
  * 提供用户名密码登录、记住用户名、语言切换和主题切换。
- * 整屏以 login-background.png 作背景，登录表单收进靠右的卡片（登录小窗），避免遮挡背景主体。
+ * 整屏背景图按项目区分：校园端使用 login-background.jpg，党委端沿用 login-background.png。
+ * 校园端登录小窗固定在右下角，党委端保持中部偏右布局，均避免遮挡背景中的红色地标。
+ * 主题支持跟随系统 / 浅色 / 深色三种模式，默认跟随系统。
  * 登录成功后写入登录态，并跳转到 CAMPUS_PATH 角色解析页；
  * 已登录用户访问本页时直接重定向到 CAMPUS_PATH。
  * 由其他页面（如角色解析页在后端未启动时）跳转而来时，读取路由 state 中的 loginError
@@ -10,9 +12,7 @@ import { CAMPUS_PATH } from '../config/routes'
  */
 import {
   LockOutlined,
-  MoonOutlined,
   SafetyCertificateOutlined,
-  SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Button, Checkbox, Dropdown, Form, Input } from 'antd'
@@ -21,10 +21,12 @@ import axios from 'axios'
 import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import ErrorState from '../components/ErrorState'
+import ThemeModeDropdown from '../components/ThemeModeDropdown'
 import { login } from '../api/auth'
 import { extractErrorReason } from '../api/common'
 import { CAS_LOGIN_URL, REMEMBERED_USERNAME_KEY } from '../config/auth'
 import { useT } from '../i18n'
+import { PROJECT_KEY } from '../projects'
 import { useAuthStore } from '../store/auth'
 import { useSettingsStore } from '../store/settings'
 import { useLoginSuccess } from '../composables/useLoginSuccess'
@@ -61,8 +63,6 @@ export default function LoginPage() {
 
   const locale = useSettingsStore((s) => s.locale)
   const setLocale = useSettingsStore((s) => s.setLocale)
-  const theme = useSettingsStore((s) => s.theme)
-  const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
   // 已登录用户访问 LOGIN_PATH 时直接进入角色解析页
   if (token) {
@@ -123,7 +123,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page">
+    <div className={`login-page login-page--${PROJECT_KEY}`}>
       {/* 左上角校名标识，叠在背景板之上 */}
       <img className="login-brand" src={`${import.meta.env.BASE_URL}logo2.svg`} alt="井冈山大学" />
 
@@ -141,15 +141,10 @@ export default function LoginPage() {
             {locale === 'zh' ? '中' : 'EN'}
           </Button>
         </Dropdown>
-        <Button
-          type="text"
-          size="small"
-          icon={theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-          onClick={toggleTheme}
-        />
+        <ThemeModeDropdown size="small" />
       </div>
 
-      {/* 登录小窗：桌面端位于纪念碑右侧留白区，窄屏回归居中 */}
+      {/* 登录小窗：校园端位于右下角、党委端位于中部偏右，窄屏回归居中 */}
       <main className="login-panel">
         <div className="login-panel-inner">
           <div className="login-logo">

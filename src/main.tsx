@@ -12,6 +12,7 @@ import { BrowserRouter } from 'react-router'
 import App from './App'
 import './index.css'
 import { useClearButtonTabOrder } from './hooks/useClearButtonTabOrder'
+import { useResolvedTheme } from './hooks/useResolvedTheme'
 import { PROJECT } from './projects'
 import { useSettingsStore } from './store/settings'
 
@@ -47,8 +48,8 @@ const zhCNLocale: Locale = zhDatePicker
 function RootProviders() {
   useClearButtonTabOrder()
   const locale = useSettingsStore((s) => s.locale)  // 语言切换
-  const themeMode = useSettingsStore((s) => s.theme)  // 主题切换
-  const dark = themeMode === 'dark'
+  // 主题偏好为 system 时跟随操作系统，并响应系统深浅色的实时变化
+  const dark = useResolvedTheme() === 'dark'
 
   // 同步到 <html data-theme>，供自定义 CSS 变量切换明暗配色
   useEffect(() => {
@@ -87,6 +88,9 @@ function RootProviders() {
 
 // 首屏渲染前先按持久化的语言设置 dayjs locale，避免日期组件短暂显示英文月份
 dayjs.locale(useSettingsStore.getState().locale === 'zh' ? 'zh-cn' : 'en')
+
+// 供全局 CSS 按项目切换品牌配色：校园蓝 / 党建红
+document.documentElement.dataset.project = PROJECT.key
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -43,6 +43,43 @@
   --scrollbar-thumb-hover: #4a5064;
 }
 
+/* 校园项目：恢复品牌蓝与冷色中性底；党建引领项目继续使用上面的红金配色 */
+:root[data-project='campus'] {
+  --brand-deep: #1d39c4;
+  --brand: #2f54eb;
+  --brand-light: #597ef7;
+  --ink: #1f2a44;
+  --ink-secondary: #5b6784;
+  --line: #dbe4f5;
+  --page-bg: #f3f6fc;
+  --card-bg: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.96);
+  --editor-bg: #f5f8ff;
+  --editor-line: #d6e0f5;
+  --member-hit-bg: #e8f0ff;
+  --member-hit-ink: #1d39c4;
+  --row-disabled-bg: #eef2f8;
+  --row-disabled-ink: #8a94a6;
+}
+
+:root[data-theme='dark'][data-project='campus'] {
+  /* 校园项目暗色需重新覆盖正文色：上面 campus 块把 --ink 固定为深蓝，若不覆盖会出现深色字压深色底 */
+  --ink: #e6e8f0;
+  --ink-secondary: #9aa3b5;
+  --line: #2b3653;
+  --page-bg: #0f1420;
+  --card-bg: #171e2e;
+  --header-bg: rgba(23, 30, 46, 0.96);
+  --editor-bg: #12141d;
+  --editor-line: #3a3f52;
+  --member-hit-bg: #1b2b4d;
+  --member-hit-ink: #9db8ff;
+  --row-disabled-bg: #151a26;
+  --row-disabled-ink: #6b7488;
+  --scrollbar-thumb: #3a3f52;
+  --scrollbar-thumb-hover: #4a5064;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -114,8 +151,8 @@ h3 {
 
 /* ============ 登录页 ============ */
 
-/* 整屏背景板：来源图片 public/login-background.png 原色铺满全屏。
-   桌面端登录框落在纪念碑右侧的留白区，避免遮挡画面主体。 */
+/* 整屏背景板：按项目使用不同图片，均以 cover 铺满全屏。
+   校园端用实景照片并把登录框固定在右下角；党委端沿用专用设计图，右侧留有放置登录框的空间。 */
 .login-page {
   position: relative;
   min-height: 100vh;
@@ -123,7 +160,18 @@ h3 {
   align-items: center;
   justify-content: center;
   padding: 72px 24px 80px;
-  background: url('/login-background.png') center center / cover no-repeat;
+  background-color: #0b1622;
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.login-page--campus {
+  background-image: url('/login-background.jpg');
+}
+
+.login-page--party {
+  background-image: url('/login-background.png');
 }
 
 /* 登录页左上角校名标识：叠加在背景板之上，保持原始宽高比 */
@@ -165,9 +213,6 @@ h3 {
 /* 暖白宣纸质感与朱红、鎏金细节呼应背景中的井冈山主题。 */
 .login-panel {
   position: absolute;
-  top: 50%;
-  left: 68.5%;
-  transform: translate(-50%, -50%);
   z-index: 1;
   width: min(360px, calc(100vw - 32px));
   padding: 30px 32px 26px;
@@ -178,6 +223,19 @@ h3 {
   box-shadow: 0 18px 48px rgba(98, 34, 28, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px) saturate(112%);
   -webkit-backdrop-filter: blur(12px) saturate(112%);
+}
+
+/* 校园端：实景照片右下角留白区；宽屏时随宽度适度上移，窄屏保持原位 */
+.login-page--campus .login-panel {
+  right: clamp(16px, 2.5vw, 40px);
+  bottom: max(clamp(20px, 4vh, 48px), min(calc((100vw - 1280px) * 0.55), 10vh));
+}
+
+/* 党委端：沿用原设计图的中部偏右布局，设计图右侧本身留有空白 */
+.login-page--party .login-panel {
+  top: 50%;
+  left: 68.5%;
+  transform: translate(-50%, -50%);
 }
 
 .login-panel::before {
@@ -194,6 +252,18 @@ h3 {
 :root[data-theme='dark'] .login-panel {
   background: linear-gradient(145deg, rgba(38, 29, 29, 0.94), rgba(47, 31, 28, 0.92));
   border-color: rgba(211, 166, 82, 0.45);
+}
+
+/* 夜间输入框与次按钮：避免沿用浅色底导致文字看不清 */
+:root[data-theme='dark'] .login-panel .ant-input-affix-wrapper {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(211, 166, 82, 0.32);
+}
+
+:root[data-theme='dark'] .login-panel > .login-panel-inner > .ant-btn:not(.ant-btn-primary) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(211, 166, 82, 0.35);
+  color: #f3dfc1;
 }
 
 .login-panel-inner {
@@ -303,6 +373,97 @@ h3 {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
+/* 校园项目：登录页恢复品牌蓝配色；党建引领项目保持原有红金样式 */
+.login-page--campus .login-panel {
+  background: linear-gradient(145deg, rgba(250, 252, 255, 0.95), rgba(241, 246, 255, 0.92));
+  border-color: rgba(47, 84, 235, 0.26);
+  box-shadow: 0 18px 48px rgba(30, 58, 138, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.78);
+}
+
+.login-page--campus .login-panel::before {
+  background: linear-gradient(90deg, #1d39c4 0%, #2f54eb 58%, #85a5ff 100%);
+}
+
+.login-page--campus .login-logo {
+  color: #f3f7ff;
+  background: linear-gradient(145deg, #1d39c4, #2f54eb);
+  border-color: rgba(133, 165, 255, 0.86);
+  box-shadow: 0 8px 20px rgba(29, 57, 196, 0.24);
+}
+
+.login-page--campus .login-heading h2 {
+  color: #1f2f66;
+}
+
+.login-page--campus .login-panel .ant-input-affix-wrapper {
+  border-color: rgba(47, 84, 235, 0.22);
+}
+
+.login-page--campus .login-panel .ant-input-affix-wrapper:hover,
+.login-page--campus .login-panel .ant-input-affix-wrapper-focused {
+  border-color: #2f54eb;
+  box-shadow: 0 0 0 2px rgba(47, 84, 235, 0.1);
+}
+
+.login-page--campus .login-panel .ant-btn-primary {
+  border-color: #2f54eb;
+  background: linear-gradient(90deg, #1d39c4, #2f54eb);
+  box-shadow: 0 6px 16px rgba(47, 84, 235, 0.22);
+}
+
+.login-page--campus .login-panel .ant-btn-primary:hover {
+  border-color: #1d39c4 !important;
+  background: linear-gradient(90deg, #1630a8, #2445c9) !important;
+}
+
+.login-page--campus .login-panel .ant-checkbox-checked .ant-checkbox-inner {
+  border-color: #2f54eb;
+  background: #2f54eb;
+}
+
+.login-page--campus .login-panel > .login-panel-inner > .ant-btn:not(.ant-btn-primary) {
+  border-color: rgba(47, 84, 235, 0.32);
+  color: #1d39c4;
+  background: rgba(247, 250, 255, 0.75);
+}
+
+:root[data-theme='dark'] .login-page--campus .login-panel {
+  background: linear-gradient(145deg, rgba(23, 30, 50, 0.95), rgba(28, 37, 64, 0.93));
+  border-color: rgba(89, 126, 247, 0.42);
+}
+
+:root[data-theme='dark'] .login-page--campus .login-heading h2 {
+  color: #dbe6ff;
+}
+
+:root[data-theme='dark'] .login-page--campus .login-panel .ant-input-affix-wrapper {
+  background: rgba(89, 126, 247, 0.08);
+  border-color: rgba(89, 126, 247, 0.28);
+}
+
+:root[data-theme='dark'] .login-page--campus .login-panel > .login-panel-inner > .ant-btn:not(.ant-btn-primary) {
+  background: rgba(89, 126, 247, 0.12);
+  border-color: rgba(89, 126, 247, 0.35);
+  color: #c9d8ff;
+}
+
+/* 校园端中等宽度下缩小小窗，保证右下角落点仍避开红色地标 */
+@media (min-width: 921px) and (max-width: 1279px) {
+  .login-page--campus .login-panel {
+    transform: scale(0.85);
+    transform-origin: bottom right;
+  }
+}
+
+/* 矮屏时缩小并贴近底部，避免上移后压到红色地标 */
+@media (min-width: 921px) and (max-height: 760px) {
+  .login-page--campus .login-panel {
+    bottom: 16px;
+    transform: scale(0.85);
+    transform-origin: bottom right;
+  }
+}
+
 @media (max-width: 920px) {
   /* 窄屏背景主体不再可避让，小窗回归居中并取满可用宽度 */
   .login-page {
@@ -316,11 +477,11 @@ h3 {
     height: 48px;
   }
 
-  .login-panel {
+  .login-page .login-panel {
     position: relative;
-    top: auto;
-    left: auto;
+    inset: auto;
     transform: none;
+    width: min(360px, calc(100vw - 32px));
     padding: 28px 22px 26px;
     border-radius: 8px;
   }
@@ -1149,6 +1310,20 @@ h3 {
   background: #86171e;
 }
 
+/* 幽灵（ghost）主按钮：保持透明底 + 主色文字，避免上面的实心背景色把同色文字“吞掉” */
+.workspace-content .ant-btn-primary.ant-btn-background-ghost {
+  border-color: #a61f27;
+  background: transparent;
+  box-shadow: none;
+  color: #a61f27;
+}
+
+.workspace-content .ant-btn-primary.ant-btn-background-ghost:not(:disabled):hover {
+  border-color: #86171e;
+  background: rgba(166, 31, 39, 0.06);
+  color: #86171e;
+}
+
 .workspace-content .ant-input-affix-wrapper,
 .workspace-content .ant-input,
 .workspace-content .ant-select-selector,
@@ -1242,6 +1417,210 @@ h3 {
 :root[data-theme='dark'] .academy-overview,
 :root[data-theme='dark'] .school-overview {
   background: linear-gradient(110deg, rgba(180, 35, 43, 0.15), rgba(189, 138, 54, 0.09));
+}
+
+/* ============ 校园项目：蓝色门户主题 ============ */
+/* 仅覆盖 campus 项目，党建引领项目保持上方红金主题不变 */
+
+:root[data-project='campus'] .workspace-page {
+  --workspace-accent: #2f54eb;
+  --workspace-accent-soft: rgba(47, 84, 235, 0.08);
+  --workspace-gold: #597ef7;
+  background:
+    linear-gradient(135deg, rgba(47, 84, 235, 0.035) 0, transparent 34%),
+    var(--page-bg);
+}
+
+:root[data-project='campus'] .portal-header {
+  border-bottom-color: rgba(89, 126, 247, 0.22);
+  box-shadow: 0 3px 16px rgba(23, 40, 90, 0.06);
+}
+
+:root[data-project='campus'] .header-brand {
+  border-right-color: rgba(89, 126, 247, 0.2);
+}
+
+:root[data-project='campus'] .header-brand-name {
+  color: #1f2f66;
+}
+
+:root[data-project='campus'] .portal-switcher:hover {
+  border-color: rgba(47, 84, 235, 0.22);
+}
+
+:root[data-project='campus'] .feedback-nav-btn.ant-btn-primary {
+  border-color: #2f54eb;
+  background: #2f54eb;
+}
+
+:root[data-project='campus'] .workspace-sider {
+  background: rgba(250, 252, 255, 0.94) !important;
+  border-right-color: rgba(89, 126, 247, 0.22);
+  box-shadow: 5px 0 22px rgba(23, 40, 90, 0.045);
+}
+
+:root[data-project='campus'] .workspace-sider-title {
+  color: #1d39c4 !important;
+}
+
+:root[data-project='campus'] .workspace-sider-title::after {
+  background: linear-gradient(90deg, rgba(89, 126, 247, 0.65), transparent);
+}
+
+:root[data-project='campus'] .workspace-sider-icon {
+  border-color: rgba(133, 165, 255, 0.68);
+  box-shadow: 0 5px 12px rgba(29, 57, 196, 0.16);
+}
+
+:root[data-project='campus'] .workspace-menu.ant-menu-inline .ant-menu-item {
+  color: #44506b;
+}
+
+:root[data-project='campus'] .workspace-menu.ant-menu-light .ant-menu-item:hover:not(.ant-menu-item-selected) {
+  color: #1d39c4;
+  background: rgba(47, 84, 235, 0.055);
+}
+
+:root[data-project='campus'] .workspace-menu.ant-menu-light .ant-menu-item-selected {
+  color: #1d39c4;
+  background: linear-gradient(90deg, rgba(47, 84, 235, 0.13), rgba(89, 126, 247, 0.07));
+}
+
+:root[data-project='campus'] .workspace-menu.ant-menu-light .ant-menu-item-selected::before {
+  background: #2f54eb;
+}
+
+:root[data-project='campus'] .workspace-sider-footer {
+  border-top-color: rgba(89, 126, 247, 0.2);
+}
+
+:root[data-project='campus'] .workspace-sider-toggle:hover {
+  color: #2f54eb;
+  background: rgba(47, 84, 235, 0.08);
+}
+
+:root[data-project='campus'] .workspace-content .panel-card,
+:root[data-project='campus'] .workspace-content .party-profile,
+:root[data-project='campus'] .workspace-content .workspace-module-group {
+  border-color: rgba(47, 84, 235, 0.16);
+  box-shadow: 0 5px 18px rgba(23, 40, 90, 0.055);
+}
+
+:root[data-project='campus'] .workspace-content .panel-card-header {
+  border-bottom-color: rgba(47, 84, 235, 0.12);
+  background: linear-gradient(90deg, rgba(47, 84, 235, 0.045), transparent 44%);
+}
+
+:root[data-project='campus'] .workspace-content .panel-card-header::before {
+  background: linear-gradient(#1d39c4, #597ef7);
+}
+
+:root[data-project='campus'] .workspace-content .panel-card-title,
+:root[data-project='campus'] .workspace-content .academy-section-title,
+:root[data-project='campus'] .workspace-content .school-section-title {
+  color: #1f2f66;
+}
+
+:root[data-project='campus'] .workspace-content .ant-btn-primary {
+  border-color: #2f54eb;
+  background: #2f54eb;
+  box-shadow: 0 4px 10px rgba(47, 84, 235, 0.16);
+}
+
+:root[data-project='campus'] .workspace-content .ant-btn-primary:not(:disabled):hover {
+  border-color: #1d39c4;
+  background: #1d39c4;
+}
+
+/* 幽灵（ghost）主按钮：透明底 + 主色文字，避免蓝底蓝字导致文字不可见 */
+:root[data-project='campus'] .workspace-content .ant-btn-primary.ant-btn-background-ghost {
+  border-color: #2f54eb;
+  background: transparent;
+  box-shadow: none;
+  color: #2f54eb;
+}
+
+:root[data-project='campus'] .workspace-content .ant-btn-primary.ant-btn-background-ghost:not(:disabled):hover {
+  border-color: #1d39c4;
+  background: rgba(47, 84, 235, 0.06);
+  color: #1d39c4;
+}
+
+:root[data-project='campus'] .workspace-content .ant-table-wrapper .ant-table-thead > tr > th {
+  color: #4b5874;
+  background: #eef3fc;
+  border-bottom-color: #d9e3f5;
+}
+
+:root[data-project='campus'] .workspace-content .ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom-color: rgba(47, 84, 235, 0.1);
+}
+
+:root[data-project='campus'] .workspace-content .ant-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: rgba(47, 84, 235, 0.045) !important;
+}
+
+:root[data-project='campus'] .workspace-content .ant-tabs .ant-tabs-tab-active .ant-tabs-tab-btn,
+:root[data-project='campus'] .workspace-content .ant-tabs .ant-tabs-tab:hover {
+  color: #2f54eb;
+}
+
+:root[data-project='campus'] .workspace-content .ant-tabs .ant-tabs-ink-bar {
+  background: #2f54eb;
+}
+
+:root[data-project='campus'] .branch-overview,
+:root[data-project='campus'] .academy-overview,
+:root[data-project='campus'] .school-overview {
+  border-color: rgba(89, 126, 247, 0.25);
+  background: linear-gradient(110deg, #f5f8ff, #eef3ff);
+}
+
+:root[data-project='campus'] .branch-overview-value,
+:root[data-project='campus'] .academy-overview-value,
+:root[data-project='campus'] .school-overview-value {
+  color: #1d39c4;
+}
+
+:root[data-project='campus'] .branch-todo-item:hover,
+:root[data-project='campus'] .branch-todo-item:focus-within {
+  border-color: rgba(47, 84, 235, 0.42);
+  box-shadow: 0 4px 14px rgba(29, 57, 196, 0.09);
+}
+
+:root[data-theme='dark'][data-project='campus'] .header-brand-name {
+  color: #dbe6ff;
+}
+
+:root[data-theme='dark'][data-project='campus'] .workspace-sider {
+  background: rgba(18, 24, 38, 0.96) !important;
+}
+
+:root[data-theme='dark'][data-project='campus'] .workspace-menu.ant-menu-inline .ant-menu-item {
+  color: #c8d2e8;
+}
+
+:root[data-theme='dark'][data-project='campus'] .workspace-menu.ant-menu-light .ant-menu-item-selected {
+  color: #dbe6ff;
+  background: linear-gradient(90deg, rgba(47, 84, 235, 0.28), rgba(89, 126, 247, 0.12));
+}
+
+:root[data-theme='dark'][data-project='campus'] .workspace-content .panel-card-title,
+:root[data-theme='dark'][data-project='campus'] .workspace-content .academy-section-title,
+:root[data-theme='dark'][data-project='campus'] .workspace-content .school-section-title {
+  color: #dbe6ff;
+}
+
+:root[data-theme='dark'][data-project='campus'] .workspace-content .ant-table-wrapper .ant-table-thead > tr > th {
+  color: #d3dcf0;
+  background: #1b2437;
+  border-bottom-color: #2c3a57;
+}
+
+:root[data-theme='dark'][data-project='campus'] .branch-overview,
+:root[data-theme='dark'][data-project='campus'] .academy-overview,
+:root[data-theme='dark'][data-project='campus'] .school-overview {
+  background: linear-gradient(110deg, rgba(47, 84, 235, 0.18), rgba(89, 126, 247, 0.1));
 }
 
 /* 功能面板（业务模块后续接入用） */

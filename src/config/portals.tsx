@@ -337,10 +337,10 @@ export const SCHOOL_PORTAL_KEY: PortalKey = 'school'
 
 /**
  * 各门户「我的」模块 key。
- * 党员端「我的」保留在左侧菜单；支部端 / 学院端 / 学校端仍隐藏侧栏入口，
- * 统一由顶栏头像菜单进入。
+ * 党员端「我的」保留在左侧菜单；学生端、支部端 / 学院端 / 学校端由顶栏头像菜单进入。
  */
 export const PORTAL_PROFILE_MODULE_KEYS: Partial<Record<PortalKey, string>> = {
+  student: 'student_m5',
   [BRANCH_PORTAL_KEY]: 'branch_m4',
   [ACADEMY_PORTAL_KEY]: 'academy_m4',
   [SCHOOL_PORTAL_KEY]: 'school_m4',

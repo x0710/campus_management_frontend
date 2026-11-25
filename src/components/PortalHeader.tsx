@@ -4,9 +4,7 @@ import {
   DownOutlined,
   KeyOutlined,
   LogoutOutlined,
-  MoonOutlined,
   QuestionCircleOutlined,
-  SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import {
@@ -44,6 +42,7 @@ import { useSharedResource } from '../composables/useSharedResource'
 import { myRolesResource, myPortalPositionsResource } from '../store/referenceData'
 import { useSettingsStore } from '../store/settings'
 import PortalNoticeBell from './PortalNoticeBell'
+import ThemeModeDropdown from './ThemeModeDropdown'
 
 interface PortalHeaderProps {
   /** 左侧自定义内容（如返回按钮、面包屑） */
@@ -73,8 +72,6 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const originalAuth = useAuthStore((s) => s.originalAuth)
   const locale = useSettingsStore((s) => s.locale)
   const setLocale = useSettingsStore((s) => s.setLocale)
-  const theme = useSettingsStore((s) => s.theme)
-  const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
   // 真实姓名：登录态只带账户名，姓名需经 GET /api/users/me 获取（走会话缓存，不重复请求）
   const [realName, setRealName] = useState<string | null>(null)
@@ -281,15 +278,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             {t('common.reportIssue')}
           </Button>
         </Tooltip>
-        <Tooltip title={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}>
-          <Button
-            type="text"
-            className="header-icon-btn"
-            aria-label={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}
-            icon={theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-            onClick={toggleTheme}
-          />
-        </Tooltip>
+        <ThemeModeDropdown className="header-icon-btn" />
         <PortalNoticeBell />
 
         {originalAuth && (

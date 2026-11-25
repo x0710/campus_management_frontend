@@ -11,12 +11,17 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Avatar, Button, Card, Descriptions, Skeleton, Space, Tag, Typography } from 'antd'
+import { Avatar, Button, Card, Descriptions, Skeleton, Space, Tabs, Tag, Typography } from 'antd'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ErrorState from '../../components/ErrorState'
 import UserProfileEditModal from '../../components/UserProfileEditModal'
 import MyWorkplaceField from '../../components/MyWorkplaceField'
+import GradesTab from '../leader/member-detail/GradesTab'
+import LeaveTab from '../leader/member-detail/LeaveTab'
+import ProfileDetailTab from '../leader/member-detail/ProfileDetailTab'
+import RewardingTab from '../leader/member-detail/RewardingTab'
+import ViolationTab from '../leader/member-detail/ViolationTab'
 import { getCurrentUser } from '../../api/auth'
 import { getRole, queryUserRoleRelations } from '../../api/rbac'
 import type { RoleInfo } from '../../api/types/rbac'
@@ -141,10 +146,9 @@ export default function StudentProfileView() {
   return (
     <section className="panel-card" style={{width:'100%',maxWidth:'unset'}}>
       <header className="panel-card-header">
-        <h3 className="panel-card-title">{t('profile.title')}</h3>
+        <h3 className="panel-card-title">{t('portal.student_m5')}</h3>
         <Button
           type="primary"
-          ghost
           icon={<EditOutlined />}
           disabled={!user}
           onClick={() => setEditOpen(true)}
@@ -158,7 +162,13 @@ export default function StudentProfileView() {
         ) : error ? (
           <ErrorState message={error} />
         ) : user ? (
-          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+          <Tabs
+            items={[
+              {
+                key: 'basic',
+                label: t('profile.title'),
+                children: (
+                  <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             {/* 基本信息与头像并排：基本信息自适应占据剩余宽度，头像固定在右侧；窄屏自动换行 */}
             <div
               style={{
@@ -316,7 +326,36 @@ export default function StudentProfileView() {
                 </Space>
               )}
             </Card>
-          </Space>
+                  </Space>
+                ),
+              },
+              {
+                key: 'profile',
+                label: t('memberDetail.tabProfile'),
+                children: <ProfileDetailTab uid={user.id} locale={locale} t={t} readOnly />,
+              },
+              {
+                key: 'grades',
+                label: t('memberDetail.tabGrades'),
+                children: <GradesTab uid={user.id} t={t} readOnly />,
+              },
+              {
+                key: 'leave',
+                label: t('memberDetail.tabLeave'),
+                children: <LeaveTab uid={user.id} t={t} />,
+              },
+              {
+                key: 'violation',
+                label: t('memberDetail.tabViolation'),
+                children: <ViolationTab uid={user.id} t={t} readOnly />,
+              },
+              {
+                key: 'rewarding',
+                label: t('memberDetail.tabRewarding'),
+                children: <RewardingTab uid={user.id} t={t} locale={locale} readOnly />,
+              },
+            ]}
+          />
         ) : null}
       </div>
 

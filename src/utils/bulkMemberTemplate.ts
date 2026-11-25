@@ -21,6 +21,7 @@ import {
   BULK_TEMPLATE_COLUMNS,
   BULK_TEMPLATE_GUIDE_SHEET_NAME,
   POSITION_USAGE_SCOPE_LABEL_KEYS,
+  type BulkTemplateColumn,
 } from '../config/bulkMembers'
 import type { TranslateFn } from '../i18n'
 import type { XlsxSheet } from './xlsx'
@@ -55,6 +56,11 @@ export interface MemberTemplateInput {
   positions: PositionDetail[]
   /** 系统角色全量数据（必填，可为空数组） */
   roles: RoleInfo[]
+  /**
+   * 样表列定义（可选，默认党建项目 14 列）。
+   * 项目差异由调用方传入 config/bulkImportProfile 中对应项目的 columns。
+   */
+  columns?: BulkTemplateColumn[]
 }
 
 /** 组装结果 */
@@ -72,19 +78,20 @@ export interface MemberTemplateResult {
  */
 export function buildMemberTemplateSheets(input: MemberTemplateInput): MemberTemplateResult {
   const { t, orgs, orgNameById, positions, roles } = input
+  const columns = input.columns ?? BULK_TEMPLATE_COLUMNS
 
   const sheets: XlsxSheet[] = [
     {
       name: BULK_MEMBER_SHEET_NAME,
-      columns: BULK_TEMPLATE_COLUMNS.map((col) => ({
+      columns: columns.map((col) => ({
         header: t(col.labelKey),
         width: col.excelWidth,
       })),
       rows: [
         // 第 2 行为填写说明，与第 3–4 行示例一起由导入程序自动跳过
-        BULK_TEMPLATE_COLUMNS.map((col) => t(col.descKey)),
-        BULK_TEMPLATE_COLUMNS.map((col) => col.sampleA),
-        BULK_TEMPLATE_COLUMNS.map((col) => col.sampleB),
+        columns.map((col) => t(col.descKey)),
+        columns.map((col) => col.sampleA),
+        columns.map((col) => col.sampleB),
       ],
       rowHeights: { 2: 96 },
     },

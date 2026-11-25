@@ -51,13 +51,13 @@ import {
   BULK_MEMBER_TEMPLATE_FILE_NAME,
   BULK_ORG_IDENTITY_EXAMPLE,
   BULK_ROLE_EXAMPLE,
-  BULK_TEMPLATE_COLUMNS,
   POSITION_USAGE_SCOPE_LABEL_KEYS,
   type BulkLookupKey,
 } from '../../config/bulkMembers'
-import { ACADEMY_ANCESTOR_DEPTHS, BRANCH_ANCESTOR_DEPTHS, SCHOOL_ORG_ADMIN_MODULE_KEY } from '../../config/organization'
+import { getBulkImportProfile } from '../../config/bulkImportProfile'
+import { ACADEMY_ANCESTOR_DEPTHS, BRANCH_ANCESTOR_DEPTHS } from '../../config/organization'
 import { resolvePortalOrg } from '../../composables/usePortalOrg'
-import { collectOrgSubtree } from '../../utils/orgTree'
+import { collectOrgSubtree, listOrgDescendantIds } from '../../utils/orgTree'
 import { useT } from '../../i18n'
 import { cachedGet } from '../../api/cache'
 import { useImportPreview } from '../../store/importPreview'
@@ -66,13 +66,11 @@ import { useUiStateStore } from '../../store/uiState'
 import type { PaginatedResponse } from '../../api/types/common'
 import type { UserInfo } from '../../api/types/users'
 import {
-  analyzeMemberRows,
   type MemberCheckIssue,
   type MemberCheckResult,
   type ParsedMember,
 } from '../../utils/bulkMemberCheck'
 import {
-  importMemberRows,
   type MemberImportOutcome,
   type MemberImportRequestLog,
 } from '../../utils/bulkMemberImport'
@@ -128,14 +126,15 @@ export default function BulkAddMembersView() {
   const navigate = useNavigate()
   const location = useLocation()
   const { portalKey } = usePortalParams<{ portalKey: string }>()
+  /** 项目差异配置：样表列、默认来源模块、排除组织、校验与导入实现（见 config/bulkImportProfile） */
+  const importProfile = useMemo(() => getBulkImportProfile(portalKey ?? ''), [portalKey])
   const { message } = AntdApp.useApp()
   const previewActive = useImportPreview((state) => state.preview !== null)
   const [preparingPreview, setPreparingPreview] = useState(false)
 
-  // 返回时回到来源模块（默认党委学校端「组织成员管理」）
+  // 返回时回到来源模块（缺省值由项目配置决定：党建为 school_m2，校园领导端为 leader_m3）
   const fromModuleKey =
-    new URLSearchParams(location.search).get('from') ??
-    (portalKey === 'branch' ? 'branch_m5' : portalKey === 'academy' ? 'academy_m5' : SCHOOL_ORG_ADMIN_MODULE_KEY)
+    new URLSearchParams(location.search).get('from') ?? importProfile.defaultModuleKey
 
   // ---- 当前查看的表格 ----
   const [activeTable, setActiveTable] = useState<BulkTableKey>('orgs')
@@ -196,7 +195,13 @@ export default function BulkAddMembersView() {
           const { orgId } = await resolvePortalOrg(depths)
           setOrgs(orgId === null ? [] : collectOrgSubtree(all, orgId))
         } else {
-          setOrgs(all)
+          // 项目差异：领导端不展示「学院党委」子树，保持与组织概览一致
+          const excluded = new Set<number>()
+          for (const rootId of importProfile.excludeOrgRootIds) {
+            excluded.add(rootId)
+            for (const id of listOrgDescendantIds(all, rootId)) excluded.add(id)
+          }
+          setOrgs(all.filter((org) => !excluded.has(org.id)))
         }
         setAllOrgs(all)
       } catch (err) {
@@ -208,7 +213,7 @@ export default function BulkAddMembersView() {
         setOrgsLoading(false)
       }
     },
-    [t, portalKey],
+    [t, portalKey, importProfile],
   )
 
   /**
@@ -425,7 +430,7 @@ export default function BulkAddMembersView() {
   // ============ 样表说明 ============
   const templateRows = useMemo<TemplateColumnRow[]>(
     () =>
-      BULK_TEMPLATE_COLUMNS.map((col) => ({
+      importProfile.columns.map((col) => ({
         key: col.key,
         label: t(col.labelKey),
         description: t(col.descKey),
@@ -433,7 +438,7 @@ export default function BulkAddMembersView() {
         sampleA: col.sampleA,
         sampleB: col.sampleB,
       })),
-    [t],
+    [t, importProfile],
   )
 
   const templateColumns = useMemo<ColumnsType<TemplateColumnRow>>(
@@ -496,6 +501,7 @@ export default function BulkAddMembersView() {
       orgNameById,
       positions,
       roles,
+      columns: importProfile.columns,
     })
 
     if (missing.length > 0) {
@@ -547,7 +553,7 @@ export default function BulkAddMembersView() {
     setAnalyzing(true)
     try {
       const { rows } = await readXlsx(file)
-      const result = analyzeMemberRows({
+      const result = importProfile.analyzeRows({
         rows,
         startRow: BULK_DATA_START_ROW,
         orgs: allOrgs,
@@ -703,7 +709,7 @@ export default function BulkAddMembersView() {
     // 进度按「请求数」推进：0 / 0 先占位，importMemberRows 启动时会立刻给出预估总数
     setImportProgress({ done: 0, total: 0 })
     try {
-      const outcomes = await importMemberRows({
+      const outcomes = await importProfile.importRows({
         members,
         t,
         signal: controller.signal,
@@ -751,7 +757,7 @@ export default function BulkAddMembersView() {
     setRetrying(true)
     setImportProgress({ done: 0, total: 0 })
     try {
-      const retried = await importMemberRows({
+      const retried = await importProfile.importRows({
         members: rows,
         t,
         signal: controller.signal,
