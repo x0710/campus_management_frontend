@@ -1,8 +1,8 @@
-import type { PartyProfileImportItem } from '../../api/partyProfileImports'
+import type { ImportRoleMode, PartyProfileImportItem } from '../../api/partyProfileImports'
 import type { ParsedMember } from '../bulkMemberCheck'
 import { toProfileExtrasRequest, toUserUpdateRequest } from './payloads'
 
-export function toImportItem(member: ParsedMember): PartyProfileImportItem {
+export function toImportItem(member: ParsedMember, roleMode: ImportRoleMode = 'merge'): PartyProfileImportItem {
   const gender = member.gender === '男' ? 'male' : member.gender === '女' ? 'female' : undefined
   return {
     user_id: member.uid,
@@ -13,7 +13,7 @@ export function toImportItem(member: ParsedMember): PartyProfileImportItem {
       ...(member.partyNo ? { party_no: Number(member.partyNo) } : {}),
       ...(member.joinTime ? { join_time: member.joinTime } : {}),
     },
-    ...(member.roleIds.length ? { role_ids: member.roleIds } : {}),
+    ...(member.roleIds.length ? { role_ids: member.roleIds, role_mode: roleMode } : {}),
     members: member.orgIdentities.flatMap((org) => org.positions.map((position) => ({
       organization_id: org.orgId, user_id: member.uid, position, workplace: '',
     }))),

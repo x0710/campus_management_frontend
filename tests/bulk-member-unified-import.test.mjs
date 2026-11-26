@@ -22,11 +22,15 @@ test('综合导入请求不提交密码和建号任职数组，空角色及党�
   assert.equal(item.user.password, undefined)
   assert.equal(item.user.org, undefined)
   assert.equal(item.role_ids, undefined)
+  assert.equal(item.role_mode, undefined)
   assert.deepEqual(item.party, {})
   assert.deepEqual(item.members, [{ organization_id: 10, user_id: 1, position: 'member', workplace: '' }])
   assert.equal(item.profile.user_id, 1)
   assert.equal(item.changes.name, '张三')
-  assert.deepEqual(toImportItem({ ...member(1), roleIds: [2], partyNo: '100' }).role_ids, [2])
+  const withRoles = { ...member(1), roleIds: [2] }
+  assert.deepEqual(toImportItem(withRoles).role_ids, [2])
+  assert.equal(toImportItem(withRoles).role_mode, 'merge')
+  assert.equal(toImportItem(withRoles, 'replace').role_mode, 'replace')
 })
 
 test('统一提交一次，由返回 UID 匹配结果，保留随机密码和已有账号结果', async () => {

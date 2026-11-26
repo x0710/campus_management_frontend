@@ -10,7 +10,7 @@ import { usePortalParams } from '../../hooks/usePortalParams'
  *   1. 组织与 ID 对应表：填写「组织:身份」列时，冒号前填这里的组织 ID；
  *   2. 身份（职位）与编码对应表：冒号后填这里的身份编码；
  *   3. 系统角色与 ID 对应表：填写「系统角色」列时使用这里的角色 ID（只填数字）；
- *   4. 样表说明：样表十四列的含义、是否必填与两行示例。
+ *   4. 样表说明：样表十五列的含义、是否必填与两行示例。
  *
  * 下载的样表是一份 Excel：第 1 张工作表是「新成员」填写模板（第 5 行起填数据），
  * 之后是「填写说明」与组织 / 身份 / 系统角色三张对照表，可直接在 Excel 里查编码。
@@ -37,6 +37,7 @@ import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import type { ImportRoleMode } from '../../api/partyProfileImports'
 import { extractErrorReason } from '../../api/common'
 import { listAllOrganizations } from '../../api/organizations'
 import { listAllPositions } from '../../api/positions'
@@ -159,6 +160,8 @@ export default function BulkAddMembersView() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<AnalysisState | null>(null)
   const [issueOpen, setIssueOpen] = useState(false)
+  const [roleMode, setRoleMode] = useState<ImportRoleMode>('merge')
+  const retryRoleMode = useRef<ImportRoleMode>('merge')
   const [importOpen, setImportOpen] = useState(false)
   // ---- 真实导入（写库）----
   const [importing, setImporting] = useState(false)
@@ -563,6 +566,7 @@ export default function BulkAddMembersView() {
         return
       }
 
+      setRoleMode('merge')
       setAnalysis({ fileName: file.name, result })
       if (result.issues.length > 0) {
         setIssueOpen(true)
@@ -703,8 +707,9 @@ export default function BulkAddMembersView() {
     // 进度按「请求数」推进：0 / 0 先占位，importMemberRows 启动时会立刻给出预估总数
     setImportProgress({ done: 0, total: 0 })
     try {
+      retryRoleMode.current = roleMode
       const outcomes = await importMemberRows({
-        members,
+        members, roleMode,
         t,
         signal: controller.signal,
         onProgress: (done, total) => setImportProgress({ done, total }),
@@ -752,7 +757,7 @@ export default function BulkAddMembersView() {
     setImportProgress({ done: 0, total: 0 })
     try {
       const retried = await importMemberRows({
-        members: rows,
+        members: rows, roleMode: retryRoleMode.current,
         t,
         signal: controller.signal,
         onProgress: (done, total) => setImportProgress({ done, total }),
@@ -814,7 +819,7 @@ export default function BulkAddMembersView() {
         }
       }
       const returnTo = `${getPortalPath(portalKey)}/${fromModuleKey}`
-      useImportPreview.getState().start({ members, existingUids, returnTo,
+      useImportPreview.getState().start({ members, roleMode, existingUids, returnTo,
         organizations: allOrgs, roles, positions, fileName: analysis.fileName })
       const ui = useUiStateStore.getState()
       ui.setSelectedOrgId(fromModuleKey, members[0]?.orgIdentities[0]?.orgId ?? null)
@@ -855,6 +860,11 @@ export default function BulkAddMembersView() {
               {t('bulkMembers.analyze')}
             </Button>
           </Tooltip>
+          {analysisPassed && (
+            <Segmented<ImportRoleMode> aria-label={t('bulkMembers.roleMode')} value={roleMode}
+              disabled={importing || preparingPreview || previewActive} onChange={setRoleMode}
+              options={[{ value: 'merge', label: t('bulkMembers.mergeRoles') }, { value: 'replace', label: t('bulkMembers.replaceRoles') }]} />
+          )}
           {analysisPassed && (
             <Tooltip title={t('bulkMembers.previewHint')}>
               <Button icon={<EyeOutlined />} loading={preparingPreview}
@@ -1083,7 +1093,7 @@ export default function BulkAddMembersView() {
               type="warning"
               showIcon
               title={t('bulkMembers.importConfirmTitle', { n: analysis?.result.total ?? 0 })}
-              description={t('bulkMembers.importConfirmDesc')}
+              description={t('bulkMembers.importConfirmDesc') + ' ' + t(roleMode === 'replace' ? 'bulkMembers.replaceRoles' : 'bulkMembers.mergeRoles')}
             />
             <ol className="bulk-import-steps">
               <li>{t('bulkMembers.importStep1')}</li>

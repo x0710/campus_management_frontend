@@ -18,3 +18,4 @@ export const REMEMBERED_PASSWORD_TTL_MS = 24 * 60 * 60 * 1000
 export const CAS_CALLBACK_PATH = appPath('auth/cas/callback')
 /** 先由后端创建 state 和流程 Cookie，再重定向至学校认证中心。 */
 export const CAS_LOGIN_URL = resolveApiUrl('/auth/cas/login')
+export const CAS_LOGOUT_URL = resolveApiUrl('/auth/cas/logout')

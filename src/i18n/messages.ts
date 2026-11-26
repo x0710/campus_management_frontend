@@ -55,8 +55,10 @@ const messages = {
       logout: '退出登录',
       reportIssue: '问题上报',
       reportIssueHint: '遇到问题，点击立即上报',
-      switchToLight: '切换到浅色模式',
-      switchToDark: '切换到深色模式',
+      theme: '主题',
+      systemTheme: '跟随系统',
+      lightTheme: '浅色',
+      darkTheme: '深色',
       accountNameHint: '账户名：{name}',
       id: 'ID',
       total: '共',
@@ -830,7 +832,7 @@ const messages = {
     },
     bulkMembers: {
       title: '批量添加新成员',
-      desc: '填写样表前先在这里查询编码：组织 ID 或 code 填在「组织:身份」冒号前（整表格式由第一条数据确定），身份编码填在冒号后，「系统角色」只填角色 ID 数字。上方可切换查看三张对照表与样表说明；填好后点「导入表格并分析」，系统从第 5 行起逐行校验。同一份样表也可用于批量更新：登录账号名（同时是 UID）已存在时会更新该用户的资料、任职、党员档案、民族/籍贯/户口信息与角色，不会重复创建。',
+      desc: '填写样表前先在这里查询编码：组织 ID 或 code 填在「组织:身份」冒号前（整表格式由第一条数据确定），身份编码填在冒号后，「系统角色」只填角色 ID 数字。上方可切换查看三张对照表与样表说明；填好后点「导入表格并分析」，系统从第 5 行起逐行校验。同一份样表也可用于批量更新：内部ID已存在时会更新该用户的资料、任职、党员档案、民族/籍贯/户口信息与角色，不会重复创建。',
       back: '返回组织成员管理',
       backHint: '返回组织成员管理（保留上次选中的组织）',
       download: '下载样表',
@@ -840,7 +842,7 @@ const messages = {
       refreshHint: '重新拉取最新数据（绕过缓存）',
       count: '共 {n} 条',
       orgTitle: '组织与 ID 对应表',
-      orgHint: 'D 列冒号前可填组织 ID 或组织编码 code；第一条实际数据确定整表格式，后续保持一致。纯数字同时命中 ID 与 code 时优先按 ID 识别。',
+      orgHint: '「组织:身份」列冒号前可填组织 ID 或组织编码 code；第一条实际数据确定整表格式，后续保持一致。纯数字同时命中 ID 与 code 时优先按 ID 识别。',
       posTitle: '身份与编码对应表',
       posHint:
         '「组织:身份」列冒号后填这里的身份编码（如 ZGDY、ZBSJ）；身份只有在「适用范围」覆盖目标组织时才可用，跨组织填写前请先核对。',
@@ -871,7 +873,8 @@ const messages = {
         roleName: '角色名称',
         roleCode: '角色编码',
         roleDesc: '角色说明',
-        username: '登录账号名（工号/学号）',
+        uid: '内部ID',
+        username: '登录用户名',
         orgIdentity: '组织:身份',
         partyNo: '党员编号',
         joinTime: '入党时间',
@@ -881,8 +884,8 @@ const messages = {
         householdType: '户口性质',
       },
       colDesc: {
-        username:
-          '登录用的工号或学号，必填、纯数字且不能重复；该值同时作为用户 UID（后端不再自动生成 UID）。请从第 5 行开始填写真实数据（第 2 行说明、第 3–4 行示例不要当成数据）。',
+        uid: '必填，填写无前导零的正整数。系统按此 ID 识别和更新成员。',
+        username: '留空时使用内部ID作为登录用户名，也可填写含字母的用户名。同一表内不能重复。已有成员保留原登录用户名。',
         name: '真实姓名。',
         gender: '填写「男」或「女」。',
         orgIdentity:
@@ -893,7 +896,7 @@ const messages = {
         email: '常用邮箱，如 123@qq.com。',
         birthday: '出生日期，建议写成 2000-10-01 这样的文本日期。',
         roles:
-          '只填角色 ID 数字（如 15），多个用「/」分隔（如 15/14）；不要填写角色名称。填写后覆盖原有角色，留空则保留原角色；只能分配当前操作者授权范围内的角色。',
+          '只填角色 ID 数字（如 15），多个用「/」分隔（如 15/14）；不要填写角色名称。填写后默认追加角色，可手动选择覆盖，留空则保留原角色；只能分配当前操作者授权范围内的角色。',
         password: '无需填写，新账号密码由后端随机生成，导入成功后下载。',
         ethnic: '可空；填写后导入时写入该账号的个人档案（民族）。',
         nativePlace: '可空；填写后导入时写入该账号的个人档案（籍贯），如「贵州黔东南」。',
@@ -945,6 +948,9 @@ const messages = {
       exitPreview: '退出模拟，恢复真实数据',
       importTitle: '开始导入',
       importPassed: '校验通过，共 {n} 条数据可导入',
+      roleMode: '系统角色导入方式',
+      mergeRoles: '追加角色',
+      replaceRoles: '覆盖角色',
       importStep1: '后端按 UID 判断：不存在则建号并随机生成密码，已有账号保留用户名和密码',
       importStep2: '写入组织任职与身份（职位编码）',
       importStep3: '写入党员编号与入党时间',
@@ -952,7 +958,7 @@ const messages = {
       importStep5:
         '把民族 / 籍贯 / 户口所在地 / 户口性质写入个人档案（没有档案的账号会自动创建档案）',
       importNote:
-        '整批在同一事务中导入，任一条失败整批回滚，不自动拆批重试。任职仅新增，已有任职保留；填写系统角色时覆盖原角色，留空则保留。取消或网络中断后请核对实际结果。新账号初始密码仅在成功响应时返回，请及时下载。',
+        '整批在同一事务中导入，任一条失败整批回滚，不自动拆批重试。任职仅新增，已有任职保留；填写系统角色时按所选方式追加或覆盖，留空则保留。取消或网络中断后请核对实际结果。新账号初始密码仅在成功响应时返回，请及时下载。',
       importConfirm: '确认导入',
       importConfirmTitle: '将真实写入 {n} 条数据',
       importConfirmDesc:
@@ -1041,19 +1047,19 @@ const messages = {
         orgIdentityScope:
           '身份只有在「适用范围」覆盖目标组织时才可用：如「本组织及所有下级」可填到下级支部，「仅本组织」只能填该身份所属组织，否则提交时会报「该职位不属于目标组织」。',
         rolesItem: '系统角色',
-        roles: '只填角色 ID 数字，多个用「/」分隔，例如 15/14；留空表示只保留基础角色。',
+        roles: '只填角色 ID 数字，多个用「/」分隔，例如 15/14；留空保留已有角色。',
         profileItem: '民族 / 籍贯 / 户口',
         profile:
           '这四列可空；导入时会写入该账号的个人档案，账号没有档案时自动创建。',
         importItem: '导入方式',
         import:
-          '回到「批量添加新成员」页，点「导入表格并分析」选择本文件（仅支持 .xlsx）。登录账号名（UID）已存在时会更新该用户，不会重复创建。',
+          '回到「批量添加新成员」页，点「导入表格并分析」选择本文件（仅支持 .xlsx）。内部ID已存在时会更新该用户，不会重复创建。',
       },
       check: {
         unnamed: '未填姓名',
-        usernameEmpty: '登录账号名留空，需要补全',
-        usernameNotNumeric: '登录账号必须是纯数字（该值同时作为用户 UID）',
-        usernameDuplicate: '登录账号名重复（{value}，与第 {row} 行相同）',
+        uidInvalid: '内部ID须为无前导零的正整数，最大为 9007199254740991',
+        uidDuplicate: '内部ID重复（{value}，与第 {row} 行相同）',
+        usernameDuplicate: '登录用户名重复（{value}，与第 {row} 行相同）',
         nameEmpty: '姓名留空，需要补全',
         gender: '性别应为「男」或「女」（{value}）',
         orgIdentityEmpty: '组织:身份留空，需要补全',
@@ -1918,8 +1924,10 @@ const messages = {
       logout: 'Log out',
       reportIssue: 'Report Issue',
       reportIssueHint: 'Report a problem',
-      switchToLight: 'Switch to light mode',
-      switchToDark: 'Switch to dark mode',
+      theme: 'Theme',
+      systemTheme: 'System',
+      lightTheme: 'Light',
+      darkTheme: 'Dark',
       accountNameHint: 'Account name: {name}',
       id: 'ID',
       total: 'Total',
@@ -2699,7 +2707,7 @@ const messages = {
     },
     bulkMembers: {
       title: 'Bulk add new members',
-      desc: 'Look up the codes here before filling the sheet: the organization ID or code goes before the colon in "organization:identity" (the first data row determines the format throughout the sheet), the identity code after it, and "system roles" takes role ID numbers only. Switch between the three lookup tables and the template above; when done, click "Import & analyze" to check the file from row 5 onwards. The same sheet can also update data in bulk: if the login account (which is also the UID) already exists, its profile, memberships, party profile, ethnicity / native place / household info and roles are updated instead of creating a duplicate.',
+      desc: 'Look up the codes here before filling the sheet: the organization ID or code goes before the colon in "organization:identity" (the first data row determines the format throughout the sheet), the identity code after it, and "system roles" takes role ID numbers only. Switch between the three lookup tables and the template above; when done, click "Import & analyze" to check the file from row 5 onwards. The same sheet can also update data in bulk: if the internal ID already exists, its profile, memberships, party profile, ethnicity / native place / household info and roles are updated instead of creating a duplicate.',
       back: 'Back to organization members',
       backHint: 'Return to organization members (keeps the previously selected organization)',
       download: 'Download template',
@@ -2711,7 +2719,7 @@ const messages = {
       count: '{n} in total',
       orgTitle: 'Organizations & IDs',
       orgHint:
-        'Use an organization ID or code before the colon in column D. The first data row determines the format for the whole sheet. Numeric values matching both an ID and a code are treated as IDs.',
+        'Use an organization ID or code before the colon in the organization:identity column. The first data row determines the format for the whole sheet. Numeric values matching both an ID and a code are treated as IDs.',
       posTitle: 'Identities & codes',
       posHint:
         'Use the identity code after the colon in the "organization:identity" column (e.g. ZGDY, ZBSJ). An identity is only valid when its usage scope covers the target organization; check the scope before pairing across organizations.',
@@ -2743,7 +2751,8 @@ const messages = {
         roleName: 'Role name',
         roleCode: 'Role code',
         roleDesc: 'Role description',
-        username: 'Login account (staff/student no.)',
+        uid: 'Internal ID',
+        username: 'Login username',
         orgIdentity: 'Organization:identity',
         partyNo: 'Party member no.',
         joinTime: 'Join date',
@@ -2753,8 +2762,8 @@ const messages = {
         householdType: 'Household type',
       },
       colDesc: {
-        username:
-          'The staff or student number used for login; required, digits only and must be unique. It is also used as the user UID (the backend no longer generates it). Enter real data from row 5 (rows 2 and 3–4 are instructions and examples).',
+        uid: 'Required positive integer with no leading zeros. Used to identify and update the member.',
+        username: 'Leave blank to use the internal ID, or enter a custom username. Letters and digits are allowed. Must be unique within the sheet. Existing members keep their login username.',
         name: 'Real name.',
         gender: 'Fill in "男" (male) or "女" (female).',
         orgIdentity:
@@ -2765,7 +2774,7 @@ const messages = {
         email: 'Email address, e.g. 123@qq.com.',
         birthday: 'Date of birth, preferably as text such as 2000-10-01.',
         roles:
-          'Role ID numbers only (e.g. 15), separated by "/" (e.g. 15/14); do not write role names. Supplied IDs replace existing roles; leave blank to preserve them. Assigned permissions must be within your authority.',
+          'Role ID numbers only (e.g. 15), separated by "/" (e.g. 15/14); do not write role names. Supplied IDs append roles by default; select Replace roles to overwrite; leave blank to preserve them. Assigned permissions must be within your authority.',
         password:
           'Leave blank. Passwords are generated by the server and can be downloaded after import.',
         ethnic: 'Optional; when filled, the import writes it to the user\'s personal profile (ethnicity).',
@@ -2823,6 +2832,9 @@ const messages = {
       exitPreview: 'Exit preview and restore real data',
       importTitle: 'Start import',
       importPassed: 'Check passed: {n} row(s) ready to import',
+      roleMode: 'Role import mode',
+      mergeRoles: 'Append roles',
+      replaceRoles: 'Replace roles',
       importStep1:
         'The server creates missing users with random passwords; existing usernames and passwords are preserved',
       importStep2: 'Write the organization memberships and identities (position codes)',
@@ -2831,7 +2843,7 @@ const messages = {
       importStep5:
         'Write ethnicity / native place / household location / household type into the personal profile (a profile is created automatically when missing)',
       importNote:
-        'The entire import uses one transaction: any failure rolls back all rows. No automatic splitting or retries. Memberships are added without removing existing ones. Supplied roles replace existing roles; blank roles preserve them. Verify results after cancellation or network loss. Download new passwords after success; they are returned only once.',
+        'The entire import uses one transaction: any failure rolls back all rows. No automatic splitting or retries. Memberships are added without removing existing ones. Supplied roles follow the selected append or replace mode; blank roles preserve them. Verify results after cancellation or network loss. Download new passwords after success; they are returned only once.',
       importConfirm: 'Confirm import',
       importConfirmTitle: '{n} row(s) will be written to the system',
       importConfirmDesc:
@@ -2923,18 +2935,18 @@ const messages = {
           'An identity is only valid when its usage scope covers the target organization. For example, "this organization and all descendants" can be used in descendant branches, while "this organization only" can only be used in the owning organization; otherwise the server rejects it with "position does not belong to the target organization".',
         rolesItem: 'System roles',
         roles:
-          'Role ID numbers only, separated by "/", e.g. 15/14. Leave empty to keep the base role only.',
+          'Role ID numbers only, separated by "/", e.g. 15/14. Leave empty to keep existing roles.',
         profileItem: 'Ethnicity / native place / household',
         profile:
           'These four columns are optional. The import writes them into the personal profile and creates the profile automatically when the account has none.',
         importItem: 'How to import',
         import:
-          'Go back to "Bulk add members" and click "Import & analyze" to pick this file (only .xlsx). If the login account (UID) already exists, the user is updated instead of recreated.',
+          'Go back to "Bulk add members" and click "Import & analyze" to pick this file (only .xlsx). If the internal ID already exists, the user is updated instead of recreated.',
       },
       check: {
         unnamed: '(no name)',
-        usernameEmpty: 'Login account is empty; please fill it in',
-        usernameNotNumeric: 'Login account must be digits only (it is used as the user UID)',
+        uidInvalid: 'Internal ID must be a positive integer with no leading zeros, up to 9007199254740991',
+        uidDuplicate: 'Duplicate internal ID ({value}, same as row {row})',
         usernameDuplicate: 'Duplicate login account ({value}, same as row {row})',
         nameEmpty: 'Name is empty; please fill it in',
         gender: 'Gender must be "男" or "女" ({value})',

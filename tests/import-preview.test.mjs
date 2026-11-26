@@ -14,9 +14,9 @@ const member = (uid, name = '导入人员') => ({ row: uid, uid, username: Strin
 })
 const page = (data, current = 1, pages = 1) => ({ data, total: data.length, page: current, total_pages: pages, page_size: 100 })
 const role = { id: 2, code: 'admin', name: '管理', description: '', created_at: '', updated_at: '' }
-function start(members = [member(1), member(3)], existing = [1]) {
+function start(members = [member(1), member(3)], existing = [1], roleMode = 'merge') {
   useAuthStore.getState().setAuth({ token: 'preview-test', username: 'viewer', lastLoginAt: '2020' })
-  useImportPreview.getState().start({ members, existingUids: new Set(existing), fileName: 'test.xlsx',
+  useImportPreview.getState().start({ members, roleMode, existingUids: new Set(existing), fileName: 'test.xlsx',
     returnTo: '/portal/branch/branch_m5', organizations: [{ id: 10, name: '支部' }], roles: [role], positions: [] })
 }
 async function isolated(action) {
@@ -90,6 +90,10 @@ test('组织成员合并所有后端分页、去重任职、重新分页及统�
 
 test('角色覆盖、党员及个人档案合并，未填资料保留原值', async () => isolated(async () => {
   start()
+  const loadRoles = async () => [{ uid: 1, id: 99 }, { uid: 1, id: 2 }]
+  const merged = await readPreviewData('/rbac/users/roles', { uids: '1,3' }, loadRoles)
+  assert.deepEqual(merged.map((item) => [item.uid, item.id]), [[1, 99], [1, 2], [3, 2]])
+  start(undefined, undefined, 'replace')
   const roles = await readPreviewData('/rbac/users/roles', { uids: '1,3' }, async () => [{ uid: 1, id: 99 }])
   assert.deepEqual(roles.map((item) => [item.uid, item.id]), [[1, 2], [3, 2]])
   const party = await readPreviewData('/party/profiles', { uids: '3' }, async () => [])

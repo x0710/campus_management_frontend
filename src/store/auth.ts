@@ -10,6 +10,7 @@ export interface AuthSnapshot {
 }
 
 interface AuthState {
+  loginMethod: 'password' | 'cas' | null
   originalAuth: (AuthSnapshot & { mustChangePassword: boolean; returnTo?: string }) | null
   impersonate: (snapshot: AuthSnapshot, returnTo?: string) => void
   restoreAuth: () => void
@@ -39,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       originalAuth: null,
+      loginMethod: null,
       impersonate: (snapshot, returnTo) => set((state) => ({
         originalAuth: state.originalAuth ?? (state.token && state.username ? {
           token: state.token,
@@ -68,6 +70,7 @@ export const useAuthStore = create<AuthState>()(
       setAuth: ({ token, username, lastLoginAt }, method = 'password', password) =>
         set((state) => ({
           originalAuth: null,
+          loginMethod: method,
           token,
           username,
           lastLoginAt,
@@ -83,6 +86,7 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () =>
         set({
           originalAuth: null,
+          loginMethod: null,
           pendingPassword: null,
           token: null,
           username: null,

@@ -6,7 +6,10 @@ import type { OrganizationInfo } from '../api/types/organizations'
 import type { RoleInfo } from '../api/types/rbac'
 import type { PositionDetail } from '../api/types/positions'
 
+import type { ImportRoleMode } from '../api/partyProfileImports'
+
 export interface ImportPreview {
+  roleMode: ImportRoleMode
   owner: string
   fileName: string
   returnTo: string

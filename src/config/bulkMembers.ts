@@ -117,22 +117,30 @@ export interface BulkTemplateColumn {
 }
 
 /**
- * 样表十四列：与「添加新成员列表.xlsx」表头逐列对应。
+ * 样表十五列：与「添加新成员列表.xlsx」表头逐列对应。
  * 示例值取自样表本身，便于用户照抄格式；「系统角色」只写角色 ID 数字，不写角色名称。
- * 登录账号名与初始密码相邻放在前两列，便于成对填写与核对账号凭证。
- * 后四列（民族 / 籍贯 / 户口所在地 / 户口性质）为可选项，导入时写入该账号的个人档案（没有档案会自动创建）。
+ * 前两列分别填写内部 ID 和登录用户名。
+ * 民族 / 籍贯 / 户口所在地 / 户口性质为可选项，导入时写入该账号的个人档案（没有档案会自动创建）。
  */
 export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
+  {
+    key: 'uid',
+    labelKey: 'bulkMembers.col.uid',
+    descKey: 'bulkMembers.colDesc.uid',
+    required: true,
+    sampleA: '2509332233',
+    sampleB: '2509332234',
+    excelWidth: 22,
+  },
   {
     key: 'username',
     labelKey: 'bulkMembers.col.username',
     descKey: 'bulkMembers.colDesc.username',
-    required: true,
-    sampleA: '1234567890',
-    sampleB: '4567891230',
+    required: false,
+    sampleA: '2509332233',
+    sampleB: '2509332234',
     excelWidth: 22,
   },
-
   {
     key: 'name',
     labelKey: 'adminUsers.fieldName',
@@ -143,15 +151,6 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     excelWidth: 12,
   },
   {
-    key: 'gender',
-    labelKey: 'adminUsers.fieldGender',
-    descKey: 'bulkMembers.colDesc.gender',
-    required: false,
-    sampleA: '男',
-    sampleB: '女',
-    excelWidth: 8,
-  },
-  {
     key: 'orgIdentity',
     labelKey: 'bulkMembers.col.orgIdentity',
     descKey: 'bulkMembers.colDesc.orgIdentity',
@@ -159,6 +158,15 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     sampleA: '1198：ZGDY',
     sampleB: '1198：ZGDY/ZBSJ；1067：SJ',
     excelWidth: 34,
+  },
+  {
+    key: 'roles',
+    labelKey: 'adminUsers.fieldRoles',
+    descKey: 'bulkMembers.colDesc.roles',
+    required: false,
+    sampleA: '15/14',
+    sampleB: '15',
+    excelWidth: 18,
   },
   {
     key: 'partyNo',
@@ -206,15 +214,6 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     excelWidth: 14,
   },
   {
-    key: 'roles',
-    labelKey: 'adminUsers.fieldRoles',
-    descKey: 'bulkMembers.colDesc.roles',
-    required: false,
-    sampleA: '15/14',
-    sampleB: '15',
-    excelWidth: 18,
-  },
-  {
     key: 'ethnic',
     labelKey: 'bulkMembers.col.ethnic',
     descKey: 'bulkMembers.colDesc.ethnic',
@@ -249,6 +248,15 @@ export const BULK_TEMPLATE_COLUMNS: BulkTemplateColumn[] = [
     sampleA: '城镇',
     sampleB: '农村',
     excelWidth: 12,
+  },
+  {
+    key: 'gender',
+    labelKey: 'adminUsers.fieldGender',
+    descKey: 'bulkMembers.colDesc.gender',
+    required: false,
+    sampleA: '男',
+    sampleB: '女',
+    excelWidth: 8,
   },
 ]
 

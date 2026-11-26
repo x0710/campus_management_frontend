@@ -1,12 +1,11 @@
+import ThemeMenu from './ThemeMenu'
 import { getPortalPath, getPortalKeyFromPathname, CAMPUS_PATH, LOGIN_PATH, migrateLegacyPath } from '../config/routes'
 /** 门户系列页面共享顶栏：品牌 / 自定义左侧 / 语言 / 夜间模式 / 用户 / 登出 */
 import {
   DownOutlined,
   KeyOutlined,
   LogoutOutlined,
-  MoonOutlined,
   QuestionCircleOutlined,
-  SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import {
@@ -24,6 +23,7 @@ import {
 import axios from 'axios'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { CAS_LOGOUT_URL } from '../config/auth'
 import { invalidate } from '../api/cache'
 import { changeMyPassword, getCurrentUser } from '../api/auth'
 import { getMyProfile } from '../api/users'
@@ -73,8 +73,6 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const originalAuth = useAuthStore((s) => s.originalAuth)
   const locale = useSettingsStore((s) => s.locale)
   const setLocale = useSettingsStore((s) => s.setLocale)
-  const theme = useSettingsStore((s) => s.theme)
-  const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
   // 真实姓名：登录态只带账户名，姓名需经 GET /api/users/me 获取（走会话缓存，不重复请求）
   const [realName, setRealName] = useState<string | null>(null)
@@ -223,8 +221,13 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
   const handleLogout = () => {
     // 代码要求 17：退出登录先清空接口会话缓存，避免下一个登录用户看到上一个用户的残留数据
     // （如 /credentials/me 被缓存时，会把上一位用户的 uid 带给新用户）
+    const { loginMethod } = useAuthStore.getState()
     invalidate()
     clearAuth()
+    if (loginMethod !== 'password') {
+      window.location.replace(CAS_LOGOUT_URL)
+      return
+    }
     navigate(LOGIN_PATH, { replace: true })
   }
 
@@ -281,15 +284,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             {t('common.reportIssue')}
           </Button>
         </Tooltip>
-        <Tooltip title={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}>
-          <Button
-            type="text"
-            className="header-icon-btn"
-            aria-label={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}
-            icon={theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-            onClick={toggleTheme}
-          />
-        </Tooltip>
+        <ThemeMenu />
         <PortalNoticeBell />
 
         {originalAuth && (

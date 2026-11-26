@@ -1,6 +1,6 @@
 /** 统一综合导入：整批事务提交，不自动拆批或重放写请求。 */
 import axios from 'axios'
-import { importPartyProfiles } from '../../api/partyProfileImports'
+import { type ImportRoleMode, importPartyProfiles } from '../../api/partyProfileImports'
 import { extractErrorReason } from '../../api/common'
 import type { TranslateFn } from '../../i18n'
 import type { ParsedMember } from '../bulkMemberCheck'
@@ -11,6 +11,7 @@ export type { MemberImportOutcome, MemberImportRequestLog } from './types'
 export async function importMemberRows(params: {
   members: ParsedMember[]
   t: TranslateFn
+  roleMode?: ImportRoleMode
   signal?: AbortSignal
   onProgress?: (done: number, total: number) => void
   onLog?: (entry: MemberImportRequestLog) => void
@@ -26,7 +27,7 @@ export async function importMemberRows(params: {
   let status: MemberImportRequestLog['status'] = 'success'
   let message: string | undefined
   try {
-    const results = await importPartyProfiles(members.map(toImportItem), signal)
+    const results = await importPartyProfiles(members.map((member) => toImportItem(member, params.roleMode)), signal)
     const byUid = new Map(results.map((result) => [result.user_id, result]))
     return members.map((member) => {
       const result = byUid.get(member.uid)

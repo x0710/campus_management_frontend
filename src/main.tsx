@@ -6,7 +6,7 @@ import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
-import { StrictMode, useEffect } from 'react'
+import { StrictMode, useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App'
@@ -43,14 +43,22 @@ const zhCNLocale: Locale = zhDatePicker
     }
   : zhCNBase
 
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+function subscribeSystemTheme(notify: () => void) {
+  systemTheme.addEventListener('change', notify)
+  return () => systemTheme.removeEventListener('change', notify)
+}
+const systemIsDark = () => systemTheme.matches
+
 function RootProviders() {
   useClearButtonTabOrder()
   const locale = useSettingsStore((s) => s.locale)  // 语言切换
   const themeMode = useSettingsStore((s) => s.theme)  // 主题切换
-  const dark = themeMode === 'dark'
+  const systemDark = useSyncExternalStore(subscribeSystemTheme, systemIsDark)
+  const dark = themeMode === 'system' ? systemDark : themeMode === 'dark'
 
   // 同步到 <html data-theme>，供自定义 CSS 变量切换明暗配色
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light'
   }, [dark])
 

@@ -5,7 +5,7 @@ import { persist } from 'zustand/middleware'
 
 import type { Locale } from '../types/locale'
 export type { Locale } from '../types/locale'
-export type ThemeMode = 'light' | 'dark'
+export type ThemeMode = 'light' | 'dark' | 'system'
 
 interface SettingsState {
   locale: Locale
@@ -13,7 +13,6 @@ interface SettingsState {
   /** 左侧菜单是否收起（持久化到 localStorage，跨门户与刷新保持） */
   sidebarCollapsed: boolean
   setLocale: (locale: Locale) => void
-  toggleTheme: () => void
   setTheme: (theme: ThemeMode) => void
   setSidebarCollapsed: (collapsed: boolean) => void
 }
@@ -23,14 +22,19 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       locale: 'zh',
-      theme: 'light',
+      theme: 'system',
       sidebarCollapsed: false,
       setLocale: (locale) => set({ locale }),
       setTheme: (theme) => set({ theme }),
-      toggleTheme: () =>
-        set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
     }),
-    { name: 'campus-settings' },
+    {
+      name: 'campus-settings',
+      version: 1,
+      migrate: (persisted) => {
+        const previous = persisted as Partial<SettingsState> | null
+        return { ...previous, theme: previous?.theme === 'dark' ? 'dark' : 'system' } as SettingsState
+      },
+    },
   ),
 )

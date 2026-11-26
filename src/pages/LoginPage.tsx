@@ -1,3 +1,4 @@
+import ThemeMenu from '../components/ThemeMenu'
 import { CAMPUS_PATH } from '../config/routes'
 /**
  * 登录页：
@@ -10,9 +11,7 @@ import { CAMPUS_PATH } from '../config/routes'
  */
 import {
   LockOutlined,
-  MoonOutlined,
   SafetyCertificateOutlined,
-  SunOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Button, Checkbox, Dropdown, Form, Input } from 'antd'
@@ -61,8 +60,6 @@ export default function LoginPage() {
 
   const locale = useSettingsStore((s) => s.locale)
   const setLocale = useSettingsStore((s) => s.setLocale)
-  const theme = useSettingsStore((s) => s.theme)
-  const toggleTheme = useSettingsStore((s) => s.toggleTheme)
 
   // 已登录用户访问 LOGIN_PATH 时直接进入角色解析页
   if (token) {
@@ -141,12 +138,7 @@ export default function LoginPage() {
             {locale === 'zh' ? '中' : 'EN'}
           </Button>
         </Dropdown>
-        <Button
-          type="text"
-          size="small"
-          icon={theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-          onClick={toggleTheme}
-        />
+        <ThemeMenu compact />
       </div>
 
       {/* 登录小窗：桌面端位于纪念碑右侧留白区，窄屏回归居中 */}

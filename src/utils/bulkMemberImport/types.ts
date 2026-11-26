@@ -12,7 +12,7 @@ export interface MemberImportOutcome {
   name: string
   /** 登录账号名（必填） */
   username: string
-  /** 用户 ID（必填；导入时由登录账号名得到） */
+  /** 用户 ID（必填；来自内部 ID 列） */
   uid: number | null
   /** create = 新建账号；update = 账号已存在，更新其资料 */
   action: 'create' | 'update'

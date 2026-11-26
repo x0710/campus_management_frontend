@@ -6,12 +6,15 @@ import type { ProfileDetailCreateRequest } from './types/profileDetails'
 import type { PartyProfileUpdateRequest } from './types/partyProfiles'
 import type { MemberBatchCreate } from './types/organizations'
 
+export type ImportRoleMode = 'merge' | 'replace'
+
 export interface PartyProfileImportItem {
   user_id: number
   user?: Pick<UserCreateRequest, 'uid' | 'username' | 'name' | 'gender'>
   changes?: UserUpdateRequest
   profile?: ProfileDetailCreateRequest
   party: PartyProfileUpdateRequest
+  role_mode?: ImportRoleMode
   role_ids?: number[]
   members?: MemberBatchCreate[]
 }

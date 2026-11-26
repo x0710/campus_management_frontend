@@ -124,9 +124,11 @@ async function mergePreview(url: string, params: Params, load: Load, preview: Im
   if (url === '/rbac/users/roles') {
     const real = await load(url, params) as Row[]
     const replacements = new Map(selected.filter((member) => member.roleIds.length).map((member) => [member.uid, member]))
-    return [...real.filter((row) => !replacements.has(Number(row.uid))), ...[...replacements.values()].flatMap((member) => member.roleIds.flatMap((id) => {
+    const retained = preview.roleMode === 'replace' ? real.filter((row) => !replacements.has(Number(row.uid))) : real
+    const existing = new Set(retained.map((row) => `${row.uid}:${row.id}`))
+    return [...retained, ...[...replacements.values()].flatMap((member) => member.roleIds.flatMap((id) => {
       const role = preview.roles.find((item) => item.id === id)
-      return role ? [{ ...role, uid: member.uid }] : []
+      return role && !existing.has(`${member.uid}:${id}`) ? [{ ...role, uid: member.uid }] : []
     }))]
   }
   if (url === '/user-positions') {

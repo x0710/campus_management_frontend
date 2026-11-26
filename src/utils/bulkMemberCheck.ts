@@ -14,6 +14,8 @@
 import type { OrganizationInfo } from '../api/types/organizations'
 import type { PositionDetail } from '../api/types/positions'
 import type { RoleInfo } from '../api/types/rbac'
+import { BULK_TEMPLATE_COLUMNS } from '../config/bulkMembers'
+import messages from '../i18n/messages'
 import type { TranslateFn } from '../i18n'
 import type { XlsxCellValue } from './xlsxReader'
 
@@ -33,7 +35,7 @@ export interface MemberCheckIssue {
 export interface ParsedMember {
   /** Excel 行号（1 基，必填） */
   row: number
-  /** 用户 ID：创建接口要求前端指定，这里直接取登录账号名（须为纯数字） */
+  /** 用户 ID：创建接口要求前端指定，由内部 ID 列提供 */
   uid: number
   username: string
   name: string
@@ -243,12 +245,21 @@ export function analyzeMemberRows(params: {
   const orgIdSet = new Set(orgs.map((org) => org.id))
   const orgById = new Map(orgs.map((org) => [org.id, org]))
   const orgIdByCode = new Map(orgs.map((org) => [org.code, org.id]))
-  // 旧版模板 B 列为初始密码；新版删除该列，组织身份移至 D 列。
+  // 旧模板共用账号与 UID，其中最早的版本还带有初始密码列。
+  const firstHeader = normalizeCellText(rows[0]?.[0] ?? null)
+  const separateUsername = Object.values(messages).some((locale) => firstHeader === locale.bulkMembers.col.uid)
   const legacyPasswordColumn = /密码|password/i.test(normalizeCellText(rows[0]?.[1] ?? null))
-  const columnCount = legacyPasswordColumn ? 15 : 14
-  const orgColumn = legacyPasswordColumn ? 4 : 3
+  const fourthHeader = normalizeCellText(rows[0]?.[3] ?? null)
+  const currentLayout = separateUsername && Object.values(messages).some((locale) =>
+    fourthHeader === locale.bulkMembers.col.orgIdentity)
+  const columns = currentLayout ? BULK_TEMPLATE_COLUMNS.map((column) => column.key) : [
+    'uid', ...(separateUsername ? ['username'] : legacyPasswordColumn ? ['password'] : []),
+    'name', 'gender', 'orgIdentity', 'partyNo', 'joinTime', 'phone', 'email', 'birthday',
+    'roles', 'ethnic', 'nativePlace', 'householdLocation', 'householdType',
+  ]
+  const orgColumn = columns.indexOf('orgIdentity')
   // 从第一条非空实际数据判断整表格式，跳过模板说明、示例及空行。
-  const firstRow = rows.slice(startRow - 1).find((row) => row.slice(0, columnCount).some((cell) => normalizeCellText(cell) !== ''))
+  const firstRow = rows.slice(startRow - 1).find((row) => row.slice(0, columns.length).some((cell) => normalizeCellText(cell) !== ''))
   const firstSegment = normalizeCellText(firstRow?.[orgColumn] ?? null).split(';')[0] ?? ''
   const firstOrg = stripParenthetical(firstSegment.split(':')[0] ?? '').trim()
   // 纯数字同时命中 ID 和 code 时优先 ID；仅命中 code 时支持纯数字组织编码。
@@ -259,46 +270,39 @@ export function analyzeMemberRows(params: {
 
   const members: ParsedMember[] = []
   const issues: MemberCheckIssue[] = []
+  const seenUids = new Map<number, number>()
   const seenUsernames = new Map<string, number>()
   let total = 0
 
   for (let rowNumber = startRow; rowNumber <= rows.length; rowNumber += 1) {
     const row = rows[rowNumber - 1] ?? []
-    // 前 10 列是账号 / 任职 / 角色信息（旧模板为 11 列），后 4 列是个人档案信息（均可空）
-    const cells = Array.from({ length: columnCount }, (_, index) => normalizeCellText(row[index] ?? null))
+    const cells = columns.map((_, index) => normalizeCellText(row[index] ?? null))
     // 整行为空（含只有格式没有内容）时跳过，不参与统计也不报错
     if (cells.every((cell) => cell === '')) continue
     total += 1
 
-    if (legacyPasswordColumn) cells.splice(1, 1)
-    const [
-      username,
-      name,
-      gender,
-      orgIdentity,
-      partyNo,
-      joinTime,
-      phone,
-      email,
-      birthday,
-      roleText,
-      ethnic,
-      nativePlace,
-      householdLocation,
-      householdType,
-    ] = cells
+    const uidText = cells[0]
+    const uid = Number(uidText)
+    const suppliedUsername = separateUsername ? String(row[1] ?? '').trim() : ''
+    const username = suppliedUsername || uidText
+    const {
+      name, gender, orgIdentity, partyNo, joinTime, phone, email, birthday, roles: roleText,
+      ethnic, nativePlace, householdLocation, householdType,
+    } = Object.fromEntries(columns.map((key, index) => [key, cells[index]]))
 
     const rowIssues: MemberCheckIssue[] = []
     const addIssue = (field: string, message: string) => {
       rowIssues.push({ row: rowNumber, name: name || t('bulkMembers.check.unnamed'), field, message })
     }
 
-    // 登录账号名（同时作为用户 UID：创建接口已要求前端指定 uid，故必须为纯数字）
-    if (!username) {
-      addIssue(t('bulkMembers.col.username'), t('bulkMembers.check.usernameEmpty'))
-    } else if (!/^[1-9]\d*$/.test(username)) {
-      addIssue(t('bulkMembers.col.username'), t('bulkMembers.check.usernameNotNumeric'))
-    } else if (seenUsernames.has(username)) {
+    if (!/^[1-9]\d*$/.test(uidText) || !Number.isSafeInteger(uid)) {
+      addIssue(t('bulkMembers.col.uid'), t('bulkMembers.check.uidInvalid'))
+    } else if (seenUids.has(uid)) {
+      addIssue(t('bulkMembers.col.uid'), t('bulkMembers.check.uidDuplicate', { value: uidText, row: seenUids.get(uid) ?? '' }))
+    } else {
+      seenUids.set(uid, rowNumber)
+    }
+    if (username && seenUsernames.has(username)) {
       addIssue(
         t('bulkMembers.col.username'),
         t('bulkMembers.check.usernameDuplicate', {
@@ -306,7 +310,7 @@ export function analyzeMemberRows(params: {
           row: seenUsernames.get(username) ?? '',
         }),
       )
-    } else {
+    } else if (username) {
       seenUsernames.set(username, rowNumber)
     }
 
@@ -432,14 +436,11 @@ export function analyzeMemberRows(params: {
       }
     }
 
-    // 初始密码（必填）
-
-
     issues.push(...rowIssues)
     if (rowIssues.length === 0) {
       members.push({
         row: rowNumber,
-        uid: Number(username),
+        uid,
         username,
         name,
         gender: normalizedGender,
