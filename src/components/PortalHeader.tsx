@@ -29,11 +29,11 @@ import { changeMyPassword, getCurrentUser } from '../api/auth'
 import { getMyProfile } from '../api/users'
 import { useErrorFeedback } from '../composables/useErrorFeedback'
 import {
+  DEFAULT_PORTAL_KEY,
   getAccessiblePortalKeys,
   getPortal,
   isPortalDisabled,
   isSuperAdminRole,
-  PARTY_PORTAL_KEY,
   PORTAL_PROFILE_MODULE_KEYS,
   PORTALS,
   type PortalKey,
@@ -279,7 +279,7 @@ export default function PortalHeader({ left }: PortalHeaderProps) {
             className="feedback-nav-btn"
             aria-label={t('common.reportIssue')}
             icon={<QuestionCircleOutlined />}
-            onClick={() => navigate(`${getPortalPath(currentPortalKey ?? PARTY_PORTAL_KEY)}/feedback`)}
+            onClick={() => navigate(`${getPortalPath(currentPortalKey ?? DEFAULT_PORTAL_KEY)}/feedback`)}
           >
             {t('common.reportIssue')}
           </Button>

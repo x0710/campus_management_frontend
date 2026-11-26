@@ -1,12 +1,12 @@
 import { resolveDefaultPartyPortalKey, getAccessiblePartyPortalKeys } from './partyPortalPositions'
+import { PROJECT } from '../projects'
 /** 门户模块配置, 提供门户模块的定义和状态管理，包括图标、颜色、模块列表等 */
 /**
  * 每个工作端（学生端、教师端、产品层门户、管理员端）对应一个门户模块。
  * 模块包含图标、主色渐变、主色、规划功能列表（i18n key 后缀 + 状态）。
  *
- * 学生端 / 教师端 / 领导端当前为「已停用」状态：定义保留（代码与模块仍在），
- * 但不展示入口、不在可访问门户列表中、直接输入 URL 也会被重定向回角色默认门户，
- * 见 DISABLED_PORTAL_KEYS 与 isPortalDisabled。
+ * 学生端 / 教师端 / 领导端等门户的模块定义全部保留（同一份代码被两个项目复用），
+ * 但只有当前项目 portals 列表里的门户会被注册成路由，见 src/projects/。
  */
 
 import {
@@ -242,19 +242,21 @@ export function getPortal(key: string | undefined): PortalDef | undefined {
 }
 
 /**
- * 已停用的门户（学生端 / 教师端 / 领导端）。
- * 代码与模块定义均保留，但对外不开放：可访问门户列表会过滤掉它们，
- * PortalWorkspace 也会把直接输入 <门户路径> 的访问重定向回角色默认门户。
+ * 当前项目对外提供的门户。
+ * 门户定义（图标、模块）全部保留在 PORTALS 中供所有项目复用，
+ * 但只有这里列出的门户会在当前项目里被注册成路由、出现在入口里；
+ * 「哪些门户属于哪个项目」由 src/projects/ 决定，不再写死在本文件。
  */
-export const DISABLED_PORTAL_KEYS: PortalKey[] = ['student', 'teacher', 'leader']
+export const ENABLED_PORTAL_KEYS: readonly PortalKey[] = PROJECT.portals
 
 /**
- * 判断门户是否已停用（不可访问）。
+ * 判断门户是否不属于当前项目（因此不可访问）。
+ * 代码与模块定义仍然保留，只是当前项目不对外开放。
  * @param key 门户 key（可为 undefined，例如 URL 参数缺失时）
- * @returns true 表示该门户已停用
+ * @returns true 表示该门户不属于当前项目
  */
 export function isPortalDisabled(key: string | undefined): boolean {
-  return DISABLED_PORTAL_KEYS.includes(key as PortalKey)
+  return !PROJECT.portals.includes(key as PortalKey)
 }
 
 /**
@@ -318,10 +320,10 @@ export function isSuperAdminRole(role: PortalRole): boolean {
   return role.code.trim().toLowerCase() === 'super_admin'
 }
 
-/** 默认门户：所有人登录后默认进入党员端（支部书记 / 党委委员 / 校级党委按任职职位另行分流） */
-export const DEFAULT_PORTAL_KEY: PortalKey = 'party'
+/** 默认门户：当前项目的 defaultPortal（党建项目为党员端，校园平台为学生端） */
+export const DEFAULT_PORTAL_KEY: PortalKey = PROJECT.defaultPortal
 
-/** 党员端门户 key：默认门户，全部登录用户可访问 */
+/** 党员端门户 key（党建项目的默认门户；校园平台不提供该门户，见 src/projects/） */
 export const PARTY_PORTAL_KEY: PortalKey = 'party'
 
 /** 党委支部端门户 key：仅支部书记（party_branch）职位可访问 */
@@ -345,30 +347,39 @@ export const PORTAL_PROFILE_MODULE_KEYS: Partial<Record<PortalKey, string>> = {
 }
 
 /**
- * 登录后默认门户：支部职位（party_branch）→ 党委支部端；
+ * 登录后默认门户：当前项目不含党建门户时直接使用 defaultPortal；
+ * 否则按任职职位分流：支部职位（party_branch）→ 党委支部端；
  * 学院职位（party_committee）→ 党委学院端；学校职位（party_sch）→ 党委学校端；其余 → 党员端。
  * 多个职位同时命中时按支部、学院、学校的顺序优先。
  * @param positions 当前用户的任职职位编码（必填）
- * @returns 默认进入的 PortalKey（必返回；无匹配职位时为党员端）
+ * @returns 默认进入的 PortalKey（必返回）
  */
 export function resolveDefaultPortalKey(positions: { code: string }[]): PortalKey {
-  return resolveDefaultPartyPortalKey(positions)
+  const partyDefault = resolveDefaultPartyPortalKey(positions)
+  // 校园平台不提供任何党建门户，按任职职位分流没有意义，直接落到项目默认门户
+  return isPortalDisabled(partyDefault) ? DEFAULT_PORTAL_KEY : partyDefault
 }
 
 /**
- * 根据系统角色和组织任职获取当前用户可访问的全部门户：
- *   党员端：全部登录用户；
+ * 根据系统角色和组织任职获取当前用户可访问的全部门户（只含当前项目提供的门户）：
+ *   项目默认门户：所有登录用户可访问（党建项目为党员端，校园平台为学生端）；
  *   党委支部端：支部职位及学院、学校上级职位；
  *   党委学院端：学院职位及学校上级职位；
  *   党委学校端：仅校级党委职位（party_sch）；
- *   其余门户（管理端）仍按原有角色 code 映射；学生端 / 教师端 / 领导端已停用，不会返回。
- * 返回顺序为党员端 / 支部端 / 学院端 / 学校端在前，其余按 PORTALS 定义顺序。
+ *   其余门户（管理端 / 学生端 / 教师端 / 领导端）仍按原有角色 code 映射。
+ * 返回顺序为项目默认门户、党建各端在前，其余按 PORTALS 定义顺序。
  * @param roles 当前用户的角色列表（必填）
- * @returns 非空的 PortalKey 数组（必返回；至少包含党员端）
+ * @returns 非空的 PortalKey 数组（必返回；至少包含项目默认门户）
  */
 export function getAccessiblePortalKeys(roles: PortalRole[], positions: { code: string }[] = []): PortalKey[] {
-  const allowed = new Set<PortalKey>([PARTY_PORTAL_KEY, ...getPortalKeysByRoleCodes(roles.map((role) => role.code))])
-  const partyKeys: PortalKey[] = getAccessiblePartyPortalKeys(positions)
+  const allowed = new Set<PortalKey>([
+    DEFAULT_PORTAL_KEY,
+    ...getPortalKeysByRoleCodes(roles.map((role) => role.code)),
+  ])
+  // 当前项目不提供的门户不进可访问列表（例如校园平台没有党员端 / 支部端）
+  const partyKeys: PortalKey[] = getAccessiblePartyPortalKeys(positions).filter(
+    (key) => !isPortalDisabled(key),
+  )
   const restKeys = PORTALS.filter(
     (portal) =>
       allowed.has(portal.key) && !partyKeys.includes(portal.key) && !isPortalDisabled(portal.key),

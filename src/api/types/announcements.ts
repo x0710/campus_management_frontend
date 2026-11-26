@@ -61,6 +61,8 @@ export interface AnnouncementQuery extends PageQuery, CreatedDateQuery {
   priority?: AnnouncementPriority
   status?: AnnouncementStatus
   publisher_id?: number
+  /** 按用户 ID 批量筛选（逗号分隔，如 "1,2,3"） */
+  uids?: string
   /** 创建时间起始（含，RFC3339） */
   from_at?: string
   /** 创建时间截止（含，RFC3339） */

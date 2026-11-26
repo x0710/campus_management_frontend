@@ -173,8 +173,8 @@ function PortalWorkspaceContent() {
     return groups
   }, [readyModules, previewModules, pendingModules, plannedModules, t])
 
-  // 门户 key 非法或该门户已停用（学生端 / 教师端 / 领导端）时回到默认门户：
-  // 直接输入 <门户路径>/... 也无法进入，代码保留但不再工作
+  // 门户 key 非法或该门户不属于当前项目时回到默认门户：
+  // 直接输入 <门户路径>/... 也无法进入（路由本身也只在当前项目的门户上注册）
   if (!portal || isPortalDisabled(portal.key)) {
     return <Navigate to={CAMPUS_PATH} replace />
   }

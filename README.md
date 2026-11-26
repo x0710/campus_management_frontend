@@ -41,10 +41,43 @@ yarn lint
 yarn build
 ```
 
-站点基础路径通过 `VITE_APP_BASE` 配置，默认 `/campus/party`。
+---
+
+### 两个项目（党建 / 校园平台）
+
+本仓库用**同一份代码**承载两个部署项目。两个项目的区别只在于「对外提供哪些门户」，
+不需要也不要靠长期分支隔离。
+
+| 项目 | 启动 / 构建 | 站点基路径 | 对外门户 |
+| --- | --- | --- | --- |
+| 党建（默认） | `yarn dev:party` / `yarn build:party` | `/campus/party` | 党员端、支部端、党委学院端、党委学校端、管理端 |
+| 校园平台 | `yarn dev:campus` / `yarn build:campus` | `/campus` | 学生端、教师端、领导端、管理端 |
+
+`yarn dev` / `yarn build` 等价于党建项目，与历史行为一致。
+两个项目的构建产物分别输出到 `dist/` 与 `dist/campus/`，互不覆盖。
+
+门户清单只在一处维护：`src/projects/index.ts`。新增或调整门户请改那里，
+不要再增加「停用门户」这类反向开关——不在项目清单里的门户，连路由都不会注册。
+
+以后改动的归属判断：
+
+| 改动性质 | 放哪里 |
+| --- | --- |
+| 某个门户的页面 / 功能 | `src/pages/<门户>/` |
+| 两个项目都要的（组织、成员、审批、请求、i18n 引擎） | 现有 `src/api`、`src/composables`、`src/hooks`、`src/components`、`src/utils` |
+| 只影响某个项目的门户组合 / 品牌 / 术语 | `src/projects/` |
+| 新增一个学校或客户 | 在 `src/projects/` 增加一个项目定义 |
+
+分支只用于功能开发（`main` + `feature/*`）。不要再为「项目」建长期分支：
+项目是构建配置，不是代码分叉，长期双分支只会让合并冲突不断累积。
+
+---
+
+站点基础路径通过 `VITE_APP_BASE` 配置，默认 `/campus/party`；所属项目通过 `VITE_PROJECT` 配置。
 复制 `.env.example` 为 `.env.local`：
 
 ```dotenv
+VITE_PROJECT=party
 VITE_APP_BASE=/campus/party
 # 留空时 API 自动使用站点基础路径下的 /api，也可独立填写完整后端地址。
 VITE_API_BASE=
@@ -58,7 +91,7 @@ Vite 的 `base` 与运行时的 `APP_BASE` 共用这项配置；页面路由、J
 同源部署需配置 Nginx 静态文件映射与页面回退，跨域 API 需由后端允许前端来源的 CORS 请求。
 本地 Vite 代理将配置的 API 路径转发到 `http://localhost:8000/api`。
 
-默认部署地址：
+默认部署地址（党建项目，基路径 `/campus/party`）：
 
 | 入口 | 路径 |
 | --- | --- |
@@ -67,9 +100,19 @@ Vite 的 `base` 与运行时的 `APP_BASE` 共用这项配置；页面路由、J
 | 党员个人端 | `/campus/party/member` |
 | 支部、学院、学校端 | `/campus/party/branch`、`/campus/party/academy`、`/campus/party/school` |
 | 管理端 | `/campus/admin`（与站点基础路径同级，不带 party 前缀） |
-| 学生、教师、领导端 | `/campus/party/student`、`/campus/party/teacher`、`/campus/party/leader` |
 | 静态资源 | `/campus/party/assets/...` |
 | API | `/campus/party/api/...` |
+
+校园平台（基路径 `/campus`）同样结构：
+
+| 入口 | 路径 |
+| --- | --- |
+| 站点与门户选择 / 登录 | `/campus`、`/campus/login` |
+| 学生端 | `/campus/student` |
+| 教师端 | `/campus/teacher` |
+| 领导端 | `/campus/leader` |
+| 管理端 | `/campus/admin` |
+| 静态资源 / API | `/campus/assets/...`、`/campus/api/...` |
 
 旧 `/campus/login`、`/campus/admin/...`、`/campus/party/admin/...`、`/portal/...` 等地址进入前端后会迁移并保留参数和锚点。
 多应用共用域名时，Nginx 是否继续把旧地址交给本应用需单独配置；新链接始终使用站点基础路径。

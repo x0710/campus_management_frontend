@@ -23,6 +23,8 @@ export interface DailyRecordInfo {
   occurred_at: string
   /** 记录人姓名；历史数据可能为空 */
   recorder_name: string | null
+  /** 创建时间（RFC3339） */
+  created_at: string
 }
 
 /** 日常记录详情（api.json: DailyRecordDetail） */

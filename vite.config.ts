@@ -29,15 +29,19 @@ function adminBasePlugin(adminBase: string, appBase: string): Plugin {
   }
 }
 
-// 后端（campus-server）默认监听 [::]:8000，且未配置 CORS，
-// 开发环境将部署用 API 前缀转发到后端 /api，保持同源访问。
+// 后端（campus-server）未配置 CORS，开发环境把 API 前缀转发到后端 /api，保持同源访问。
+// 后端地址只写在本机 .env.local 的 VITE_PROXY_TARGET，不进版本库；缺省指向本地 8000 端口。
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   const appBase = normalizeAppBase(env.VITE_APP_BASE || DEFAULT_APP_BASE)
   const adminBase = adminBaseOf(appBase)
   const apiBase = (env.VITE_API_BASE?.trim() || `${appBase}/api`).replace(/\/+$/, '')
+  const proxyTarget = env.VITE_PROXY_TARGET?.trim() || 'http://localhost:8000'
+  // 校园平台与党建项目基路径不同，产物分开输出，避免两者互相覆盖
+  const isCampus = env.VITE_PROJECT === 'campus'
   return {
     base: `${appBase}/`,
+    build: { outDir: isCampus ? 'dist/campus' : 'dist' },
     plugins: [react(), adminBasePlugin(adminBase, appBase)],
     resolve: {
       // react / react-dom 安装在 campus-ts/node_modules，antd 等安装在 frontend/node_modules，
@@ -48,12 +52,12 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         ...(apiBase.startsWith('/') ? { [apiBase]: {
-          target: 'http://localhost:8000',
+          target: proxyTarget,
           changeOrigin: true,
           rewrite: (path: string) => `/api${path.slice(apiBase.length)}`,
         } } : {}),
         '/api': {
-          target: 'http://localhost:8000',
+          target: proxyTarget,
           changeOrigin: true,
         },
       },

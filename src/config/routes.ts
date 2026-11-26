@@ -1,6 +1,7 @@
 import type { PortalKey } from './portals'
 import { appPath, APP_BASE } from './appBase'
 import { adminBaseOf } from './deployment'
+import { PROJECT } from '../projects'
 
 export const CAMPUS_PATH = appPath()
 export const LOGIN_PATH = appPath('login')
@@ -19,8 +20,16 @@ export const PORTAL_PATHS: Record<PortalKey, string> = {
 }
 
 export function getPortalPath(portalKey?: string): string {
-  return portalKey && Object.hasOwn(PORTAL_PATHS, portalKey) ? PORTAL_PATHS[portalKey as PortalKey] : PORTAL_PATHS.party
+  return portalKey && Object.hasOwn(PORTAL_PATHS, portalKey)
+    ? PORTAL_PATHS[portalKey as PortalKey]
+    : PORTAL_PATHS[PROJECT.defaultPortal]
 }
+
+/**
+ * 当前项目对外提供的门户路径。
+ * 路由只注册这些路径：不属于当前项目的门户，入口和页面路由都不存在。
+ */
+export const ENABLED_PORTAL_PATHS: string[] = PROJECT.portals.map((key) => PORTAL_PATHS[key])
 
 /** 先匹配较深的支部/党委路径，避免被党员端前缀覆盖。 */
 const portalPaths = (Object.entries(PORTAL_PATHS) as [PortalKey, string][])
