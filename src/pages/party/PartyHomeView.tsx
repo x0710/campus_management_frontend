@@ -12,18 +12,19 @@ import { usePortalParams } from '../../hooks/usePortalParams'
  * 分数与近期记录：经 useMyPartyScores 接真实接口 GET /api/party-scores，
  * 按创建时间倒序取最近 PARTY_RECENT_RECORD_LIMIT 条。
  * 近期记录不再直接展示申请分数（避免被误认为已获得成绩），而是展示审核状态
- * 「审核中 / 申请成功 / 被驳回」；双击记录跳转到独立申报详情页（申请内容 + 审核内容）。
+ * 「审核中 / 申请成功 / 被驳回」；手机端点按记录在当前页查看详情。
  *
  * 先锋指数由 computePartyScoreSummary 计算：基础分 70 + 加分项（封顶 30），总分封顶 100，减分固定 0。
  */
 import { isPartyScoreDeduction } from '../../utils/partyScore'
-import { Skeleton, Spin, Tag } from 'antd'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Button, Collapse, Grid, Skeleton, Spin, Tag } from 'antd'
+import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { getOrganizationTree } from '../../api/organizations'
 import type { PartyScore } from '../../api/types/partyScores'
 import ErrorState from '../../components/ErrorState'
-import PartyScoreSummary from '../../components/PartyScoreSummary'
+import PartyScoreDetailModal from '../../components/PartyScoreDetailModal'
+import { PartyScoreSummaryContent } from '../../components/PartyScoreSummary'
 import PartyApprovalEntry from '../../components/PartyApprovalEntry'
 import { useCurrentIdentity } from '../../composables/useCurrentIdentity'
 import { useMyPartyScores } from '../../composables/useMyPartyScores'
@@ -37,11 +38,16 @@ import { SCHOOL_COLLEGE_PARENT_ORG_ID } from '../../config/organization'
 import { useT } from '../../i18n'
 import { useAuthStore } from '../../store/auth'
 
+const Declaration = lazy(() => import('./PartyDeclarationView'))
+const MemberProfile = lazy(() => import('./PartyProfileView').then((module) => ({ default: module.ProfileDescriptions })))
+const Notifications = lazy(() => import('./PartyProfileView').then((module) => ({ default: module.NotificationsList })))
+
 /** 近期记录日期标签：月.日（数值型，各语言下通用；时间非法时返回占位符） */
-function formatRecordDate(value: string): string {
+function formatRecordDate(value: string, showYear: boolean): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getMonth() + 1}.${date.getDate()}`
+  const monthDay = `${date.getMonth() + 1}.${date.getDate()}`
+  return showYear ? `${date.getFullYear()}.${monthDay}` : monthDay
 }
 
 /** 顶部组织链路：仅包含组织 2 的子组织，按「当前组织 → 上级组织」排列。 */
@@ -63,7 +69,16 @@ export default function PartyHomeView() {
     organizationIds,
     loading: identityLoading,
   } = useCurrentIdentity()
-  const { records, loading, error, refresh } = useMyPartyScores()
+  const scores = useMyPartyScores()
+  const { records, loading, error, refresh } = scores
+  const mobile = Grid.useBreakpoint().md === false
+  const [recordLimit, setRecordLimit] = useState(PARTY_RECENT_RECORD_LIMIT)
+  const [detail, setDetail] = useState<PartyScore | null>(null)
+  const [panels, setPanels] = useState<string[]>([])
+  const submitted = useCallback(() => {
+    setPanels((open) => open.filter((key) => key !== 'declare'))
+    refresh(true)
+  }, [refresh])
   const templateNames = usePartyTemplateNames()
   /** 首页顶部完整组织链路：组织树返回后一次性写入，避免各级组织分批出现 */
   const [orgChain, setOrgChain] = useState<PartyOrgChain | null>(null)
@@ -126,14 +141,8 @@ export default function PartyHomeView() {
 
   /** 近期记录：创建时间倒序后截取固定条数 */
   const recentRecords = useMemo(
-    () =>
-      [...records]
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        )
-        .slice(0, PARTY_RECENT_RECORD_LIMIT),
-    [records],
+    () => records.slice(0, mobile ? recordLimit : PARTY_RECENT_RECORD_LIMIT),
+    [records, mobile, recordLimit],
   )
 
   // 近期记录审核状态：已核定分数直接判定成功，其余读取审批记录区分「被驳回 / 审核中」
@@ -151,7 +160,7 @@ export default function PartyHomeView() {
   }
 
   return (
-    <div className="party-view">
+    <div className="party-view party-home">
       {/* 顶部：姓名 | 完整组织链路（解析完成前展示骨架屏，避免刷新时跳变） */}
       <section className="party-profile">
         {headerLoading ? (
@@ -178,8 +187,13 @@ export default function PartyHomeView() {
       </section>
 
       {/* 总成绩：先锋指数 + 基础分/加分项/减分 */}
-      <PartyScoreSummary />
+      <PartyScoreSummaryContent {...scores} />
       <PartyApprovalEntry />
+
+      {mobile && <Collapse className="party-home-tools" activeKey={panels} onChange={setPanels} expandIconPlacement="end" items={[
+        { key: 'declare', label: t('partyDeclaration.formTitle'), children: <Suspense fallback={<Skeleton active />}><Declaration onHomeSubmit={submitted} /></Suspense> },
+        { key: 'profile', label: t('partyProfile.tabProfile'), children: <Suspense fallback={<Skeleton active />}><MemberProfile /></Suspense> },
+      ]} />}
 
       {/* 近期记录：本人最近若干条成绩申报 */}
       <section className="party-records">
@@ -197,37 +211,43 @@ export default function PartyHomeView() {
             {recentRecords.map((record) => {
               const status = statuses.get(record.id)
               return (
-                <li
-                  key={record.id}
-                  className="party-record-item"
-                  style={{ cursor: 'pointer' }}
-                  title={t('partyDeclaration.rowClickHint')}
-                  onDoubleClick={() => openRecordDetail(record)}
-                >
-                  <span className="party-record-date">
-                    {formatRecordDate(record.created_at)}
-                  </span>
-                  <span className="party-record-act">
-                    {isPartyScoreDeduction(record) ? t('partyDeduction.type') : record.template_id != null
-                      ? templateNames.get(record.template_id) ?? record.template_id
-                      : t('common.unknown')}
-                  </span>
-                  {/* 近期记录只展示审核状态，不展示申请分数，避免被误认为已获得成绩 */}
-                  <span className="party-record-status">
-                    {isPartyScoreDeduction(record) ? <Tag color="error">{t('partyDeduction.success')}</Tag> : status ? (
-                      <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
-                        {t(`partyDeclaration.applicationStatus_${status}`)}
-                      </Tag>
-                    ) : (
-                      <Spin size="small" />
-                    )}
-                  </span>
+                <li key={record.id}>
+                  <button type="button" className="party-record-item"
+                    onClick={() => mobile ? setDetail(record) : openRecordDetail(record)}>
+                    <span className="party-record-date">
+                      {formatRecordDate(record.created_at, mobile)}
+                    </span>
+                    <span className="party-record-act">
+                      {isPartyScoreDeduction(record) ? t('partyDeduction.type') : record.template_id != null
+                        ? templateNames.get(record.template_id) ?? record.template_id
+                        : t('common.unknown')}
+                    </span>
+                    {/* 近期记录只展示审核状态，不展示申请分数，避免被误认为已获得成绩 */}
+                    <span className="party-record-status">
+                      {isPartyScoreDeduction(record) ? <Tag color="error">{t('partyDeduction.success')}</Tag> : status ? (
+                        <Tag color={PARTY_SCORE_APPLICATION_STATUS_COLOR[status]}>
+                          {t(`partyDeclaration.applicationStatus_${status}`)}
+                        </Tag>
+                      ) : (
+                        <Spin size="small" />
+                      )}
+                    </span>
+                    {mobile && record.reason?.trim() && <span className="party-home-reason">{record.reason}</span>}
+                  </button>
                 </li>
               )
             })}
           </ul>
         )}
+        {mobile && !loading && !error && records.length > recentRecords.length && (
+          <Button block onClick={() => setRecordLimit((limit) => limit + PARTY_RECENT_RECORD_LIMIT)}>{t('party.moreRecords')}</Button>
+        )}
       </section>
+      {mobile && <section className="party-home-notices">
+        <h3>{t('partyProfile.tabNotifications')}</h3>
+        <Suspense fallback={<Skeleton active />}><Notifications compact /></Suspense>
+      </section>}
+      {detail && <PartyScoreDetailModal record={detail} templateNames={templateNames} onClose={() => setDetail(null)} />}
     </div>
   )
 }

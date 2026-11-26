@@ -90,7 +90,7 @@ interface TemplateRulesState {
  * 党员端：成绩申报（表单 + 本人申报记录）
  * @returns 类型：Element
  */
-export default function PartyDeclarationView() {
+export default function PartyDeclarationView({ onHomeSubmit }: { onHomeSubmit?: () => void } = {}) {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const { message } = AntdApp.useApp()
@@ -297,7 +297,7 @@ export default function PartyDeclarationView() {
   const { data, total, loading, error, page, pageSize, setPage, setPageSize, reload, refresh, dateQuery, setDateQuery } =
     usePaginated<PartyScore>(
       async (query, force): Promise<PaginatedResponse<PartyScore>> => {
-        if (myUid === null) {
+        if (onHomeSubmit || myUid === null) {
           return Promise.resolve({
             data: [],
             total: 0,
@@ -317,8 +317,8 @@ export default function PartyDeclarationView() {
 
   /** user_id 就绪后重新拉取本人申报记录 */
   useEffect(() => {
-    if (myUid !== null) reload()
-  }, [myUid, reload])
+    if (!onHomeSubmit && myUid !== null) reload()
+  }, [myUid, reload, onHomeSubmit])
 
   /** 申报类型 ID → 名称，用于列表与详情展示（累积全部已加载模板；查不到时回退展示 ID） */
   const templateNameById = templateNames
@@ -431,7 +431,8 @@ export default function PartyDeclarationView() {
       rulesReqRef.current += 1
       // 恢复完整的申报类型列表（清掉上一次输入搜索的结果）
       void loadTemplates()
-      if (page === 1) refresh()
+      if (onHomeSubmit) onHomeSubmit()
+      else if (page === 1) refresh()
       else setPage(1)
     } catch (err) {
       reportError(err)
@@ -443,9 +444,9 @@ export default function PartyDeclarationView() {
   return (
     <div className="party-view">
       <section className="panel-card">
-        <header className="panel-card-header">
+        {!onHomeSubmit && <header className="panel-card-header">
           <h3 className="panel-card-title">{t('partyDeclaration.formTitle')}</h3>
-        </header>
+        </header>}
         <div className="panel-card-body">
           {templatesError ? (
             <ErrorState message={templatesError} onRetry={() => void loadTemplates()} />
@@ -581,7 +582,7 @@ export default function PartyDeclarationView() {
         </div>
       </section>
 
-      <section className="panel-card">
+      {!onHomeSubmit && <section className="panel-card">
         <header className="panel-card-header">
           <h3 className="panel-card-title">{t('partyDeclaration.listTitle')}</h3>
           <CreatedDateFilter value={dateQuery} onChange={setDateQuery} />
@@ -625,7 +626,7 @@ export default function PartyDeclarationView() {
             />
           )}
         </div>
-      </section>
+      </section>}
     </div>
   )
 }

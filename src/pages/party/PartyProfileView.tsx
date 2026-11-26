@@ -56,7 +56,7 @@ import MyWorkplaceField from '../../components/MyWorkplaceField'
  */
 
 /** 我的档案：基本信息 + 党员端扩展信息 */
-function ProfileDescriptions() {
+export function ProfileDescriptions() {
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
   const username = useAuthStore((s) => s.username)
@@ -262,7 +262,7 @@ function ProfileDescriptions() {
             </Button>
           }
         >
-          <Descriptions column={2} bordered size="small">
+          <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
             <Descriptions.Item label={t('profile.name')}>{displayName}</Descriptions.Item>
             <Descriptions.Item label={t('profile.accountName')}>
               {username?.trim() || t('profile.noData')}
@@ -299,7 +299,7 @@ function ProfileDescriptions() {
           disabled={partyProfilesLoading || (!partyProfile && !partyProfileNotFound)}
           onClick={openPartyEdit}>{t('common.edit')}</Button>
       }>
-        <Descriptions column={2} bordered size="small">
+        <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
           <Descriptions.Item label={t('partyProfile.fieldMemberNo')}>
             {partyProfilesLoading
               ? t('common.loading')
@@ -354,7 +354,7 @@ function ProfileDescriptions() {
           <Space orientation="vertical" size={12} style={{ width: '100%' }}>
             {orgs.map((org) => (
               <Card key={org.id} size="small" variant="outlined" style={{ background: 'transparent' }}>
-                <Descriptions column={2} size="small">
+                <Descriptions column={{ xs: 1, sm: 2 }} size="small">
                   <Descriptions.Item label={t('profile.organization')}>
                     {org.organization_name}
                   </Descriptions.Item>
@@ -700,7 +700,8 @@ function ApprovalGuide() {
 }
 
 /** 消息通知列表：分页展示站内通知，点击未读项标记已读 */
-function NotificationsList() {
+export function NotificationsList({ compact = false }: { compact?: boolean } = {}) {
+  const pageSize = compact ? 3 : PARTY_NOTICE_PAGE_SIZE
   const openApproval = useApprovalNoticeNavigation()
   const t = useT()
   const locale = useSettingsStore((s) => s.locale)
@@ -715,7 +716,7 @@ function NotificationsList() {
 
   useEffect(() => {
     let cancelled = false
-    queryNotices({ ...createdDates, page, page_size: PARTY_NOTICE_PAGE_SIZE })
+    queryNotices({ ...createdDates, page, page_size: pageSize })
       .then((res) => {
         if (cancelled) return
         setNotices(res.data)
@@ -734,7 +735,7 @@ function NotificationsList() {
     return () => {
       cancelled = true
     }
-  }, [page, reloadSeq, t, createdDates])
+  }, [page, pageSize, reloadSeq, t, createdDates])
 
   /** 重新加载（事件回调内可安全重置加载态） */
   const retry = () => {
@@ -875,13 +876,15 @@ function NotificationsList() {
       <div className="party-notif-pagination">
         <Pagination
           current={page}
-          pageSize={PARTY_NOTICE_PAGE_SIZE}
+          pageSize={pageSize}
+          hideOnSinglePage={compact}
+          simple={compact ? { readOnly: true } : false}
           total={total}
           showSizeChanger={false}
           showQuickJumper
           showTotal={(n: number) =>
             `${t('common.total')} ${n} ${t('common.items')} · ${t('common.totalPages', {
-              n: Math.max(1, Math.ceil(n / PARTY_NOTICE_PAGE_SIZE)),
+              n: Math.max(1, Math.ceil(n / pageSize)),
             })}`
           }
           onChange={setPage}
@@ -891,9 +894,9 @@ function NotificationsList() {
   )
   }
   return <div>
-    <div style={{ marginBottom: 16 }}><CreatedDateFilter value={createdDates} onChange={(next) => {
+    {!compact && <div style={{ marginBottom: 16 }}><CreatedDateFilter value={createdDates} onChange={(next) => {
       setPage(1); setCreatedDates(next); setError(null); setLoading(true)
-    }} /></div>
+    }} /></div>}
     {renderContent()}
   </div>
 }

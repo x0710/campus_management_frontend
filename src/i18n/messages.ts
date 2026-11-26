@@ -439,6 +439,13 @@ const messages = {
     },
     feedback: {
       title: '意见反馈',
+      inbox: '反馈收件箱',
+      allCategories: '全部分类',
+      results: '{n} 条反馈',
+      sender: '提交人',
+      contact: '联系方式',
+      backToList: '返回列表',
+      emptyInbox: '暂无符合条件的反馈',
       colActions: '操作',
       createdAt: '提交时间',
       updatedAt: '更新时间',
@@ -1639,6 +1646,7 @@ const messages = {
       statBonus: '加分项',
       statDeduction: '减分',
       recentRecords: '近期记录',
+      moreRecords: '查看更多记录',
       recordsEmpty: '暂无成绩申报记录',
     },
     partyDeduction: {
@@ -2309,6 +2317,13 @@ const messages = {
     },
     feedback: {
       title: 'Feedback',
+      inbox: 'Feedback inbox',
+      allCategories: 'All categories',
+      results: '{n} reports',
+      sender: 'Submitted by',
+      contact: 'Contact',
+      backToList: 'Back to list',
+      emptyInbox: 'No matching feedback',
       colActions: 'Actions',
       createdAt: 'Created at',
       updatedAt: 'Updated at',
@@ -3538,6 +3553,7 @@ const messages = {
       statBonus: 'Bonus',
       statDeduction: 'Deduction',
       recentRecords: 'Recent records',
+      moreRecords: 'Show more records',
       recordsEmpty: 'No score declarations yet',
     },
     partyDeduction: {

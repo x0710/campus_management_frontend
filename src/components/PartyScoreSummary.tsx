@@ -3,7 +3,7 @@
 import { Skeleton } from 'antd'
 import { useMemo } from 'react'
 import ErrorState from './ErrorState'
-import { useMyPartyScores } from '../composables/useMyPartyScores'
+import { useMyPartyScores, type MyPartyScoresState } from '../composables/useMyPartyScores'
 import { useT } from '../i18n'
 import { computePartyScoreSummary, getPartyScoreGrade } from '../utils/partyScore'
 import type { PartyScoreGrade } from '../utils/partyScore'
@@ -33,8 +33,12 @@ function formatScoreValue(value: number): string {
  * @returns 类型：Element
  */
 export default function PartyScoreSummary() {
+  const scores = useMyPartyScores()
+  return <PartyScoreSummaryContent {...scores} />
+}
+
+export function PartyScoreSummaryContent({ records, loading, error, refresh }: MyPartyScoresState) {
   const t = useT()
-  const { records, loading, error, refresh } = useMyPartyScores()
   const summary = useMemo(() => computePartyScoreSummary(records), [records])
   const gradeInfo = useMemo(() => getPartyScoreGrade(summary.total), [summary.total])
 

@@ -105,7 +105,7 @@ export default function PartyPersonalDetails({
         <ErrorState message={error} onRetry={() => void load()} />
       ) : <>
         {!profile && <Alert type="info" showIcon title={readOnly ? t('partyProfile.personalDetailsMissingReadOnly') : t('partyProfile.personalDetailsMissing')} style={{ marginBottom: 12 }} />}
-        <Descriptions bordered size="small" column={2}>
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
           {fields.map(([key, label]) => <Descriptions.Item key={key} label={t(`memberDetail.${label}`)}>
             {profile?.[key]?.trim() || '-'}
           </Descriptions.Item>)}
